@@ -3,11 +3,14 @@ export interface Camera {
   name: string;
   location: string;
   type: 'retail' | 'warehouse' | 'parking' | 'conveyor';
+  kind: 'ip' | 'onvif' | 'usb';
   status: 'online' | 'offline';
   fps: number;
   resolution: string;
-  latency: number; // in ms
+  latency: number;
   site: 'Hà Nội' | 'TP.HCM' | 'Bình Dương';
+  username: string;
+  password: string;
 }
 
 export interface Detection {
@@ -25,7 +28,7 @@ export interface CountingZone {
   id: string;
   name: string;
   type: 'zone' | 'line';
-  points: { x: number; y: number }[]; // simple visual coordinates (0-100 scale)
+  points: { x: number; y: number }[];
   lineStart?: { x: number; y: number };
   lineEnd?: { x: number; y: number };
   count: number;
@@ -38,9 +41,8 @@ export interface Pipeline {
   id: string;
   name: string;
   cameraId: string;
-  modelId: string;
-  detectorName: string; // "YOLO-NAS" or "LocateAnything"
-  searchQuery?: string; // For LocateAnything custom prompts
+  detectorName: string;
+  searchQuery?: string;
   countingZones: CountingZone[];
   alertChannels: {
     zalo: boolean;
@@ -48,6 +50,8 @@ export interface Pipeline {
     telegram: boolean;
     webhook: boolean;
   };
+  scheduleStart?: string;
+  scheduleEnd?: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -72,9 +76,9 @@ export interface AlertRule {
   cameraId: string;
   pipelineId?: string;
   isActive: boolean;
-  targetObject: string; // e.g. "Nhân viên", "Xe nâng", "Hộp carton"
-  condition: string;    // e.g. "Vào vùng cấm", "Vượt vạch", "Không đồ bảo hộ"
-  action: string;       // e.g. "Gửi cảnh báo Khẩn cấp", "Kích hoạt còi", "Gửi Email"
+  targetObject: string;
+  condition: string;
+  action: string;
   severity: 'info' | 'warning' | 'error' | 'critical';
   createdAt: string;
 }
@@ -85,15 +89,6 @@ export interface LogEntry {
   cameraId: string;
   message: string;
   type: 'info' | 'success' | 'warning' | 'error';
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'operator' | 'viewer';
-  status: 'active' | 'inactive';
-  lastLogin: string;
 }
 
 export interface StorageConfig {

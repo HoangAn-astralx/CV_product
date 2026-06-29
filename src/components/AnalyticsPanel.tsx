@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { VISITOR_CHART_DATA, ALERT_CHART_DATA, OBJECT_CHART_DATA, OBJECT_PROPORTION_DATA, WAREHOUSE_CHART_DATA, WAREHOUSE_PROPORTION, VISITOR_RATIO, RETAIL_ALERTS, WAREHOUSE_ALERTS } from '../mockData';
+import { VISITOR_CHART_DATA, ALERT_CHART_DATA, OBJECT_CHART_DATA, OBJECT_PROPORTION_DATA, WAREHOUSE_CHART_DATA, WAREHOUSE_PROPORTION, VISITOR_RATIO } from '../mockData';
 import { AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { Calendar, FileDown, TrendingUp, List, AlertTriangle, Info, BellRing, Activity, Users, Package, Car } from 'lucide-react';
+import { Calendar, FileDown, Users, Package, Car, Sparkles, Send } from 'lucide-react';
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -25,41 +25,31 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const AlertsList = ({ alerts }: { alerts: any[] }) => {
-  return (
-    <div className="flex flex-col gap-2.5 max-h-[400px] overflow-y-auto pr-1">
-      {alerts.map((alert, i) => (
-        <div key={i} className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs transition-colors ${
-          alert.type === 'danger' ? 'bg-red-50/80 border-red-100 hover:bg-red-100 text-red-900' :
-          alert.type === 'warning' ? 'bg-amber-50/80 border-amber-100 hover:bg-amber-100 text-amber-900' :
-          'bg-blue-50/80 border-blue-100 hover:bg-blue-100 text-blue-900'
-        }`}>
-          <div className="mt-0.5 flex-shrink-0">
-            {alert.type === 'danger' ? <AlertTriangle size={16} className="text-red-500" /> :
-             alert.type === 'warning' ? <AlertTriangle size={16} className="text-amber-500" /> :
-             <Info size={16} className="text-blue-500" />}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold leading-relaxed">{alert.message}</p>
-            <p className={`text-[10px] mt-1.5 font-bold flex items-center gap-1 ${
-              alert.type === 'danger' ? 'text-red-600' : alert.type === 'warning' ? 'text-amber-600' : 'text-blue-600'
-            }`}>
-              <Clock size={10} /> {alert.time}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const Clock = ({ size }: { size: number }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-);
-
 export default function AnalyticsPanel() {
   const [selectedRange, setSelectedRange] = useState<'today' | 'week'>('today');
   const [activeMetric, setActiveMetric] = useState<'visitors' | 'warehouse' | 'parking'>('visitors');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2000);
+  };
+
+  const handleAiSend = (prompt: string) => {
+    if (!prompt.trim()) return;
+    const lower = prompt.toLowerCase();
+    let target: 'visitors' | 'warehouse' | 'parking' = 'visitors';
+    if (lower.includes('kho') || lower.includes('hộp') || lower.includes('xe nâng') || lower.includes('kiểm kê') || lower.includes('an toàn') || lower.includes('bảo hộ')) {
+      target = 'warehouse';
+    } else if (lower.includes('bãi') || lower.includes('xe') || lower.includes('ô tô') || lower.includes('đỗ') || lower.includes('biển số') || lower.includes('phương tiện')) {
+      target = 'parking';
+    }
+    const labels = { visitors: 'Cửa hàng Bán lẻ', warehouse: 'Kho hàng & Nhà máy', parking: 'Bãi đỗ xe' };
+    setActiveMetric(target);
+    setAiPrompt('');
+    showToast(`✓ Đã chuyển sang biểu đồ: ${labels[target]}`);
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="analytics-panel-section">
@@ -68,20 +58,20 @@ export default function AnalyticsPanel() {
         {/* Date / Filter Selector */}
         <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm space-y-4">
           <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-            <Calendar size={16} className="text-indigo-600" />
+            <Calendar size={16} className="text-emerald-600" />
             Bộ lọc thời gian
           </h3>
           
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setSelectedRange('today')}
-              className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${selectedRange === 'today' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-600/10' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+              className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${selectedRange === 'today' ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-600/10' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
             >
               Hôm nay
             </button>
             <button
               onClick={() => setSelectedRange('week')}
-              className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${selectedRange === 'week' ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+              className={`py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${selectedRange === 'week' ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
             >
               7 ngày qua
             </button>
@@ -94,9 +84,9 @@ export default function AnalyticsPanel() {
           
           <div
             onClick={() => setActiveMetric('visitors')}
-            className={`border rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 flex items-center gap-3 ${activeMetric === 'visitors' ? 'border-indigo-600 bg-indigo-50/20 shadow-sm' : 'border-slate-100 hover:bg-slate-50/50'}`}
+            className={`border rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 flex items-center gap-3 ${activeMetric === 'visitors' ? 'border-emerald-600 bg-emerald-50/20 shadow-sm' : 'border-slate-100 hover:bg-slate-50/50'}`}
           >
-            <Users size={16} className={activeMetric === 'visitors' ? 'text-indigo-600' : 'text-slate-400'} />
+            <Users size={16} className={activeMetric === 'visitors' ? 'text-emerald-600' : 'text-slate-400'} />
             <div>
               <h4 className="font-bold text-xs text-slate-800">Cửa hàng Bán lẻ</h4>
               <p className="text-[9px] text-slate-500">Phân tích hành vi & đếm người</p>
@@ -105,9 +95,9 @@ export default function AnalyticsPanel() {
 
           <div
             onClick={() => setActiveMetric('warehouse')}
-            className={`border rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 flex items-center gap-3 ${activeMetric === 'warehouse' ? 'border-indigo-600 bg-indigo-50/20 shadow-sm' : 'border-slate-100 hover:bg-slate-50/50'}`}
+            className={`border rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 flex items-center gap-3 ${activeMetric === 'warehouse' ? 'border-emerald-600 bg-emerald-50/20 shadow-sm' : 'border-slate-100 hover:bg-slate-50/50'}`}
           >
-            <Package size={16} className={activeMetric === 'warehouse' ? 'text-indigo-600' : 'text-slate-400'} />
+            <Package size={16} className={activeMetric === 'warehouse' ? 'text-emerald-600' : 'text-slate-400'} />
             <div>
               <h4 className="font-bold text-xs text-slate-800">Kho hàng & Nhà máy</h4>
               <p className="text-[9px] text-slate-500">Giám sát xe nâng, đếm hộp</p>
@@ -116,33 +106,13 @@ export default function AnalyticsPanel() {
 
           <div
             onClick={() => setActiveMetric('parking')}
-            className={`border rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 flex items-center gap-3 ${activeMetric === 'parking' ? 'border-indigo-600 bg-indigo-50/20 shadow-sm' : 'border-slate-100 hover:bg-slate-50/50'}`}
+            className={`border rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 flex items-center gap-3 ${activeMetric === 'parking' ? 'border-emerald-600 bg-emerald-50/20 shadow-sm' : 'border-slate-100 hover:bg-slate-50/50'}`}
           >
-            <Car size={16} className={activeMetric === 'parking' ? 'text-indigo-600' : 'text-slate-400'} />
+            <Car size={16} className={activeMetric === 'parking' ? 'text-emerald-600' : 'text-slate-400'} />
             <div>
               <h4 className="font-bold text-xs text-slate-800">Bãi đỗ xe thông minh</h4>
               <p className="text-[9px] text-slate-500">Phân loại xe & đỗ sai quy định</p>
             </div>
-          </div>
-        </div>
-
-        {/* Insight Quick Summary Box */}
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl p-5 flex flex-col justify-between shadow-lg shadow-indigo-500/20">
-          <div>
-            <div className="flex items-center gap-1 bg-white/20 text-white px-2 py-0.5 rounded-full text-[9px] font-bold w-fit mb-3 backdrop-blur-sm">
-              <TrendingUp size={10} />
-              <span>AI Insight ({activeMetric === 'visitors' ? 'Cửa hàng' : activeMetric === 'warehouse' ? 'Kho' : 'Bãi xe'})</span>
-            </div>
-            <h4 className="font-black text-sm">
-              {activeMetric === 'visitors' ? 'Xu hướng tăng đột biến!' : activeMetric === 'warehouse' ? 'Tuân thủ an toàn tốt!' : 'Lưu lượng xe tải tăng!'}
-            </h4>
-            <p className="text-[11px] text-indigo-100 mt-2 leading-relaxed">
-              {activeMetric === 'visitors' 
-                ? 'Lưu lượng người tăng mạnh vào khung giờ 16:00 - 18:00. Khuyến nghị tăng cường nhân sự hỗ trợ.'
-                : activeMetric === 'warehouse' 
-                ? 'Trong tuần qua không phát hiện vi phạm khu vực cấm xe nâng. Tốc độ kiểm kho hộp vàng đạt 150 hộp/ngày.'
-                : 'Lượng xe tải ra vào khu vực bốc dỡ tăng 20% so với hôm qua. Cần chú ý điều phối luồng xe tránh ùn tắc.'}
-            </p>
           </div>
         </div>
       </div>
@@ -170,6 +140,52 @@ export default function AnalyticsPanel() {
             >
               <FileDown size={14} /> Xuất Excel
             </button>
+          </div>
+        </div>
+
+        {/* AI Prompt Bar */}
+        <div className="px-6 py-4 border-b border-slate-100 bg-white">
+          <div className="flex flex-col gap-3 max-w-4xl">
+            <h4 className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+              <Sparkles size={16} className="text-emerald-600" />
+              Tạo biểu đồ bằng AI
+            </h4>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAiSend(aiPrompt)}
+                placeholder="Ví dụ: Vẽ biểu đồ tròn thể hiện tỷ lệ xe máy và ô tô hôm qua..." 
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-shadow"
+              />
+              <button
+                onClick={() => handleAiSend(aiPrompt)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white p-2.5 rounded-xl transition-colors shadow-md cursor-pointer flex items-center justify-center"
+              >
+                <Send size={18} />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleAiSend('Lưu lượng khách tuần này')}
+                className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-100 transition-colors cursor-pointer border border-emerald-100"
+              >
+                Lưu lượng khách tuần này
+              </button>
+              <button
+                onClick={() => handleAiSend('So sánh vi phạm an toàn')}
+                className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-100 transition-colors cursor-pointer border border-emerald-100"
+              >
+                So sánh vi phạm an toàn
+              </button>
+              <button
+                onClick={() => handleAiSend('Hiệu suất nhận diện biển số')}
+                className="text-[11px] bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-bold hover:bg-emerald-100 transition-colors cursor-pointer border border-emerald-100"
+              >
+                Hiệu suất nhận diện biển số
+              </button>
+            </div>
           </div>
         </div>
 
@@ -320,19 +336,14 @@ export default function AnalyticsPanel() {
             </div>
 
           </div>
-          
-          {/* Alerts List Bottom */}
-          <div className="mt-6 bg-white border border-slate-100 rounded-2xl p-5 shadow-xs flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                <BellRing size={16} className="text-rose-500" />
-                Danh sách Alert gần đây ({activeMetric === 'visitors' ? 'Cửa hàng' : activeMetric === 'warehouse' ? 'Kho hàng' : 'Bãi xe'})
-              </h3>
-            </div>
-            <AlertsList alerts={activeMetric === 'warehouse' ? WAREHOUSE_ALERTS : RETAIL_ALERTS} />
-          </div>
         </div>
       </div>
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 bg-emerald-600 text-white text-xs font-medium px-4 py-2.5 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-bounce">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

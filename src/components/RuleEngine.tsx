@@ -6,7 +6,6 @@ interface RuleEngineProps {
   cameras: Camera[];
   rules: AlertRule[];
   setRules: Dispatch<SetStateAction<AlertRule[]>>;
-  role: 'admin' | 'operator' | 'viewer';
   onComplete?: () => void;
 }
 
@@ -14,12 +13,10 @@ export default function RuleEngine({
   cameras,
   rules,
   setRules,
-  role
 }: RuleEngineProps) {
   const [viewState, setViewState] = useState<'list' | 'create'>('list');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Form states
   const [ruleName, setRuleName] = useState('');
   const [selectedCameraId, setSelectedCameraId] = useState(cameras[0]?.id || '');
   const [targetObject, setTargetObject] = useState('Nhân viên');
@@ -30,18 +27,10 @@ export default function RuleEngine({
   const filteredRules = rules.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()) || r.targetObject.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const toggleRule = (ruleId: string) => {
-    if (role === 'viewer') {
-      alert('🔒 Bạn không có quyền bật/tắt Rule với vai trò Viewer.');
-      return;
-    }
     setRules(prev => prev.map(r => r.id === ruleId ? { ...r, isActive: !r.isActive } : r));
   };
 
   const deleteRule = (ruleId: string) => {
-    if (role === 'viewer') {
-      alert('🔒 Bạn không có quyền xóa Rule với vai trò Viewer.');
-      return;
-    }
     if (confirm('Xác nhận xóa quy tắc cảnh báo này?')) {
       setRules(prev => prev.filter(r => r.id !== ruleId));
     }
@@ -52,7 +41,7 @@ export default function RuleEngine({
       alert('Vui lòng nhập tên quy tắc!');
       return;
     }
-    
+
     const newRule: AlertRule = {
       id: `rule-${Date.now()}`,
       name: ruleName,
@@ -66,8 +55,7 @@ export default function RuleEngine({
     };
 
     setRules(prev => [newRule, ...prev]);
-    
-    // Reset form
+
     setRuleName('');
     setViewState('list');
   };
@@ -94,26 +82,23 @@ export default function RuleEngine({
 
   return (
     <div className="flex h-[calc(100vh-64px)] bg-slate-50 overflow-hidden">
-      {/* Left Sidebar - Rules List */}
       <div className={`${viewState === 'create' ? 'hidden md:flex w-1/3' : 'w-full md:w-1/3 lg:w-1/4'} bg-white border-r border-slate-200 flex flex-col`}>
         <div className="p-4 border-b border-slate-100 flex-shrink-0">
           <div className="flex justify-between items-center mb-4">
             <div>
               <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                <ShieldAlert size={18} className="text-indigo-600" />
+                <ShieldAlert size={18} className="text-emerald-600" />
                 Rule Cảnh Báo
               </h2>
               <p className="text-xs text-slate-500 mt-1">Quản lý các quy tắc phát sinh cảnh báo</p>
             </div>
-            {role !== 'viewer' && (
-              <button
-                onClick={() => setViewState('create')}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition-colors"
-                title="Tạo quy tắc mới"
-              >
-                <Plus size={18} />
-              </button>
-            )}
+            <button
+              onClick={() => setViewState('create')}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded-lg transition-colors"
+              title="Tạo quy tắc mới"
+            >
+              <Plus size={18} />
+            </button>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
@@ -122,7 +107,7 @@ export default function RuleEngine({
               placeholder="Tìm kiếm rule..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 text-sm rounded-lg pl-9 pr-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full bg-slate-50 border border-slate-200 text-sm rounded-lg pl-9 pr-3 py-2 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
             />
           </div>
         </div>
@@ -136,11 +121,11 @@ export default function RuleEngine({
             filteredRules.map(rule => {
               const cam = cameras.find(c => c.id === rule.cameraId);
               return (
-                <div key={rule.id} className="bg-white border border-slate-200 rounded-xl p-3 hover:border-indigo-300 transition-all group">
+                <div key={rule.id} className="bg-white border border-slate-200 rounded-xl p-3 hover:border-emerald-300 transition-all group">
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-bold text-sm text-slate-800 line-clamp-1 pr-2">{rule.name}</h3>
-                    <button onClick={() => toggleRule(rule.id)} className="text-slate-400 hover:text-indigo-600 transition-colors">
-                      {rule.isActive ? <ToggleRight size={24} className="text-indigo-600" /> : <ToggleLeft size={24} />}
+                    <button onClick={() => toggleRule(rule.id)} className="text-slate-400 hover:text-emerald-600 transition-colors">
+                      {rule.isActive ? <ToggleRight size={24} className="text-emerald-600" /> : <ToggleLeft size={24} />}
                     </button>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
@@ -150,19 +135,17 @@ export default function RuleEngine({
                   <div className={`text-[10px] px-2 py-1 inline-flex rounded-md border font-semibold ${getSeverityColor(rule.severity)}`}>
                     {getSeverityLabel(rule.severity)}
                   </div>
-                  
+
                   <div className="mt-3 flex justify-between items-center">
                     <div className="text-[10px] text-slate-400">
                       If: <span className="text-slate-600 font-medium">{rule.targetObject}</span>
                     </div>
-                    {role !== 'viewer' && (
-                      <button 
-                        onClick={() => deleteRule(rule.id)}
-                        className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => deleteRule(rule.id)}
+                      className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               );
@@ -171,31 +154,28 @@ export default function RuleEngine({
         </div>
       </div>
 
-      {/* Right Area - Rule Builder */}
       <div className={`${viewState === 'list' ? 'hidden md:flex flex-1' : 'w-full md:flex-1'} bg-slate-50/50 flex flex-col`}>
         {viewState === 'list' ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 text-center">
-            <div className="w-20 h-20 bg-indigo-50 text-indigo-300 rounded-full flex items-center justify-center mb-6">
+            <div className="w-20 h-20 bg-emerald-50 text-emerald-300 rounded-full flex items-center justify-center mb-6">
               <ShieldAlert size={40} />
             </div>
             <h3 className="text-lg font-bold text-slate-700 mb-2">Hệ thống Rule Cảnh Báo</h3>
             <p className="text-sm max-w-md">
               Thiết lập các quy tắc "Nếu - Thì" (If-This-Then-That) để hệ thống tự động phát hiện và gửi cảnh báo khi có sự cố xảy ra.
             </p>
-            {role !== 'viewer' && (
-              <button 
-                onClick={() => setViewState('create')}
-                className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-sm shadow-indigo-600/30 cursor-pointer"
-              >
-                <Plus size={16} />
-                Tạo Rule Mới
-              </button>
-            )}
+            <button
+              onClick={() => setViewState('create')}
+              className="mt-6 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-sm shadow-emerald-600/30 cursor-pointer"
+            >
+              <Plus size={16} />
+              Tạo Rule Mới
+            </button>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 md:p-8">
             <div className="max-w-2xl mx-auto">
-              <button 
+              <button
                 onClick={() => setViewState('list')}
                 className="md:hidden mb-4 flex items-center gap-1.5 text-slate-500 text-sm hover:text-slate-800"
               >
@@ -203,33 +183,32 @@ export default function RuleEngine({
               </button>
 
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-gradient-to-r from-slate-900 to-indigo-900 p-6 text-white">
+                <div className="bg-gradient-to-r from-slate-900 to-emerald-900 p-6 text-white">
                   <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
-                    <Plus className="text-indigo-400" />
+                    <Plus className="text-emerald-400" />
                     Thiết lập Rule mới
                   </h2>
                   <p className="text-slate-300 text-sm">Định nghĩa logic cảnh báo tùy chỉnh</p>
                 </div>
 
                 <div className="p-6 space-y-6">
-                  {/* Basic Info */}
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Tên quy tắc</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={ruleName}
                       onChange={e => setRuleName(e.target.value)}
                       placeholder="VD: Báo động người lạ vào kho"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Áp dụng cho Camera</label>
-                    <select 
+                    <select
                       value={selectedCameraId}
                       onChange={e => setSelectedCameraId(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
                     >
                       {cameras.map(c => (
                         <option key={c.id} value={c.id}>{c.name} - {c.site}</option>
@@ -239,14 +218,13 @@ export default function RuleEngine({
 
                   <div className="h-px bg-slate-100" />
 
-                  {/* Logic Configuration */}
                   <h3 className="font-bold text-slate-800">Logic Cảnh Báo (If - Then)</h3>
-                  
+
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
                     <div className="flex gap-4 items-center">
                       <div className="w-16 text-right font-bold text-slate-400 text-sm">NẾU</div>
                       <div className="flex-1">
-                        <select 
+                        <select
                           value={targetObject}
                           onChange={e => setTargetObject(e.target.value)}
                           className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none"
@@ -264,7 +242,7 @@ export default function RuleEngine({
                     <div className="flex gap-4 items-center">
                       <div className="w-16 text-right font-bold text-slate-400 text-sm">MÀ</div>
                       <div className="flex-1">
-                        <input 
+                        <input
                           type="text"
                           value={condition}
                           onChange={e => setCondition(e.target.value)}
@@ -275,9 +253,9 @@ export default function RuleEngine({
                     </div>
 
                     <div className="flex gap-4 items-center">
-                      <div className="w-16 text-right font-bold text-indigo-500 text-sm">THÌ</div>
+                      <div className="w-16 text-right font-bold text-emerald-500 text-sm">THÌ</div>
                       <div className="flex-1">
-                        <select 
+                        <select
                           value={action}
                           onChange={e => setAction(e.target.value)}
                           className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none"
@@ -292,7 +270,6 @@ export default function RuleEngine({
                     </div>
                   </div>
 
-                  {/* Severity */}
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2">Mức độ nghiêm trọng</label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -306,7 +283,7 @@ export default function RuleEngine({
                           key={sev.id}
                           onClick={() => setSeverity(sev.id as any)}
                           className={`py-2 px-3 text-xs font-bold rounded-lg border transition-all ${
-                            severity === sev.id 
+                            severity === sev.id
                               ? getSeverityColor(sev.id) + ' shadow-sm ring-1 ring-offset-1 ' + (sev.id === 'critical' ? 'ring-rose-500' : sev.id === 'error' ? 'ring-orange-500' : sev.id === 'warning' ? 'ring-amber-500' : 'ring-blue-500')
                               : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                           }`}
@@ -318,17 +295,17 @@ export default function RuleEngine({
                   </div>
 
                 </div>
-                
+
                 <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-end gap-3">
-                  <button 
+                  <button
                     onClick={() => setViewState('list')}
                     className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
                   >
                     Hủy bỏ
                   </button>
-                  <button 
+                  <button
                     onClick={handleSaveRule}
-                    className="px-5 py-2.5 text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                    className="px-5 py-2.5 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-2"
                   >
                     <Check size={16} /> Lưu Quy Tắc
                   </button>
