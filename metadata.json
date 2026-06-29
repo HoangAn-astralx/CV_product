@@ -1,0 +1,6 @@
+{
+  "name": "VisionOS Demo",
+  "description": "Giao diện demo trực quan, tối giản và thân thiện cho nền tảng Computer Vision tự cấu hình (VisionOS), giúp người dùng không chuyên dễ dàng làm quen với giám sát camera thông minh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

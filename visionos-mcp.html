@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionOS MCP</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-size: 14px; line-height: 1.7;
+  color: #1a1a2e; background: #f8f9fc;
+}
+
+.tab-bar {
+  position: sticky; top: 0; z-index: 200;
+  background: #0f1218;
+  border-bottom: 1px solid #252d3d;
+  display: flex; align-items: center; height: 52px;
+}
+.tab-btn {
+  height: 100%; padding: 0 28px; border: none; background: none;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  color: #8a96a8; cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all .15s; white-space: nowrap; flex-shrink: 0;
+}
+.tab-btn:hover { color: #eef2f8; }
+.tab-btn.active { color: #00c2ff; border-bottom-color: #00c2ff; font-weight: 600; }
+.tab-panel { display: none !important; }
+.tab-panel.active { display: block !important; }
+
+/* ── Tab 1: Tính năng ── */
+#tab-features .header{
+  background: #0f1218; color: #eef2f8;
+  padding: 40px 60px 32px; border-bottom: 3px solid #00c2ff;
+}
+#tab-features .header-top{ display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+#tab-features .product-name{ font-size:24px; font-weight:700; letter-spacing:-0.02em; }
+#tab-features .header-desc{ font-size:14px; color:#8a96a8; max-width:720px; line-height:1.8; }
+#tab-features .header-desc b{ color:#00c2ff; font-weight:600; }
+#tab-features .meta-row{ display:flex; gap:24px; margin-top:16px; padding-top:14px; border-top:1px solid #252d3d; font-size:12px; color:#515e72; flex-wrap:wrap; }
+#tab-features .meta-row span{ color:#00c2ff; }
+
+#tab-features .toc{ background:#fff; border:1px solid #e2e6ef; border-radius:10px; padding:18px 28px; margin:28px 60px; display:flex; gap:48px; flex-wrap:wrap; }
+#tab-features .toc-col{ min-width:200px; }
+#tab-features .toc-title{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#8a96a8; margin-bottom:8px; }
+#tab-features .toc a{ display:block; font-size:13px; color:#3a7bd5; text-decoration:none; margin-bottom:4px; }
+#tab-features .toc a:hover{ text-decoration:underline; }
+
+#tab-features .content{ padding:0 60px 60px; }
+#tab-features .feat-group{ margin-bottom:40px; }
+#tab-features .feat-group-header{ display:flex; align-items:center; gap:12px; margin-bottom:6px; padding-bottom:12px; border-bottom:2px solid #e2e6ef; }
+#tab-features .fgi{ width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+#tab-features .fgn{ font-size:18px; font-weight:700; color:#0f1218; }
+#tab-features .fgd{ font-size:13px; color:#8a96a8; margin-top:2px; }
+
+
+#tab-features table.ft{ width:100%; border-collapse:collapse; font-size:13px; margin-top:12px; }
+#tab-features table.ft thead th{ text-align:left; padding:9px 12px; background:#f4f6fb; border:1px solid #e2e6ef; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#8a96a8; }
+#tab-features table.ft tbody td{ padding:11px 12px; border:1px solid #e8ebf4; vertical-align:top; color:#333; line-height:1.65; }
+#tab-features table.ft tbody tr:nth-child(even) td{ background:#fafbfd; }
+#tab-features table.ft tbody tr:hover td{ background:#f0f4ff; }
+#tab-features .fn{ font-weight:600; color:#0f1218; white-space:nowrap; }
+#tab-features .fnote{ font-size:12px; color:#888; }
+#tab-features .fnote code{ font-family:monospace; font-size:11px; background:#f0f0f0; padding:1px 4px; border-radius:3px; color:#555; }
+#tab-features .note{ padding:10px 14px; border-radius:7px; font-size:13px; line-height:1.6; margin:12px 0; }
+#tab-features .note-info{ background:#e8f4ff; border-left:3px solid #3a7bd5; color:#1a3d6e; }
+
+/* ── Tab 2: Kiến trúc ── */
+#tab-arch *{box-sizing:border-box;margin:0;padding:0}
+#tab-arch body{font-family:'Inter','Segoe UI',sans-serif;font-size:14px;line-height:1.75;color:#1a1a2e;background:#f8f9fc}
+#tab-arch .cover{background:#0f1218;color:#eef2f8;padding:56px 72px 48px;border-bottom:4px solid #00c2ff}
+#tab-arch .cover-tag{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#515e72;margin-bottom:16px}
+#tab-arch .cover-title{font-size:36px;font-weight:800;letter-spacing:-0.02em;margin-bottom:8px;line-height:1.2}
+#tab-arch .cover-title span{color:#00c2ff}
+#tab-arch .cover-sub{font-size:16px;color:#8a96a8;margin-bottom:32px}
+#tab-arch .cover-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:36px}
+#tab-arch .cover-block{background:#161b24;border:1px solid #252d3d;border-radius:10px;padding:16px 20px}
+#tab-arch .cover-block-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#515e72;margin-bottom:6px}
+#tab-arch .cover-block-val{font-size:13px;color:#8a96a8;line-height:1.8}
+#tab-arch .cover-block-val b{color:#00c2ff;font-weight:600}
+#tab-arch .cover-meta{display:flex;gap:32px;border-top:1px solid #252d3d;padding-top:20px;font-size:12px;color:#515e72}
+#tab-arch .cover-meta span{color:#00c2ff}
+
+#tab-arch .toc{background:#fff;border:1px solid #e2e6ef;border-radius:10px;padding:24px 32px;margin:28px 72px}
+#tab-arch .toc h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8a96a8;margin-bottom:14px}
+#tab-arch .toc-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 40px}
+#tab-arch .toc a{display:flex;align-items:baseline;gap:6px;font-size:13px;color:#3a7bd5;text-decoration:none;padding:3px 0;border-bottom:1px dashed #f0f0f0}
+#tab-arch .toc a:hover{color:#0f1218}
+#tab-arch .toc-num{font-size:11px;color:#8a96a8;min-width:28px}
+
+#tab-arch .content{padding:0 72px 72px}
+#tab-arch .section{margin-bottom:52px}
+#tab-arch .section-header{display:flex;align-items:center;gap:14px;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #e2e6ef}
+#tab-arch .snum{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0}
+#tab-arch .stitle{font-size:22px;font-weight:700;color:#0f1218}
+#tab-arch .ssub{font-size:13px;color:#8a96a8;margin-top:2px}
+#tab-arch .subsection{margin-bottom:28px}
+#tab-arch .sub-h{font-size:16px;font-weight:700;color:#0f1218;margin-bottom:10px;padding-left:12px;border-left:3px solid #00c2ff}
+#tab-arch .sub-h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#8a96a8;margin:16px 0 8px}
+#tab-arch .card{background:#fff;border:1px solid #e2e6ef;border-radius:10px;padding:18px 22px;margin-bottom:14px}
+#tab-arch .card-title{font-size:14px;font-weight:600;color:#0f1218;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+#tab-arch .io-grid{display:grid;grid-template-columns:1fr 60px 1fr;gap:0;margin-bottom:18px;align-items:stretch}
+#tab-arch .io-box{background:#fff;border:1px solid #e2e6ef;border-radius:10px;padding:16px 18px}
+#tab-arch .io-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+#tab-arch .io-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:13px;color:#333}
+#tab-arch .io-item:last-child{margin-bottom:0}
+#tab-arch .io-dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0}
+#tab-arch .io-arrow{display:flex;align-items:center;justify-content:center;font-size:22px;color:#8a96a8}
+#tab-arch table.t{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px}
+#tab-arch table.t thead th{text-align:left;padding:8px 12px;background:#f4f6fb;border:1px solid #e2e6ef;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8a96a8}
+#tab-arch table.t tbody td{padding:10px 12px;border:1px solid #e8ebf4;vertical-align:top;color:#333;line-height:1.6}
+#tab-arch table.t tbody tr:nth-child(even) td{background:#fafbfd}
+#tab-arch table.t tbody tr:hover td{background:#f0f4ff}
+#tab-arch .tn{font-weight:600;color:#0f1218}
+#tab-arch .tnote{font-size:12px;color:#888;font-style:italic}
+#tab-arch .tnote code{font-family:monospace;font-size:11px;background:#f0f0f0;padding:1px 4px;border-radius:3px;color:#555;font-style:normal}
+#tab-arch .code-block{background:#0f1218;border-radius:8px;padding:16px 18px;margin:10px 0;font-family:'Courier New',monospace;font-size:12px;line-height:1.8;color:#eef2f8;overflow-x:auto;white-space:pre}
+#tab-arch .arch-diagram{display:flex;flex-direction:column;gap:0;margin:14px 0}
+#tab-arch .arch-row{display:flex;align-items:stretch;gap:0}
+#tab-arch .arch-layer{flex:1;background:#f4f6fb;border:1px solid #e2e6ef;border-radius:8px;padding:12px 16px;margin:4px}
+#tab-arch .arch-layer-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+#tab-arch .arch-nodes{display:flex;gap:8px;flex-wrap:wrap}
+#tab-arch .arch-node{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid transparent; color:#fff}
+#tab-arch .arch-connector{display:flex;align-items:center;justify-content:center;font-size:18px;color:#8a96a8;padding:0 4px}
+#tab-arch .flow-steps{display:flex;flex-direction:column;gap:0}
+#tab-arch .flow-step{display:flex;gap:0;align-items:stretch}
+#tab-arch .flow-step-left{display:flex;flex-direction:column;align-items:center;width:44px;flex-shrink:0}
+#tab-arch .flow-circle{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+#tab-arch .flow-line{width:2px;flex:1;min-height:12px;margin:4px 0}
+#tab-arch .flow-step-content{padding:4px 0 16px 14px;flex:1}
+#tab-arch .flow-step-title{font-size:14px;font-weight:600;color:#0f1218;margin-bottom:4px}
+#tab-arch .flow-step-desc{font-size:13px;color:#555;line-height:1.65}
+#tab-arch .note{padding:10px 14px;border-radius:7px;font-size:13px;line-height:1.6;margin:10px 0}
+#tab-arch .note-info{background:#e8f4ff;border-left:3px solid #3a7bd5;color:#1a3d6e}
+#tab-arch .note-warn{background:#fff8e6;border-left:3px solid #ffb830;color:#6b4d00}
+#tab-arch .note-ok{background:#e3faf2;border-left:3px solid #00a86b;color:#0a3d22}
+#tab-arch .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;margin-left:4px}
+#tab-arch .tag-green{background:#e3faf2;color:#0a7a50}
+#tab-arch .tag-blue{background:#e6f4ff;color:#005fa3}
+#tab-arch .tag-red{background:#fce8eb;color:#b91c1c}
+#tab-arch .tag-amber{background:#fff8e6;color:#92620a}
+#tab-arch .tag-purple{background:#f0eaff;color:#5b21b6}
+#tab-arch .prob-card{background:#fff;border:1px solid #e2e6ef;border-radius:10px;overflow:hidden;margin-bottom:20px}
+#tab-arch .prob-header{padding:14px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #e2e6ef}
+#tab-arch .prob-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+#tab-arch .prob-title{font-size:15px;font-weight:700;color:#0f1218}
+#tab-arch .prob-level{margin-left:auto;font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px}
+#tab-arch .prob-body{padding:16px 20px}
+#tab-arch .prob-body p{font-size:13px;color:#444;margin-bottom:12px;line-height:1.7}
+#tab-arch .quant-bar{height:8px;border-radius:4px;margin-top:4px}
+#tab-arch .specs-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:12px 0}
+#tab-arch .spec-card{background:#fff;border:1px solid #e2e6ef;border-radius:8px;padding:14px 16px}
+#tab-arch .spec-card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8a96a8;margin-bottom:6px}
+#tab-arch .spec-card-val{font-size:13px;color:#333;line-height:1.7}
+#tab-arch footer{margin-top:60px;padding:20px 72px;background:#f4f6fb;border-top:1px solid #e2e6ef;font-size:12px;color:#8a96a8;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+</style>
+</head>
+<body>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('tab-features', this)">Mô tả tính năng chi tiết</button>
+  <button class="tab-btn" onclick="switchTab('tab-arch', this)">Kiến trúc &amp; Kỹ thuật</button>
+</div>
+
+<!-- ════════════════════ TAB 1: TÍNH NĂNG ════════════════════ -->
+<div id="tab-features" class="tab-panel active">
+<div class="header">
+  <div class="header-top">
+    <span class="product-name">VisionOS MCP</span>
+  </div>
+  <div class="header-desc">
+    Danh mục tính năng của phiên bản <b>MCP</b> — nền tảng Computer Vision
+    chạy trên desktop, hỗ trợ CPU & GPU. Người dùng non-tech tự cấu hình pipeline AI bằng cách
+    mô tả bài toán, không cần chọn model. Xây dựng trên <b>Supervision</b>, <b>YOLO-NAS</b> và <b>LocateAnything</b>.
+  </div>
+  <div class="meta-row">
+    <span>Desktop App</span> · Tauri + React · Python Sidecar ·
+    <span>CPU</span> YOLOv8n ONNX INT8 10–30fps ·
+    <span>GPU</span> YOLOv8s TensorRT 60–120fps
+  </div>
+</div>
+
+<div class="toc">
+  <div class="toc-col">
+    <div class="toc-title">Nhóm tính năng</div>
+    <a href="#f-camera">1. Quản lý camera</a>
+    <a href="#f-pipeline">2. AI Pipeline</a>
+    <a href="#f-detection">3. AI Detection</a>
+    <a href="#f-counting">4. Counting</a>
+  </div>
+  <div class="toc-col">
+    <div class="toc-title">&nbsp;</div>
+    <a href="#f-alert">5. Alert</a>
+    <a href="#f-dashboard">6. Dashboard</a>
+    <a href="#f-admin">7. Quản trị</a>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- 1. Quản lý camera -->
+<div class="feat-group" id="f-camera">
+  <div class="feat-group-header">
+    <div class="fgi" style="background:#e8f4ff"></div>
+    <div><div class="fgn">1. Quản lý camera</div><div class="fgd">Kết nối và giám sát nguồn video từ nhiều camera IP</div></div>
+  </div>
+  <table class="ft">
+    <thead><tr><th style="width:22%">Tính năng</th><th>Mô tả</th><th style="width:28%">Ghi chú kỹ thuật</th></tr></thead>
+    <tbody>
+      <tr><td class="fn">Camera Hub</td><td>Thêm camera bằng URL RTSP/RTMP. Hỗ trợ Hikvision, Dahua, Axis. Hiển thị trạng thái online/offline, độ phân giải, FPS thực tế. Sửa/xóa camera dễ dàng.</td><td class="fnote">FFmpeg decode. Dùng process riêng mỗi camera.</td></tr>
+      <tr><td class="fn">Stream Health Monitor</td><td>Theo dõi latency (ms), tỷ lệ frame drop, thời gian kết nối. Cảnh báo khi camera offline quá 30 giây. Auto-reconnect với exponential backoff. Giữ nguyên số đếm cuối khi camera offline.</td><td class="fnote">Circuit breaker: retry 5 lần → suspend 5 phút.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 2. AI Pipeline -->
+<div class="feat-group" id="f-pipeline">
+  <div class="feat-group-header">
+    <div class="fgi" style="background:#f0eaff"></div>
+    <div><div class="fgn">2. AI Pipeline</div><div class="fgd">Cấu hình pipeline AI qua 4 bước — không cần chọn model, chỉ mô tả bài toán</div></div>
+  </div>
+  <table class="ft">
+    <thead><tr><th style="width:22%">Tính năng</th><th>Mô tả</th><th style="width:28%">Ghi chú kỹ thuật</th></tr></thead>
+    <tbody>
+      <tr><td class="fn">Pipeline Builder (4 bước)</td><td>Bước 1: Chọn camera. Bước 2: Mô tả bài toán bằng tiếng Việt (ví dụ "đếm khách hàng ra vào", "cảnh báo xâm nhập vùng cấm"). Hệ thống tự động chọn model YOLO hoặc LocateAnything dựa trên mô tả. Bước 3: Vẽ vùng / đường kẻ. Bước 4: Chọn kênh cảnh báo.</td><td class="fnote">Auto Model Routing: keyword COCO → YOLO; không có → LocateAnything; PPE-style → YOLO + LocateAnything crop.</td></tr>
+      <tr><td class="fn">Template Library</td><td>6 pipeline mẫu có sẵn: đếm khách vào ra, đếm xe bãi đỗ, cảnh báo xâm nhập, kiểm kê kệ hàng, giám sát an toàn vùng nguy hiểm, phát hiện hành vi bất thường. Chọn template → tự động điền các bước, user chỉ cần tùy chỉnh.</td><td class="fnote">Template kèm sẵn zone, rule, kênh alert mặc định.</td></tr>
+      <tr><td class="fn">Graceful Degradation</td><td>Khi CPU/GPU quá tải: tự động giảm frame rate xử lý AI (25fps → 10fps → 5fps) thay vì crash. Badge "Đang giảm tốc" hiển thị trên Live Dashboard.</td><td class="fnote">Frame sampling: xử lý 1 trong N frame, N tăng theo tải.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 3. AI Detection -->
+<div class="feat-group" id="f-detection">
+  <div class="feat-group-header">
+    <div class="fgi" style="background:#e3faf2"></div>
+    <div><div class="fgn">3. AI Detection</div><div class="fgd">Phát hiện và theo dõi đối tượng bằng AI — realtime và tìm kiếm</div></div>
+  </div>
+  <table class="ft">
+    <thead><tr><th style="width:22%">Tính năng</th><th>Mô tả</th><th style="width:28%">Ghi chú kỹ thuật</th></tr></thead>
+    <tbody>
+      <tr><td class="fn">Object Detection</td><td>Phát hiện 80+ lớp đối tượng COCO bằng YOLO, hoặc mô tả tự do bằng tiếng Việt qua LocateAnything. CPU: YOLOv8n ONNX INT8 (10–30fps). GPU: YOLOv8s TensorRT (60–120fps).</td><td class="fnote">CPU: ONNX Runtime. GPU: TensorRT. LocateAnything: GGUF q8 cho CPU.</td></tr>
+      <tr><td class="fn">Object Tracking</td><td>Gán track_id bền vững cho mỗi đối tượng qua các frame. Giữ nguyên ID ngay cả khi bị che khuất tạm thời (tối đa 60 frame). Cần cho đếm không trùng.</td><td class="fnote"><code>sv.ByteTrack</code>. CPU: max_age=60, match_thresh=0.65.</td></tr>
+      <tr><td class="fn">Natural Language Search</td><td>Tìm kiếm footage bằng câu mô tả tiếng Việt: "tìm người áo đỏ", "xe tải trắng vào bãi". Kết quả là clip ngắn ±15 giây kèm thumbnail, timestamp, confidence.</td><td class="fnote">CLIP index nền (~1fps, CPU) + LocateAnything rerank on-demand.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 4. Counting -->
+<div class="feat-group" id="f-counting">
+  <div class="feat-group-header">
+    <div class="fgi" style="background:#dbeafe"></div>
+    <div><div class="fgn">4. Counting</div><div class="fgd">Đếm đối tượng theo vùng, đường kẻ, nhiều lớp — lưu lịch sử và biểu đồ</div></div>
+  </div>
+  <table class="ft">
+    <thead><tr><th style="width:22%">Tính năng</th><th>Mô tả</th><th style="width:28%">Ghi chú kỹ thuật</th></tr></thead>
+    <tbody>
+      <tr><td class="fn">Zone Count</td><td>Đếm số đối tượng đang có mặt trong vùng polygon tại thời điểm hiện tại. Cập nhật mỗi frame, hiển thị badge trên overlay camera. Hỗ trợ đếm bằng mô tả tự nhiên (LocateAnything).</td><td class="fnote"><code>sv.PolygonZone.trigger(detections)</code></td></tr>
+      <tr><td class="fn">Line Count</td><td>Đếm số lượt đối tượng vượt qua đường kẻ theo chiều vào/ra. Tránh đếm trùng nhờ ByteTrack. IN / OUT / NET riêng biệt.</td><td class="fnote"><code>sv.LineZone.in_count / .out_count</code></td></tr>
+      <tr><td class="fn">Multi-class Count</td><td>Đếm riêng từng loại đối tượng trong cùng một vùng: người, xe máy, ô tô, hộp — mỗi loại có bộ đếm và màu riêng.</td><td class="fnote">Filter detections theo class_id trước khi zone/line trigger.</td></tr>
+      <tr><td class="fn">Multiple Zones</td><td>Tạo nhiều vùng độc lập trên cùng một camera, mỗi vùng có tên, màu và ngưỡng cảnh báo riêng. Hỗ trợ cả zone polygon và line zone đồng thời.</td><td class="fnote">Mảng <code>List[sv.PolygonZone]</code> + <code>List[sv.LineZone]</code> chạy song song.</td></tr>
+      <tr><td class="fn">Occupancy / Threshold Alert</td><td>Đặt ngưỡng tối đa cho vùng. Khi vượt: viền zone đổi đỏ, gửi alert + ghi log. Hữu ích kiểm soát sức chứa theo quy định an toàn.</td><td class="fnote">Kết hợp Alert Rules: <code>IF count &gt; max THEN alert</code></td></tr>
+      <tr><td class="fn">Event &amp; Count Storage (SQLite)</td><td>Snapshot định kỳ ghi số đếm mỗi 1/5/15/60 phút vào SQLite. Lưu lịch sử alert kèm snapshot. Analytics Dashboard đọc dữ liệu từ SQLite để vẽ biểu đồ xu hướng.</td><td class="fnote">SQLite local. Snapshot: camera_id, zone_id, count, timestamp. Alert: event log append-only.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 5. Alert -->
+<div class="feat-group" id="f-alert">
+  <div class="feat-group-header">
+    <div class="fgi" style="background:#fff8e6"></div>
+    <div><div class="fgn">5. Alert</div><div class="fgd">Cảnh báo thông minh, giảm false alarm, gửi đa kênh</div></div>
+  </div>
+  <table class="ft">
+    <thead><tr><th style="width:22%">Tính năng</th><th>Mô tả</th><th style="width:28%">Ghi chú kỹ thuật</th></tr></thead>
+    <tbody>
+      <tr><td class="fn">Alert Rules (IF/THEN)</td><td>Tạo rule với điều kiện: IF object trong zone AND thời gian ở lại &gt; N giây OR count &gt; max THEN alert. Đặt lịch active, cooldown per rule. Hỗ trợ AND/OR/NOT.</td><td class="fnote">Logic engine đơn giản, kiểm tra mỗi frame.</td></tr>
+      <tr><td class="fn">Smart Debounce</td><td>Chỉ gửi 1 alert mỗi N giây cho cùng một sự kiện. Mặc định 30 giây, user tùy chỉnh. Gom nhóm alert liên quan trong 30s thành 1 incident.</td><td class="fnote"></td></tr>
+      <tr><td class="fn">Alert Inbox</td><td>Danh sách alert với vòng đời: Mới (new) → Đã xử lý (closed). ACK (xác nhận) ngay trên Live Dashboard. Close kèm ghi chú. Lưu ai xử lý, lúc mấy giờ, ghi chú gì.</td><td class="fnote">Audit trail cho mỗi alert.</td></tr>
+      <tr><td class="fn">Alert Snapshot</td><td>Mỗi cảnh báo kèm ảnh chụp màn hình tại thời điểm phát hiện, có bounding box và metadata (camera, zone, confidence, số đếm).</td><td class="fnote">Lưu frame dưới dạng JPEG base64 hoặc file local.</td></tr>
+      <tr><td class="fn">Multi-channel Delivery</td><td>Gửi alert qua In-app notification + Email (SMTP) + Webhook. Kênh do Admin cấu hình, Operator chỉ chọn từ danh sách có sẵn.</td><td class="fnote">SMTP config trong Settings. Webhook: POST JSON đến URL.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 6. Dashboard -->
+<div class="feat-group" id="f-dashboard">
+  <div class="feat-group-header">
+    <div class="fgi" style="background:#e8f4ff"></div>
+    <div><div class="fgn">6. Dashboard</div><div class="fgd">Trực quan hóa dữ liệu realtime và lịch sử</div></div>
+  </div>
+  <table class="ft">
+    <thead><tr><th style="width:22%">Tính năng</th><th>Mô tả</th><th style="width:28%">Ghi chú kỹ thuật</th></tr></thead>
+    <tbody>
+      <tr><td class="fn">Live Dashboard (multi-camera)</td><td>Grid camera realtime với overlay bounding box, badge đếm, Alert Inbox tích hợp bên cạnh. Layout tùy chỉnh: 1×1, 2×2, 2×3, focus 1 camera. Toggle chế độ Normal / AI.</td><td class="fnote">WebSocket IPC với Python sidecar.</td></tr>
+      <tr><td class="fn">Analytics Dashboard</td><td>Biểu đồ xu hướng theo giờ/ngày/tuần với 5 loại:
+      <br>• <b>Số người theo thời gian</b> — line chart
+      <br>• <b>Số object theo thời gian</b> — line chart (theo loại)
+      <br>• <b>Số alert theo thời gian</b> — bar chart
+      <br>• <b>Thống kê theo loại đối tượng</b> — pie chart / bar chart
+      </td><td class="fnote">Dữ liệu từ SQLite snapshot. Thư viện: Chart.js.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 7. Quản trị -->
+<div class="feat-group" id="f-admin">
+  <div class="feat-group-header">
+    <div class="fgi" style="background:#fce8eb"></div>
+    <div><div class="fgn">7. Quản trị</div><div class="fgd">Phân quyền, audit, bảo vệ hệ thống</div></div>
+  </div>
+  <table class="ft">
+    <thead><tr><th style="width:22%">Tính năng</th><th>Mô tả</th><th style="width:28%">Ghi chú kỹ thuật</th></tr></thead>
+    <tbody>
+      <tr><td class="fn">Role-based Access</td><td>3 role: Admin (toàn quyền, cấu hình kênh alert, quản lý tài khoản), Operator (tạo pipeline, xem/ACK alert, search), Viewer (chỉ xem live feed và số đếm, không search, không xuất).</td><td class="fnote">Phân quyền local. User admin mặc định khi cài đặt lần đầu.</td></tr>
+      <tr><td class="fn">Audit Log (cơ bản)</td><td>Ghi lại: đăng nhập, tạo/sửa/xóa pipeline, ACK/close alert, xuất clip. Log không thể xóa hoặc sửa. Lưu tối thiểu 90 ngày.</td><td class="fnote">SQLite bảng audit_log, append-only.</td></tr>
+      <tr><td class="fn">Cascade Failure Protection</td><td>Mỗi camera chạy process riêng. 1 camera lỗi không ảnh hưởng camera khác. Circuit breaker: retry 5 lần trong 60s → suspend 5 phút. Auto-restart exponential backoff. Giữ số đếm cuối khi offline.</td><td class="fnote">Python multiprocessing. Health check thread mỗi process.</td></tr>
+      <tr><td class="fn">CPU Mode + GPU Mode</td><td><b>CPU mode:</b> YOLOv8n ONNX INT8 (10–30fps), LocateAnything GGUF q8 (on-demand), CLIP indexing CPU (~1fps). Chạy trên Intel/AMD 8+ core, RAM 16GB+.
+      <br><b>GPU mode:</b> YOLOv8s TensorRT (60–120fps), LocateAnything FP16 (nếu đủ VRAM). Tự động detect CUDA device khi khởi động. Fallback về CPU nếu không có GPU.</td><td class="fnote">Auto-detect: thử import torch + CUDA. Nếu fail → CPU mode. User có thể force CPU mode trong Settings.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /content -->
+</div>
+
+<!-- ════════════════════ TAB 2: KIẾN TRÚC ════════════════════ -->
+<div id="tab-arch" class="tab-panel">
+
+<div class="cover">
+  <div class="cover-tag">VisionOS MCP</div>
+  <div class="cover-title"><span>VisionOS</span> MCP — Kiến trúc Desktop App</div>
+  <div class="cover-sub">Ứng dụng Computer Vision chạy local, CPU-first, GPU optional, dành cho người dùng non-tech</div>
+  <div class="cover-grid">
+    <div class="cover-block">
+      <div class="cover-block-label">Tổng quan</div>
+      <div class="cover-block-val">Desktop app giám sát nhiều camera AI đồng thời. User thêm camera URL → mô tả bài toán → hệ thống tự động chọn model và chạy. Giao diện đơn giản, không cấu hình kỹ thuật.</div>
+    </div>
+    <div class="cover-block">
+      <div class="cover-block-label">Công nghệ nền tảng</div>
+      <div class="cover-block-val">
+        <b>Frontend:</b> Tauri v2 + React + Tailwind<br>
+        <b>Backend:</b> Python sidecar (inference engine)<br>
+        <b>Detection:</b> YOLOv8n ONNX (CPU) / TensorRT (GPU)<br>
+        <b>Zero-shot:</b> LocateAnything GGUF q8<br>
+        <b>Tracking/Counting:</b> Supervision ByteTrack + PolygonZone + LineZone<br>
+        <b>Search:</b> CLIP ViT-B/32 + FAISS
+      </div>
+    </div>
+    <div class="cover-block">
+      <div class="cover-block-label">Phạm vi MCP</div>
+      <div class="cover-block-val">7 nhóm tính năng: Quản lý camera · AI Pipeline · Detection · Counting · Alert · Dashboard · Quản trị. Không bao gồm: Video Archive, REST API, Behavior Detection, PPE, OCR.</div>
+    </div>
+    <div class="cover-block">
+      <div class="cover-block-label">Yêu cầu phần cứng</div>
+      <div class="cover-block-val">
+        <b>CPU mode:</b> Intel i5 / AMD Ryzen 5 (8+ core), 16GB RAM, 10GB disk<br>
+        <b>GPU mode:</b> NVIDIA GTX 1660+ (6GB VRAM), CUDA 12.x<br>
+        <b>Hỗ trợ:</b> 2–8 camera @ 5–10fps (CPU) / 15–30fps (GPU)
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toc">
+  <h2>Mục lục</h2>
+  <div class="toc-grid">
+    <div>
+      <a href="#s1"><span class="toc-num">1.</span>Kiến trúc tổng thể</a>
+      <a href="#s2"><span class="toc-num">2.</span>Cơ chế CPU / GPU Mode</a>
+      <a href="#s3"><span class="toc-num">3.</span>Luồng xử lý Pipeline</a>
+    </div>
+    <div>
+      <a href="#s4"><span class="toc-num">4.</span>Ba tính năng cốt lõi</a>
+      <a href="#s5"><span class="toc-num">5.</span>Storage & Data Model</a>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- SECTION 1: KIẾN TRÚC TỔNG THỂ -->
+<div class="section" id="s1">
+  <div class="section-header">
+    <div class="snum" style="background:#3a7bd5">1</div>
+    <div><div class="stitle">Kiến trúc tổng thể</div><div class="ssub">Luồng dữ liệu chi tiết từ camera đến UI — CPU & GPU path</div></div>
+  </div>
+
+  <div style="background:#fff;border-radius:12px;border:1px solid #e2e6ef;overflow:hidden;margin-bottom:20px">
+
+    <!-- R1: Camera Input -->
+    <div style="display:grid;grid-template-columns:120px 1fr;border-bottom:2px solid #eef2f8">
+      <div style="background:#1a1a2e;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">NGUỒN VÀO</div>
+      <div style="padding:14px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+        <div style="background:#fce8eb;border:1px solid #ffcdd2;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#b91c1c">📹 Camera IP</div>
+        <div style="color:#8a96a8;font-size:18px">→</div>
+        <div style="background:#fff8e6;border:1px solid #ffd54f;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#92620a">🎞️ FFmpeg Decode</div>
+        <div style="color:#8a96a8;font-size:18px">→</div>
+        <div style="background:#e3faf2;border:1px solid #b2dfdb;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#0a7a50">🔄 BGR → RGB</div>
+        <div style="color:#8a96a8;font-size:18px">→</div>
+        <div style="background:#f0eaff;border:1px solid #d1c4e9;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#5b21b6">⏱️ Frame Sampler 5fps</div>
+      </div>
+    </div>
+
+    <!-- R2: Decode Workers -->
+    <div style="display:grid;grid-template-columns:120px 1fr;border-bottom:2px solid #eef2f8">
+      <div style="background:#0f1218;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">DECODE WORKERS</div>
+      <div style="padding:14px 20px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="background:#e8f4ff;border:1px solid #bbdefb;border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+            <div style="font-size:11px;font-weight:700;color:#1565c0">Cam 1</div>
+            <div style="font-size:9px;color:#3a7bd5">30→5fps</div>
+          </div>
+          <div style="background:#e8f4ff;border:1px solid #bbdefb;border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+            <div style="font-size:11px;font-weight:700;color:#1565c0">Cam 2</div>
+            <div style="font-size:9px;color:#3a7bd5">30→5fps</div>
+          </div>
+          <div style="background:#e8f4ff;border:1px solid #bbdefb;border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+            <div style="font-size:11px;font-weight:700;color:#1565c0">Cam 3</div>
+            <div style="font-size:9px;color:#3a7bd5">30→5fps</div>
+          </div>
+          <div style="background:#e8f4ff;border:1px solid #bbdefb;border-radius:8px;padding:10px 16px;text-align:center;min-width:120px">
+            <div style="font-size:11px;font-weight:700;color:#1565c0">… tối đa 8</div>
+            <div style="font-size:9px;color:#3a7bd5">process riêng</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:#888;background:#f8f9fc;padding:6px 12px;border-radius:6px">
+          🔁 Circuit breaker: retry 5→60s→5 phút · Offline: giữ số đếm cuối
+        </div>
+      </div>
+    </div>
+
+    <!-- R3: Frame Queue -->
+    <div style="display:grid;grid-template-columns:120px 1fr;border-bottom:2px solid #eef2f8">
+      <div style="background:#0f1218;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">FRAME QUEUE</div>
+      <div style="padding:14px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="background:#1a1a2e;border-radius:8px;padding:10px 14px;text-align:center;min-width:120px">
+          <div style="font-size:9px;color:#8a96a8">multiprocessing.Queue</div>
+          <div style="font-size:11px;color:#eef2f8">Kích thước giới hạn</div>
+        </div>
+        <div style="color:#8a96a8;font-size:18px">→</div>
+        <div style="font-size:10px;color:#555;background:#e8f4ff;border:1px solid #bbdefb;border-radius:8px;padding:8px 14px">
+          📥 Queue đầy → decode worker tự pause (backpressure)<br>
+          <span style="font-size:9px;color:#1565c0;margin-top:4px;display:inline-block">Lưu ý: Backpressure chỉ áp dụng AI queue, không block preview.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- R4: Pipeline Runtime -->
+    <div style="display:grid;grid-template-columns:120px 1fr;border-bottom:2px solid #eef2f8">
+      <div style="background:#0f1218;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">PIPELINE<br>RUNTIME</div>
+      <div style="padding:14px 20px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:120px;background:#f8f9fc;border:1px solid #e2e6ef;border-radius:8px;padding:10px;text-align:center;font-size:10px">
+            <b>📋 Pipeline Context</b><br><span style="color:#555">Cấu hình zone, line, rules</span>
+          </div>
+          <div style="color:#8a96a8;font-size:14px">→</div>
+          <div style="flex:1;min-width:120px;background:#f3e5f5;border:2px solid #ce93d8;border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:10px;font-weight:700;color:#7b1fa2">🎯 Task Parser</div>
+            <div style="font-size:9px;color:#555">Phân tích mô tả → model_choice</div>
+            <div style="font-size:8px;color:#888">COCO→YOLO · Custom→LA · PPE→Combo</div>
+          </div>
+          <div style="color:#8a96a8;font-size:14px">→</div>
+          <div style="flex:1;min-width:120px;background:#f8f9fc;border:1px solid #e2e6ef;border-radius:8px;padding:10px;text-align:center;font-size:10px">
+            <b>⚠️ Rule Engine</b><br><span style="color:#555">IF/THEN · Debounce 30s</span>
+          </div>
+        </div>
+        <div style="margin-top:6px;padding:3px 8px;background:#e8f4ff;border-radius:6px;font-size:10px;color:#1565c0;text-align:center">
+          ⬇ Task Parser → Model Router: (model, threshold, classes)
+        </div>
+      </div>
+    </div>
+
+    <!-- R5: Model Router + Inference -->
+    <div style="display:grid;grid-template-columns:120px 1fr;border-bottom:2px solid #eef2f8">
+      <div style="background:#0f1218;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">MODEL ROUTER<br>+ INFERENCE</div>
+      <div style="padding:14px 20px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="background:#f3e5f5;border:2px solid #ce93d8;border-radius:8px;padding:8px 14px;font-size:10px;font-weight:700;color:#7b1fa2">🔀 Router<br><span style="font-weight:400;color:#555">COCO→YOLO / Custom→LA / PPE→Combo</span></div>
+          <div style="color:#8a96a8;font-size:18px">→</div>
+          <div style="border:2px solid #00a86b;border-radius:8px;overflow:hidden;min-width:160px">
+            <div style="background:#00a86b;color:#fff;padding:3px 10px;font-size:10px;font-weight:700;text-align:center">YOLO</div>
+            <div style="padding:6px 10px;font-size:10px;color:#555">CPU: ONNX INT8 10-30fps / GPU: TensorRT FP16 60-120fps</div>
+          </div>
+          <div style="color:#8a96a8;font-size:18px">→</div>
+          <div style="background:#e3faf2;border:1px solid #b2dfdb;border-radius:8px;padding:6px 10px;text-align:center;font-size:10px;font-weight:700;color:#0a7a50">sv.Detections</div>
+        </div>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
+          <span style="background:#f0eaff;color:#5b21b6;padding:3px 8px;border-radius:4px">ON-DEMAND LocateAnything: CPU GGUF 3-5s / GPU FP16 200ms</span>
+          <span style="background:#fff8e6;border:1px solid #ffe082;padding:3px 8px;border-radius:4px;color:#555">LRU Cache TTL 5 phút, 100 entries</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- R6: Supervision -->
+    <div style="display:grid;grid-template-columns:120px 1fr;border-bottom:2px solid #eef2f8">
+      <div style="background:#0f1218;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">SUPERVISION</div>
+      <div style="padding:14px 20px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px">
+          <span style="background:#f8f9fc;border:1px solid #e2e6ef;border-radius:6px;padding:6px 10px">📌 ByteTrack (giữ ID 60 frame khi khuất)</span>
+          <span style="background:#f8f9fc;border:1px solid #e2e6ef;border-radius:6px;padding:6px 10px">🔲 PolygonZone (đếm trong vùng)</span>
+          <span style="background:#f8f9fc;border:1px solid #e2e6ef;border-radius:6px;padding:6px 10px">📏 LineZone (đếm IN/OUT)</span>
+          <span style="background:#f8f9fc;border:1px solid #e2e6ef;border-radius:6px;padding:6px 10px">🔢 Multi-class Count (filter class_id)</span>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:#0a3d22;background:#e3faf2;border:1px solid #b2dfdb;border-radius:6px;padding:4px 10px">
+          💾 Adaptive Flush: SQLite khi count thay đổi &gt; 5% hoặc mỗi 60s (min 1 phút, max 5 phút)
+        </div>
+      </div>
+    </div>
+
+    <!-- R7: CLIP Indexer -->
+    <div style="display:grid;grid-template-columns:120px 1fr;border-bottom:2px solid #eef2f8">
+      <div style="background:#0f1218;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">CLIP INDEXER</div>
+      <div style="padding:14px 20px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:10px">
+          <span style="background:#f8f9fc;border:1px solid #e2e6ef;border-radius:6px;padding:6px 10px">📷 Frame Selector 1fps</span>
+          <span style="color:#8a96a8;font-size:16px">→</span>
+          <span style="background:#f0eaff;border:1px solid #d1c4e9;border-radius:6px;padding:6px 10px">🧠 CLIP ViT-B/32 → 512-dim</span>
+          <span style="color:#8a96a8;font-size:16px">→</span>
+          <span style="background:#1a1a2e;color:#eef2f8;border-radius:6px;padding:6px 10px">📁 FAISS Append (1 file/camera)</span>
+        </div>
+        <div style="margin-top:4px;font-size:10px;color:#888">⚙️ Process riêng, không ảnh hưởng realtime · CPU 1fps / GPU 5fps</div>
+      </div>
+    </div>
+
+    <!-- R8: Event Storage -->
+    <div style="display:grid;grid-template-columns:120px 1fr;border-bottom:2px solid #eef2f8">
+      <div style="background:#0f1218;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">EVENT<br>STORAGE</div>
+      <div style="padding:14px 20px;display:flex;gap:8px;flex-wrap:wrap;font-size:10px">
+        <span style="background:#1a1a2e;color:#eef2f8;border-radius:6px;padding:6px 10px">🗄️ SQLite (INDEX alerts(pipeline_id, ts))</span>
+        <span style="background:#1a1a2e;color:#eef2f8;border-radius:6px;padding:6px 10px">📁 FAISS (1 file/camera)</span>
+        <span style="background:#1a1a2e;color:#eef2f8;border-radius:6px;padding:6px 10px">🖼️ Snapshot JPEG (90 ngày)</span>
+        <span style="background:#1a1a2e;color:#eef2f8;border-radius:6px;padding:6px 10px">⚙️ App Config</span>
+      </div>
+    </div>
+
+    <!-- R9: Outputs -->
+    <div style="display:grid;grid-template-columns:120px 1fr;border-bottom:2px solid #eef2f8">
+      <div style="background:#0f1218;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">KẾT QUẢ</div>
+      <div style="padding:14px 20px;display:flex;gap:8px;flex-wrap:wrap;font-size:10px">
+        <span style="background:#fff8e6;border:1px solid #ffe082;border-radius:6px;padding:6px 10px"><b>🔔 Alert:</b> IF/THEN + debounce → In-app/Email/Webhook</span>
+        <span style="background:#e3faf2;border:1px solid #b2dfdb;border-radius:6px;padding:6px 10px"><b>📊 Analytics:</b> Biểu đồ xu hướng</span>
+        <span style="background:#f0eaff;border:1px solid #d1c4e9;border-radius:6px;padding:6px 10px"><b>🔍 Search:</b> CLIP 200ms + LA rerank 3-5s</span>
+      </div>
+    </div>
+
+    <!-- R10: IPC Bridge -->
+    <div style="display:grid;grid-template-columns:120px 1fr">
+      <div style="background:#0f1218;color:#fff;padding:14px 16px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.05em">IPC BRIDGE</div>
+      <div style="padding:14px 20px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;margin-bottom:6px">
+          <span style="background:#e8f4ff;border:1px solid #bbdefb;border-radius:6px;padding:6px 10px;flex:1;min-width:180px"><b>📡 Control:</b> JSON-RPC stdin/stdout (commands, events, ACK)</span>
+          <span style="background:#e3faf2;border:1px solid #b2dfdb;border-radius:6px;padding:6px 10px;flex:1;min-width:180px"><b>🖼️ Media:</b> Ghi file → path trong JSON (tránh base64 overhead)</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
+          <span style="background:#fff8e6;border:1px solid #ffe082;border-radius:5px;padding:4px 8px">💚 Health: heartbeat 5s, timeout 15s</span>
+          <span style="background:#fff8e6;border:1px solid #ffe082;border-radius:5px;padding:4px 8px">🔄 Reconnect: exp backoff 1→5→30s→5 phút</span>
+          <span style="background:#fff8e6;border:1px solid #ffe082;border-radius:5px;padding:4px 8px">🔐 Protocol: handshake + version check</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note note-info" style="margin-top:14px">ℹ️ <b>Luồng 10 bước:</b> Camera → FFmpeg (BGR) → BGR→RGB → Sampler 5fps → Queue → Pipeline Runtime (Parser→Router) → YOLO/LA (+Cache) → ByteTrack → Zone/Line/Count → Storage → Alert/Analytics/Search → IPC → UI. CLIP Indexer chạy nền riêng.</div>
+</div>
+
+<!-- SECTION 2: CPU / GPU MODE -->
+<div class="section" id="s2">
+  <div class="section-header">
+    <div class="snum" style="background:#ffb830">2</div>
+    <div><div class="stitle">Cơ chế CPU / GPU Mode</div><div class="ssub">Tự động phát hiện phần cứng và chọn pipeline phù hợp</div></div>
+  </div>
+
+  <div class="subsection">
+    <div class="sub-h">Phát hiện phần cứng khi khởi động</div>
+    <p style="font-size:13px;color:#444;margin-bottom:12px">Khi ứng dụng khởi chạy, Python sidecar kiểm tra CUDA availability. Nếu CUDA có sẵn và VRAM đủ (&ge;4GB), tự động chạy GPU mode. Nếu không, fallback về CPU mode. User có thể force CPU mode trong Settings.</p>
+    <table class="t">
+      <thead><tr><th>Mode</th><th>Detection Model</th><th>Format</th><th>Zero-shot Model</th><th>Tracking</th></tr></thead>
+      <tbody>
+        <tr><td class="tn">CPU</td><td>YOLOv8n</td><td>ONNX INT8</td><td>LocateAnything GGUF q8</td><td>ByteTrack CPU</td></tr>
+        <tr><td class="tn">GPU</td><td>YOLOv8s</td><td>TensorRT FP16</td><td>LocateAnything FP16</td><td>ByteTrack GPU</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="subsection">
+    <div class="sub-h">So sánh hiệu năng</div>
+    <table class="t">
+      <thead><tr><th>Chỉ số</th><th>CPU Mode</th><th>GPU Mode</th></tr></thead>
+      <tbody>
+        <tr><td class="tn">YOLO throughput</td><td>10–30 fps</td><td>60–120 fps</td></tr>
+        <tr><td class="tn">Camera tối đa @ 5fps</td><td>4–6 camera</td><td>12–24 camera</td></tr>
+        <tr><td class="tn">LocateAnything inference</td><td>~3–5 giây/frame (GGUF q8)</td><td>~200ms/frame (FP16)</td></tr>
+        <tr><td class="tn">CLIP indexing</td><td>~1 fps (CPU)</td><td>~5 fps (GPU)</td></tr>
+        <tr><td class="tn">RAM usage (4 camera)</td><td>~4–6 GB</td><td>~6–8 GB</td></tr>
+        <tr><td class="tn">VRAM usage</td><td>0 (CPU only)</td><td>~2.5 GB (YOLO) / ~6 GB (LocateAnything)</td></tr>
+      </tbody>
+    </table>
+    <div class="note note-ok">✓ <b>CPU mode</b> là mặc định và đủ dùng cho hầu hết khách hàng SMB với 2–4 camera. <b>GPU mode</b> tự động kích hoạt nếu phát hiện NVIDIA GPU &ge; 6GB VRAM.</div>
+  </div>
+
+  <div class="subsection">
+    <div class="sub-h">Auto Model Routing — Tự động chọn model theo mô tả</div>
+    <table class="t">
+      <thead><tr><th>Mô tả bài toán</th><th>Model được chọn</th><th>Lý do</th></tr></thead>
+      <tbody>
+        <tr><td class="tn">"người", "xe", "ô tô", "xe máy", "hộp"</td><td><span class="tag tag-blue">YOLO</span></td><td>Có trong COCO, inference nhanh, CPU/GPU đều được</td></tr>
+        <tr><td class="tn">"hộp carton màu vàng", "túi gạo 50kg", "xe tải trắng"</td><td><span class="tag tag-purple">LocateAnything</span></td><td>Không có trong COCO, cần zero-shot</td></tr>
+        <tr><td class="tn">"người đội mũ bảo hiểm đỏ"</td><td><span class="tag tag-amber">YOLO → LocateAnything crop</span></td><td>YOLO detect người → crop → LocateAnything query trên crop</td></tr>
+      </tbody>
+    </table>
+
+    <!-- LRU Cache note -->
+    <div class="note note-ok" style="margin-top:12px">✓ <b>LRU Inference Cache:</b> Kết quả LocateAnything và YOLO được cache trong session (TTL 5 phút, max 100 entries). Key: (model_name, query_text, frame_hash). Nếu user search "người áo đỏ" nhiều lần, cache trả kết quả ngay lập tức thay vì chạy inference lại. Cache tự động invalidate khi pipeline config thay đổi.</div>
+
+    <div class="note note-info" style="margin-top:8px">ℹ️ <b>CLIP Indexer</b> chạy process riêng, độc lập với pipeline realtime. Frame được CLIP embed ở tốc độ ~1fps (CPU) / ~5fps (GPU), append vào FAISS index. Không ảnh hưởng đến detection realtime. Khi search, CLIP vector search ~200ms, sau đó LocateAnything rerank on-demand nếu cần.</div>
+  </div>
+</div>
+
+<!-- SECTION 3: LUỒNG PIPELINE -->
+<div class="section" id="s3">
+  <div class="section-header">
+    <div class="snum" style="background:#00a86b">3</div>
+    <div><div class="stitle">Luồng xử lý Pipeline</div><div class="ssub">Từ người dùng mô tả bài toán đến kết quả realtime</div></div>
+  </div>
+
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="flow-step-left"><div class="flow-circle" style="background:#3a7bd5">1</div><div class="flow-line" style="background:#e2e6ef"></div></div>
+      <div class="flow-step-content">
+        <div class="flow-step-title">User mô tả bài toán (Bước 2 Pipeline Builder)</div>
+        <div class="flow-step-desc">User nhập: "đếm khách hàng ra vào cửa hàng". Hệ thống phân tích từ khóa → detect "người" (COCO) → chọn YOLO. Hoặc "đếm hộp carton màu vàng" → không có trong COCO → chọn LocateAnything.</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-left"><div class="flow-circle" style="background:#9b6dff">2</div><div class="flow-line" style="background:#e2e6ef"></div></div>
+      <div class="flow-step-content">
+        <div class="flow-step-title">Camera → Decode Worker (process riêng)</div>
+        <div class="flow-step-desc">FFmpeg decode stream RTSP thành numpy array. Mỗi camera 1 process riêng. Frame được sample: chỉ lấy 1/N frame để xử lý AI (5fps mặc định). BGR → RGB chuyển đổi ngay sau decode.</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-left"><div class="flow-circle" style="background:#00a86b">3</div><div class="flow-line" style="background:#e2e6ef"></div></div>
+      <div class="flow-step-content">
+        <div class="flow-step-title">YOLO / LocateAnything → sv.Detections</div>
+        <div class="flow-step-desc">YOLO chạy inference → output bounding boxes + class_id + confidence. Supervision chuyển thành sv.Detections. Nếu là LocateAnything, kết quả text → parser → sv.Detections.</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-left"><div class="flow-circle" style="background:#ffb830">4</div><div class="flow-line" style="background:#e2e6ef"></div></div>
+      <div class="flow-step-content">
+        <div class="flow-step-title">ByteTrack → Zone/Line → Counting</div>
+        <div class="flow-step-desc">ByteTrack gán track_id. PolygonZone.trigger() kiểm tra ai trong vùng. LineZone.trigger() đếm IN/OUT. Kết quả đẩy lên IPC để UI cập nhật badge realtime.</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-left"><div class="flow-circle" style="background:#ff4d6a">5</div></div>
+      <div class="flow-step-content">
+        <div class="flow-step-title">Alert Engine → Inbox + Delivery</div>
+        <div class="flow-step-desc">Kiểm tra IF/THEN rules. Smart debounce chặn spam. Nếu trigger: lưu alert vào SQLite + snapshot JPEG + gửi qua các kênh đã cấu hình. UI cập nhật Alert Inbox realtime.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 4: BA TÍNH NĂNG CỐT LÕI -->
+<div class="section" id="s4">
+  <div class="section-header">
+    <div class="snum" style="background:#9b6dff">4</div>
+    <div><div class="stitle">Ba tính năng cốt lõi — Input / Output</div><div class="ssub">Chi tiết bài toán của 3 chức năng chính trong MCP</div></div>
+  </div>
+
+  <!-- 4.1 Counting -->
+  <div class="subsection">
+    <div class="sub-h">4.1 Object Counting — Đếm đối tượng (Zone + Line)</div>
+    <div class="io-grid">
+      <div class="io-box">
+        <div class="io-label" style="color:#3a7bd5">ĐẦU VÀO</div>
+        <div class="io-item"><div class="io-dot" style="background:#3a7bd5"></div><div><b>Video stream RTSP</b> — H.264, 720p–1080p</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#3a7bd5"></div><div><b>Mô tả bài toán</b> — text tiếng Việt</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#3a7bd5"></div><div><b>Zone/Line config</b> — tọa độ polygon / đường kẻ</div></div>
+      </div>
+      <div class="io-arrow">→</div>
+      <div class="io-box">
+        <div class="io-label" style="color:#00a86b">ĐẦU RA</div>
+        <div class="io-item"><div class="io-dot" style="background:#00a86b"></div><div><b>Số đếm realtime</b> — overlay trên frame, badge trong UI</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#00a86b"></div><div><b>Lịch sử đếm</b> — SQLite, query theo giờ/ngày</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#00a86b"></div><div><b>Alert vượt ngưỡng</b> — nếu count &gt; maxLimit</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4.2 Alert -->
+  <div class="subsection">
+    <div class="sub-h">4.2 Zone Alert — Cảnh báo xâm nhập / vượt ngưỡng</div>
+    <div class="io-grid">
+      <div class="io-box">
+        <div class="io-label" style="color:#ffb830">ĐẦU VÀO</div>
+        <div class="io-item"><div class="io-dot" style="background:#ffb830"></div><div><b>Video stream</b> — như trên</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#ffb830"></div><div><b>Alert rules</b> — IF/THEN condition</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#ffb830"></div><div><b>Kênh gửi</b> — In-app / Email / Webhook</div></div>
+      </div>
+      <div class="io-arrow">→</div>
+      <div class="io-box">
+        <div class="io-label" style="color:#00a86b">ĐẦU RA</div>
+        <div class="io-item"><div class="io-dot" style="background:#00a86b"></div><div><b>Alert Inbox</b> — danh sách kèm snapshot</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#00a86b"></div><div><b>Email/Webhook</b> — gửi ra ngoài</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#00a86b"></div><div><b>Audit log</b> — ai xử lý lúc nào</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4.3 NL Search -->
+  <div class="subsection">
+    <div class="sub-h">4.3 Natural Language Search — Tìm kiếm footage</div>
+    <div class="io-grid">
+      <div class="io-box">
+        <div class="io-label" style="color:#ff4d6a">ĐẦU VÀO</div>
+        <div class="io-item"><div class="io-dot" style="background:#ff4d6a"></div><div><b>Query text</b> — tiếng Việt: "tìm người áo đỏ"</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#ff4d6a"></div><div><b>Bộ lọc</b> — camera, khoảng thời gian</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#ff4d6a"></div><div><b>CLIP index</b> — đã build sẵn từ nền</div></div>
+      </div>
+      <div class="io-arrow">→</div>
+      <div class="io-box">
+        <div class="io-label" style="color:#00a86b">ĐẦU RA</div>
+        <div class="io-item"><div class="io-dot" style="background:#00a86b"></div><div><b>Danh sách clip</b> — ±15s, có thumbnail + timestamp</div></div>
+        <div class="io-item"><div class="io-dot" style="background:#00a86b"></div><div><b>Thời gian</b> — &lt;30s cho 24h footage (CPU)</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 5: STORAGE -->
+<div class="section" id="s5">
+  <div class="section-header">
+    <div class="snum" style="background:#8a96a8">5</div>
+    <div><div class="stitle">Storage &amp; Data Model</div><div class="ssub">Cách tổ chức dữ liệu local trên máy user</div></div>
+  </div>
+
+  <table class="t">
+    <thead><tr><th>File / DB</th><th>Đường dẫn (App Data)</th><th>Nội dung</th></tr></thead>
+    <tbody>
+      <tr><td class="tn">visionos.db</td><td><code>~/.visionos/data/visionos.db</code></td><td>SQLite: cameras, pipelines, counting_snapshots, alerts, alert_log, audit_log, users</td></tr>
+      <tr><td class="tn">FAISS index</td><td><code>~/.visionos/data/vectors/</code></td><td>CLIP vector index cho NLP search. Mỗi camera một file .faiss (có file lock chống ghi đè, auto-recover khi corrupt, xoá khi xoá camera)</td></tr>
+      <tr><td class="tn">Snapshot JPEG</td><td><code>~/.visionos/snapshots/</code></td><td>Ảnh snapshot kèm alert. Tự động xóa sau 90 ngày</td></tr>
+      <tr><td class="tn">config.json</td><td><code>~/.visionos/config.json</code></td><td>Cấu hình người dùng: kênh alert (SMTP), UI preferences, force CPU mode</td></tr>
+    </tbody>
+  </table>
+
+  <div class="subsection">
+    <div class="sub-h2">SQLite Schema (tóm tắt)</div>
+    <div class="code-block">-- Bảng chính (có INDEX + FK)
+cameras(id PRIMARY KEY, name, url, status, fps, resolution, created_at)
+pipelines(id PRIMARY KEY, name, camera_id FK→cameras, task_description, auto_model, zone_type, zone_config, alert_channels, is_active, created_at)
+counting_snapshots(id PRIMARY KEY, pipeline_id FK→pipelines, timestamp, zone_name, count, in_count, out_count)
+CREATE INDEX idx_snapshots_pipeline_ts ON counting_snapshots(pipeline_id, timestamp);
+
+alerts(id PRIMARY KEY, pipeline_id FK→pipelines, timestamp, camera_name, type, message, status ENUM('NEW', 'ACKED', 'CLOSED'), score, snapshot_path, acked_at, acked_by, closed_at, closed_by, note)
+CREATE INDEX idx_alerts_pipeline_ts ON alerts(pipeline_id, timestamp);
+CREATE INDEX idx_alerts_status ON alerts(status);
+
+users(id PRIMARY KEY, username, role, created_at)
+audit_log(id PRIMARY KEY, user_id FK→users, action, detail, timestamp)
+CREATE INDEX idx_audit_user ON audit_log(user_id);</div>
+  </div>
+</div>
+
+
+
+
+</div><!-- /content -->
+</div>
+
+<script>
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(function(p) {
+    p.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  window.scrollTo(0, 0);
+}
+</script>
+
+</body>
+</html>

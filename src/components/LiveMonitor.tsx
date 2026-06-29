@@ -1,0 +1,1436 @@
+import { useState, useEffect, useRef, Dispatch, SetStateAction } from 'react';
+import { Camera, Pipeline, AlertEvent, LogEntry, CountingZone } from '../types';
+import { Play, Pause, MoreVertical, Edit2, Trash2, AlertTriangle, User, RefreshCw, Send, Sparkles, Plus, CheckCircle, Zap, Activity } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+interface LiveMonitorProps {
+  key?: string | number;
+  camera: Camera;
+  pipelines: Pipeline[];
+  alerts: AlertEvent[];
+  setAlerts: Dispatch<SetStateAction<AlertEvent[]>>;
+  logs: LogEntry[];
+  setLogs: Dispatch<SetStateAction<LogEntry[]>>;
+  role?: 'admin' | 'operator' | 'viewer';
+  isCompact?: boolean;
+  onExpand?: () => void;
+  onEditCamera?: (id: string) => void;
+  onDeleteCamera?: (id: string) => void;
+}
+
+interface SimObject {
+  id: string;
+  label: string;
+  icon: string;
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  speed: number;
+  trackId: string;
+  color: string;
+  hasCrossed: boolean;
+  isInsideZone: boolean;
+  createdAt: number;
+}
+
+export default function LiveMonitor({
+  camera,
+  pipelines,
+  alerts,
+  setAlerts,
+  logs,
+  setLogs,
+  role = 'operator',
+  isCompact = false,
+  onExpand,
+  onEditCamera,
+  onDeleteCamera
+}: LiveMonitorProps) {
+  const [showMenu, setShowMenu] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isAIMode, setIsAIMode] = useState(true);
+  const [isHeatmap, setIsHeatmap] = useState(false);
+  const [isStreamOnline, setIsStreamOnline] = useState(true);
+  const [systemLoad, setSystemLoad] = useState<'normal' | 'high' | 'critical'>('normal');
+  const [degradedFps, setDegradedFps] = useState(camera.fps);
+  const [falseAlarms, setFalseAlarms] = useState(0);
+  const [closingAlertId, setClosingAlertId] = useState<string | null>(null);
+  const [closeNote, setCloseNote] = useState('');
+  
+  // Local counts to simulate line/zone counters
+  const [inCount, setInCount] = useState(142);
+  const [outCount, setOutCount] = useState(128);
+  const [shelfBoxCount, setShelfBoxCount] = useState(5);
+  const [currentZoneCount, setCurrentZoneCount] = useState(0);
+  const [flashLine, setFlashLine] = useState(false);
+  const [flashZone, setFlashZone] = useState(false);
+
+  // Active simulated objects moving on the screen
+  const [simObjects, setSimObjects] = useState<SimObject[]>([]);
+  const requestRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number>(0);
+
+  // Find active pipelines for the current camera
+  const activePipelines = pipelines.filter(p => p.cameraId === camera.id && p.isActive);
+  const cameraAlerts = alerts.filter(a => a.cameraName === camera.name);
+  const unreadAlertsCount = cameraAlerts.filter(a => a.status === 'new' || a.status === 'read').length;
+
+  // Refs for simulation logic to avoid stale closures in requestAnimationFrame
+  const isAIModeRef = useRef(isAIMode);
+  const activePipelinesRef = useRef(activePipelines);
+  const lastUpdateRef = useRef<number>(0);
+  const degradedFpsRef = useRef<number>(degradedFps);
+
+  useEffect(() => {
+    isAIModeRef.current = isAIMode;
+  }, [isAIMode]);
+
+  useEffect(() => {
+    activePipelinesRef.current = activePipelines;
+  }, [activePipelines]);
+
+  useEffect(() => {
+    if (systemLoad === 'normal') setDegradedFps(camera.fps);
+    else if (systemLoad === 'high') setDegradedFps(15);
+    else if (systemLoad === 'critical') setDegradedFps(5);
+  }, [systemLoad, camera.fps]);
+
+  useEffect(() => {
+    degradedFpsRef.current = degradedFps;
+  }, [degradedFps]);
+
+  // Reset local counts when camera changes
+  useEffect(() => {
+    if (camera.id === 'cam-retail') {
+      setInCount(142);
+      setOutCount(128);
+      setCurrentZoneCount(0);
+    } else if (camera.id === 'cam-warehouse') {
+      setShelfBoxCount(5);
+      setCurrentZoneCount(0);
+    } else if (camera.id === 'cam-parking') {
+      setInCount(45);
+      setOutCount(12);
+      setCurrentZoneCount(0);
+    } else {
+      setInCount(320);
+      setOutCount(0);
+      setCurrentZoneCount(0);
+    }
+    setSimObjects([]);
+  }, [camera.id]);
+
+  // Handle simulations and collision/intersection checks
+  const updateSimulation = (time: number) => {
+    if (!isPlaying || !isStreamOnline) {
+      lastTimeRef.current = time;
+      lastUpdateRef.current = time;
+      requestRef.current = requestAnimationFrame(updateSimulation);
+      return;
+    }
+
+    // Graceful Degradation: Skip frames to match target FPS
+    const fpsInterval = 1000 / degradedFpsRef.current;
+    if (time - lastUpdateRef.current < fpsInterval) {
+      requestRef.current = requestAnimationFrame(updateSimulation);
+      return;
+    }
+
+    if (lastTimeRef.current === 0) {
+      lastTimeRef.current = time;
+    }
+    const deltaTime = (time - lastTimeRef.current) / 1000;
+    lastTimeRef.current = time;
+    lastUpdateRef.current = time;
+
+    setSimObjects(prevObjects => {
+      let objectsUpdated = prevObjects.map(obj => {
+        // Calculate vector to target
+        const dx = obj.targetX - obj.x;
+        const dy = obj.targetY - obj.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 1) {
+          // Reached destination, we can either remove or assign new destination
+          return {
+            ...obj,
+            x: obj.targetX,
+            y: obj.targetY,
+            speed: 0 // Will be filtered out soon
+          };
+        }
+
+        // Move towards target
+        const moveStep = obj.speed * deltaTime * 15; // scalar speed
+        const ratio = Math.min(moveStep / distance, 1);
+        const nextX = obj.x + dx * ratio;
+        const nextY = obj.y + dy * ratio;
+
+        let crossed = obj.hasCrossed;
+        let inside = obj.isInsideZone;
+
+        // --- Intersection Logic (Only runs if AI Mode is ON) ---
+        if (isAIModeRef.current) {
+          
+          // 1. Line Crossing (y = 55 for retail, simple line crossing)
+          if (camera.id === 'cam-retail' && !crossed) {
+            // Check if retail counting pipeline is active
+            const hasRetailPipe = activePipelinesRef.current.some(p => p.id === 'pipe-rt-1');
+            if (hasRetailPipe) {
+              // If object crossed y = 55
+              const crossedLine = (obj.y < 55 && nextY >= 55) || (obj.y > 55 && nextY <= 55);
+              if (crossedLine) {
+                crossed = true;
+                const isGoingDown = nextY > obj.y; // In or Out based on vector direction
+                
+                setFlashLine(true);
+                setTimeout(() => setFlashLine(false), 300);
+
+                if (isGoingDown) {
+                  setInCount(prev => prev + 1);
+                  addLog(`Khách hàng #${obj.trackId} vừa ĐI VÀO cửa hàng (Khớp 97%)`, 'success');
+                } else {
+                  setOutCount(prev => prev + 1);
+                  addLog(`Khách hàng #${obj.trackId} vừa ĐI RA cửa hàng (Khớp 96%)`, 'info');
+                }
+              }
+            }
+          }
+
+          // 2. Parking Line Crossing (y = 50 for parking entry)
+          if (camera.id === 'cam-parking' && !crossed) {
+            // Check if parking counting pipeline is active
+            const hasParkingPipe = activePipelinesRef.current.some(p => p.id === 'pipe-pk-1');
+            if (hasParkingPipe) {
+              const crossedLine = (obj.y < 50 && nextY >= 50) || (obj.y > 50 && nextY <= 50);
+              if (crossedLine) {
+                crossed = true;
+                const isGoingDown = nextY > obj.y;
+                
+                setFlashLine(true);
+                setTimeout(() => setFlashLine(false), 300);
+
+                if (isGoingDown) {
+                  setInCount(prev => prev + 1);
+                  addLog(`Phương tiện ${obj.label} #${obj.trackId} đi VÀO bãi đỗ (Khớp 98%)`, 'success');
+                } else {
+                  setOutCount(prev => prev + 1);
+                  addLog(`Phương tiện ${obj.label} #${obj.trackId} đi RA bãi đỗ (Khớp 98%)`, 'info');
+                }
+              }
+            }
+          }
+
+          // 3. Zone Intrusion/Presence (polygon test)
+          // Retail hotspot zone: x: 35-65, y: 65-90
+          // Warehouse danger zone: x: 15-85, y: 40-85
+          // Conveyor packing inspection zone: x: 35-65, y: 35-65
+          let isNowInside = false;
+          if (camera.id === 'cam-warehouse') {
+            // Danger zone boundaries (polygon approximation)
+            isNowInside = nextX >= 15 && nextX <= 85 && nextY >= 40 && nextY <= 85;
+          } else if (camera.id === 'cam-conveyor') {
+            isNowInside = nextX >= 35 && nextX <= 65 && nextY >= 35 && nextY <= 65;
+          }
+
+          if (isNowInside && !inside) {
+            inside = true;
+            if (camera.id === 'cam-warehouse') {
+              const hasWarehouseCounting = activePipelinesRef.current.some(p => p.id === 'pipe-wh-2');
+              const hasWarehouseIntrusion = activePipelinesRef.current.some(p => p.id === 'pipe-wh-1');
+              
+              if (hasWarehouseCounting || hasWarehouseIntrusion) {
+                setCurrentZoneCount(prev => prev + 1);
+                setFlashZone(true);
+                setTimeout(() => setFlashZone(false), 400);
+              }
+
+              // 1. Trigger intrusion alert if Forklift (Xe nâng) walks into danger zone
+              if (obj.label === 'Xe nâng' && hasWarehouseIntrusion) {
+                triggerAlert(
+                  'intrusion',
+                  `Cảnh báo: Xe nâng di chuyển vào khu vực cấm (Quá tốc độ)!`,
+                  98
+                );
+                addLog(`⚠️ CẢNH BÁO: Xe nâng #${obj.trackId} đi vào khu vực cấm!`, 'error');
+              } 
+              // 2. Trigger PPE alert if Worker (Nhân viên) enters Zone B
+              else if (obj.label === 'Nhân viên' && hasWarehouseIntrusion) {
+                triggerAlert(
+                  'overlimit',
+                  `Cảnh báo: Nhân viên không đội mũ bảo hộ tại Zone B.`,
+                  94
+                );
+                addLog(`⚠️ CẢNH BÁO PPE: Nhân viên #${obj.trackId} thiếu đồ bảo hộ!`, 'warning');
+              }
+              else if (hasWarehouseCounting) {
+                addLog(`Phát hiện ${obj.label} #${obj.trackId} di chuyển vào vùng giám sát`, 'info');
+              }
+            }
+          } else if (!isNowInside && inside) {
+            inside = false;
+            if (camera.id === 'cam-warehouse') {
+              const hasWarehouseCounting = activePipelinesRef.current.some(p => p.id === 'pipe-wh-2');
+              const hasWarehouseIntrusion = activePipelinesRef.current.some(p => p.id === 'pipe-wh-1');
+              
+              if (hasWarehouseCounting || hasWarehouseIntrusion) {
+                setCurrentZoneCount(prev => Math.max(0, prev - 1));
+                addLog(`${obj.label} #${obj.trackId} rời khỏi vùng giám sát`, 'info');
+              }
+            }
+          }
+        } // End of isAIMode check
+
+
+        return {
+          ...obj,
+          x: nextX,
+          y: nextY,
+          hasCrossed: crossed,
+          isInsideZone: inside
+        };
+      });
+
+      // Filter out objects that have reached destination and stopped
+      return objectsUpdated.filter(obj => obj.speed > 0 && obj.x !== obj.targetX);
+    });
+
+    requestRef.current = requestAnimationFrame(updateSimulation);
+  };
+
+  useEffect(() => {
+    requestRef.current = requestAnimationFrame(updateSimulation);
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [isPlaying, camera.id]);
+
+  // Helper to add instant events logs
+  const addLog = (message: string, type: 'info' | 'success' | 'warning' | 'error') => {
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+    const newLog: LogEntry = {
+      id: `log-sim-${Date.now()}-${Math.random()}`,
+      timestamp: timeStr,
+      cameraId: camera.id,
+      message,
+      type
+    };
+    setLogs(prev => [newLog, ...prev.slice(0, 49)]);
+  };
+
+  const handleCycleSystemLoad = () => {
+    const nextLoad = systemLoad === 'normal' ? 'high' : systemLoad === 'high' ? 'critical' : 'normal';
+    setSystemLoad(nextLoad);
+    if (nextLoad !== 'normal') {
+      const logMsg: LogEntry = {
+        id: `log-load-${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString('vi-VN'),
+        cameraId: camera.id,
+        message: `Hệ thống: Kích hoạt mô phỏng Quá tải CPU/GPU. Tự động giảm tốc độ xử lý AI xuống ${nextLoad === 'high' ? '15' : '5'} FPS để chống crash.`,
+        type: 'warning'
+      };
+      setLogs(prev => [logMsg, ...prev]);
+    }
+  };
+
+  const handleExportClip = () => {
+    if (role === 'viewer') {
+      alert('🔒 Bạn không có quyền xuất clip sự kiện ở vai trò Viewer.');
+      return;
+    }
+    const reason = prompt('Nhập lý do xuất clip sự kiện (Yêu cầu bắt buộc để lưu Audit Log):', 'Phục vụ giải trình báo cáo chất lượng');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      alert('⚠️ Vui lòng nhập lý do hợp lệ để xuất clip.');
+      return;
+    }
+    
+    // Trigger standard download notice
+    alert(`✓ Xuất video thành công! File VisionOS_Export_${camera.id}_${Date.now()}.mp4 đang được tải xuống máy tính.`);
+    
+    // Add custom Audit Log
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+    const auditLog: LogEntry = {
+      id: `log-audit-${Date.now()}`,
+      timestamp: timeStr,
+      cameraId: camera.id,
+      message: `[Audit Log] Tài khoản ${role === 'admin' ? 'Admin' : role === 'operator' ? 'Operator' : 'User'} (${role}) đã xuất tệp video từ Camera: ${camera.name}. Lý do: "${reason}"`,
+      type: 'info'
+    };
+    setLogs(prev => [auditLog, ...prev]);
+  };
+
+  // Helper to trigger alert event
+  const triggerAlert = (type: 'intrusion' | 'overlimit' | 'unusual_behavior' | 'safety_hazard', message: string, score: number) => {
+    const newAlert: AlertEvent = {
+      id: `alert-sim-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      cameraName: camera.name,
+      pipelineName: activePipelines[0]?.name || 'Giám sát tự động',
+      type,
+      message,
+      status: 'new',
+      score
+    };
+    setAlerts(prev => [newAlert, ...prev]);
+
+    // Play visual notification indicator if supported
+    if (navigator.vibrate) {
+      navigator.vibrate(200);
+    }
+  };
+
+  // User Actions to spawn simulated elements
+  const spawnObject = (type: 'customer_in' | 'customer_out' | 'worker_intrusion' | 'forklift_entry' | 'car_in' | 'car_out' | 'box_conveyor' | 'defective_box') => {
+    if (!isStreamOnline) {
+      alert('🔴 Camera hiện đang OFFLINE. Vui lòng Bật lại kết nối Camera ở thanh công cụ phía trên trước khi thả vật thể chạy thử.');
+      return;
+    }
+    if (!isPlaying) setIsPlaying(true);
+    
+    const id = Math.random().toString(36).substring(7);
+    const trackNum = Math.floor(100 + Math.random() * 900);
+    const trackId = `TRK-${trackNum}`;
+    
+    let newObj: SimObject;
+
+    switch (type) {
+      case 'customer_in':
+        newObj = {
+          id,
+          label: 'Khách hàng',
+          icon: '🚶',
+          x: 50 + (Math.random() * 10 - 5),
+          y: 10,
+          targetX: 50 + (Math.random() * 30 - 15),
+          targetY: 90,
+          speed: 1.5,
+          trackId,
+          color: '#3a7bd5',
+          hasCrossed: false,
+          isInsideZone: false,
+          createdAt: Date.now()
+        };
+        addLog(`Simulator: Đang khởi tạo Khách hàng di chuyển VÀO cửa...`, 'info');
+        break;
+      case 'customer_out':
+        newObj = {
+          id,
+          label: 'Khách hàng',
+          icon: '🚶',
+          x: 50 + (Math.random() * 20 - 10),
+          y: 90,
+          targetX: 50 + (Math.random() * 10 - 5),
+          targetY: 5,
+          speed: 1.6,
+          trackId,
+          color: '#3a7bd5',
+          hasCrossed: false,
+          isInsideZone: false,
+          createdAt: Date.now()
+        };
+        addLog(`Simulator: Đang khởi tạo Khách hàng di chuyển RA cửa...`, 'info');
+        break;
+      case 'worker_intrusion':
+        newObj = {
+          id,
+          label: 'Nhân viên',
+          icon: '👷',
+          x: 5,
+          y: 75,
+          targetX: 95,
+          targetY: 75,
+          speed: 1.2,
+          trackId,
+          color: '#f43f5e',
+          hasCrossed: false,
+          isInsideZone: false,
+          createdAt: Date.now()
+        };
+        addLog(`Simulator: Nhân viên bắt đầu di chuyển qua khu vực kho...`, 'info');
+        break;
+      case 'forklift_entry':
+        newObj = {
+          id,
+          label: 'Xe nâng',
+          icon: '🚜',
+          x: 95,
+          y: 60,
+          targetX: 5,
+          targetY: 60,
+          speed: 1.8,
+          trackId,
+          color: '#eab308',
+          hasCrossed: false,
+          isInsideZone: false,
+          createdAt: Date.now()
+        };
+        addLog(`Simulator: Xe nâng di chuyển vào luồng bốc dỡ hàng...`, 'info');
+        break;
+      case 'car_in':
+        const isCar = Math.random() > 0.3;
+        newObj = {
+          id,
+          label: isCar ? 'Ô tô' : 'Xe máy',
+          icon: isCar ? '🚗' : '🏍️',
+          x: 20 + (Math.random() * 10),
+          y: 5,
+          targetX: 20 + (Math.random() * 10),
+          targetY: 95,
+          speed: 2.5,
+          trackId,
+          color: '#10b981',
+          hasCrossed: false,
+          isInsideZone: false,
+          createdAt: Date.now()
+        };
+        addLog(`Simulator: Phương tiện di chuyển vào cổng kiểm soát...`, 'info');
+        break;
+      case 'car_out':
+        newObj = {
+          id,
+          label: 'Ô tô',
+          icon: '🚗',
+          x: 80 + (Math.random() * 10),
+          y: 95,
+          targetX: 80 + (Math.random() * 10),
+          targetY: 5,
+          speed: 2.8,
+          trackId,
+          color: '#10b981',
+          hasCrossed: false,
+          isInsideZone: false,
+          createdAt: Date.now()
+        };
+        addLog(`Simulator: Phương tiện di chuyển rời bãi đỗ...`, 'info');
+        break;
+      case 'box_conveyor':
+        newObj = {
+          id,
+          label: 'Hộp carton',
+          icon: '📦',
+          x: -5,
+          y: 50,
+          targetX: 105,
+          targetY: 50,
+          speed: 2.2,
+          trackId,
+          color: '#8b5cf6',
+          hasCrossed: false,
+          isInsideZone: false,
+          createdAt: Date.now()
+        };
+        addLog(`Simulator: Hộp sản phẩm mới chạy trên băng chuyền...`, 'info');
+        // Instantly increment pack conveyor counters
+        setTimeout(() => {
+          if (isAIModeRef.current && activePipelinesRef.current.some(p => p.id === 'pipe-cv-1')) {
+            setInCount(prev => prev + 1);
+            addLog(`Phát hiện Hộp Carton #${trackId} đi qua điểm quét (Khớp 99%)`, 'success');
+          }
+        }, 1200);
+        break;
+      case 'defective_box':
+        newObj = {
+          id,
+          label: 'Hộp lỗi móp',
+          icon: '📦',
+          x: -5,
+          y: 50,
+          targetX: 105,
+          targetY: 50,
+          speed: 2.2,
+          trackId,
+          color: '#ef4444',
+          hasCrossed: false,
+          isInsideZone: false,
+          createdAt: Date.now()
+        };
+        addLog(`⚠️ Simulator: Phát hiện hộp có dấu hiệu lỗi móp đi vào băng chuyền!`, 'warning');
+        setTimeout(() => {
+          if (isAIModeRef.current && activePipelinesRef.current.some(p => p.id === 'pipe-cv-1')) {
+            triggerAlert(
+              'safety_hazard',
+              `Phát hiện sản phẩm LỖI MÓP méo trên băng chuyền đóng gói (Mã vật thể: ${trackId})`,
+              91
+            );
+            addLog(`🚨 Báo động sản phẩm lỗi: Băng chuyền dừng khẩn cấp để kiểm tra.`, 'error');
+          }
+        }, 1200);
+        break;
+      default:
+        return;
+    }
+
+    setSimObjects(prev => [...prev, newObj]);
+  };
+
+  // Helper to draw simulated background layout of cameras
+  const renderSimulationBackground = () => {
+    switch (camera.type) {
+      case 'retail':
+        return (
+          <div 
+            className="absolute inset-0 overflow-hidden flex flex-col justify-between p-4 select-none bg-cover bg-center"
+            style={{ backgroundImage: "linear-gradient(rgba(248, 250, 252, 0.85), rgba(248, 250, 252, 0.85)), url('https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?q=80&w=1200&auto=format&fit=crop')" }}
+          >
+            {/* Store Shelves Left & Right */}
+            <div className="flex justify-between w-full h-[30%]">
+              <div className="w-[30%] bg-slate-200/80 border border-slate-300 rounded-md flex flex-col justify-center items-center text-xs text-slate-500 font-medium z-20">
+                <span>Kệ Hàng A</span>
+                <span className="text-[10px] text-slate-400 font-normal">Thời trang nam</span>
+              </div>
+              <div className="w-[30%] bg-slate-200/80 border border-slate-300 rounded-md flex flex-col justify-center items-center text-xs text-slate-500 font-medium z-20">
+                <span>Kệ Hàng B</span>
+                <span className="text-[10px] text-slate-400 font-normal">Đồ mỹ phẩm</span>
+              </div>
+            </div>
+
+            {/* Threshold Door Line (Virtual Line count at y=68%) */}
+            {isAIMode && (
+              <div className="absolute top-[68%] left-0 right-0 h-[2px] pointer-events-none z-10">
+                <div className={`w-full h-full border-t-2 border-dashed transition-all duration-300 ${flashLine ? 'border-emerald-500 shadow-lg shadow-emerald-500/50 scale-y-150' : 'border-indigo-400/80'}`}></div>
+                {!isCompact && (
+                  <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-indigo-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                    <Zap size={10} className={flashLine ? 'animate-bounce' : ''} />
+                    Vạch kiểm soát Vào / Ra
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Checkout Area Bottom */}
+            <div className="h-[20%] w-[40%] mx-auto bg-slate-100 border border-slate-200 rounded-t-lg flex items-center justify-center text-xs text-slate-500 font-medium z-20">
+              🛒 Quầy thu ngân
+            </div>
+          </div>
+        );
+      case 'warehouse':
+        return (
+          <div 
+            className="absolute inset-0 overflow-hidden flex flex-col justify-between p-4 select-none bg-cover bg-center"
+            style={{ backgroundImage: "linear-gradient(rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.85)), url('https://images.unsplash.com/photo-1586528116311-ad8ed745140c?q=80&w=1200&auto=format&fit=crop')" }}
+          >
+            {/* Warehouse Shelves top */}
+            <div className="flex justify-around w-full h-[25%] z-20 relative">
+              <div className="w-[22%] bg-amber-50 border border-amber-200 rounded-md p-1 text-[11px] text-amber-700 font-medium flex flex-col justify-center items-center">
+                <span>Kệ hàng #01</span>
+                <span className="text-[10px] text-emerald-600 font-bold">📦 {shelfBoxCount} Hộp nâu</span>
+              </div>
+              <div className="w-[22%] bg-amber-50/50 border border-amber-200/50 rounded-md p-1 text-[11px] text-amber-700/50 font-medium flex flex-col justify-center items-center">
+                <span>Kệ hàng #02</span>
+                <span className="text-[10px] font-normal">Trống</span>
+              </div>
+              <div className="w-[22%] bg-amber-50 border border-amber-200 rounded-md p-1 text-[11px] text-amber-700 font-medium flex flex-col justify-center items-center">
+                <span>Kệ hàng #03</span>
+                <span className="text-[10px] text-emerald-600 font-bold">📦 8 Hộp</span>
+              </div>
+            </div>
+
+            {/* Polygon Danger Zone (Adjusted to avoid overlapping) */}
+            {isAIMode && (
+              <div className="absolute top-[35%] left-[20%] w-[60%] h-[45%] pointer-events-none z-10">
+                <div className={`w-full h-full border-2 rounded-lg transition-all duration-300 ${flashZone ? 'border-red-500 bg-red-500/15 shadow-lg shadow-red-500/30' : 'border-rose-400/60 bg-rose-500/5'}`}></div>
+                {!isCompact && (
+                  <div className="absolute -top-3 left-4 bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                    <AlertTriangle size={10} className="animate-pulse" />
+                    Vùng xe nâng hoạt động
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Warehouse Gate Bottom */}
+            <div className="h-[15%] w-full bg-slate-200/90 border border-slate-300 rounded-t-lg flex items-center justify-center text-xs text-slate-600 font-bold z-20 relative shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+              🚢 Cổng xuất nhập hàng chính
+            </div>
+          </div>
+        );
+      case 'parking':
+        return (
+          <div 
+            className="absolute inset-0 overflow-hidden flex p-4 select-none bg-cover bg-center"
+            style={{ backgroundImage: "linear-gradient(rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.85)), url('https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?q=80&w=1200&auto=format&fit=crop')" }}
+          >
+            {/* Parking Slots Left */}
+            <div className="w-[20%] h-full flex flex-col justify-between z-20">
+              <div className="h-[25%] w-[80%] border-y border-l border-slate-300 bg-slate-100 flex items-center justify-center text-[10px] text-slate-400">P1</div>
+              <div className="h-[25%] w-[80%] border-y border-l border-slate-300 bg-emerald-50 text-emerald-600 flex items-center justify-center text-[10px] font-bold">🚗 ĐÃ ĐỖ</div>
+              <div className="h-[25%] w-[80%] border-y border-l border-slate-300 bg-slate-100 flex items-center justify-center text-[10px] text-slate-400">P3</div>
+            </div>
+
+            <div className="flex-1 flex flex-col justify-center items-center relative">
+              {/* Virtual Line count in the GAP (y=33%) */}
+              {isAIMode && (
+                <div className="absolute top-[33%] left-0 right-0 h-[2px] pointer-events-none z-10">
+                  <div className={`w-full h-full border-t-2 border-dashed transition-all duration-300 ${flashLine ? 'border-emerald-500 shadow-lg shadow-emerald-500/50 scale-y-150' : 'border-indigo-400/80'}`}></div>
+                  {!isCompact && (
+                    <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-indigo-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm">
+                      <Zap size={10} className={flashLine ? 'animate-bounce' : ''} />
+                      Vạch kiểm soát Cổng vào/ra
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      case 'conveyor':
+        return (
+          <div 
+            className="absolute inset-0 overflow-hidden flex flex-col justify-center p-4 select-none bg-cover bg-center"
+            style={{ backgroundImage: "linear-gradient(rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.85)), url('https://images.unsplash.com/photo-1587293852726-6947eb45b4e9?q=80&w=1200&auto=format&fit=crop')" }}
+          >
+            {/* Conveyor Belt running left to right */}
+            <div className="h-[30%] w-full bg-slate-300 border-y-4 border-slate-400 shadow-inner relative flex items-center">
+              {/* Conveyor roll lines */}
+              <div className="absolute inset-0 flex justify-around pointer-events-none opacity-20">
+                {[...Array(12)].map((_, i) => (
+                  <div key={i} className="w-[2px] h-full bg-black"></div>
+                ))}
+              </div>
+
+              {/* Inspection scan zone */}
+              {isAIMode && (
+                <div className="absolute left-[35%] w-[30%] h-full pointer-events-none">
+                  <div className="w-full h-full border-x-2 border-dashed border-purple-500 bg-purple-500/10 animate-pulse"></div>
+                  {!isCompact && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                      Vùng quét lỗi AI
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className={`grid grid-cols-1 ${isCompact ? '' : 'lg:grid-cols-12'} gap-6 h-full`} id="live-monitor-section">
+      {/* Simulation Stream Screen */}
+      <div className={`${isCompact ? 'col-span-1 group hover:border-indigo-500 hover:ring-4 hover:ring-indigo-400 hover:shadow-2xl hover:shadow-indigo-400/40 transition-all duration-300' : 'lg:col-span-8'} flex flex-col bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden h-full`}>
+        {/* Stream Header */}
+        <div className="bg-slate-900 px-4 py-3 flex items-center justify-between text-white relative">
+          {/* Left: Camera name & status badges */}
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-sm leading-none whitespace-nowrap">
+                  {camera.name}
+                </h3>
+                {isStreamOnline ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/20 text-red-500 border border-red-500/30 flex items-center gap-1.5 animate-pulse flex-shrink-0">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div> Đang ghi
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-500/20 text-slate-400 border border-slate-500/30 flex items-center gap-1.5 flex-shrink-0">
+                    Mất tín hiệu
+                  </span>
+                )}
+                {systemLoad !== 'normal' && isStreamOnline && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 border border-amber-500/30 animate-pulse flex items-center gap-1 flex-shrink-0">
+                    <AlertTriangle size={10} /> Đang giảm tốc
+                  </span>
+                )}
+              </div>
+              {!isCompact && (
+                <p className="text-[11px] text-slate-400 mt-1">{camera.location} • {camera.resolution} • {isStreamOnline ? `${degradedFps} FPS` : '0 FPS'}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Control buttons in a single row, properly aligned */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Online/Offline toggle */}
+            <button
+              onClick={() => {
+                if (role === 'viewer') {
+                  alert('🔒 Bạn không có quyền bật/tắt camera ở vai trò Viewer.');
+                  return;
+                }
+                const nextState = !isStreamOnline;
+                setIsStreamOnline(nextState);
+                
+                const now = new Date();
+                const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                const logMsg: LogEntry = {
+                  id: `log-camstate-${Date.now()}`,
+                  timestamp: timeStr,
+                  cameraId: camera.id,
+                  message: `Hệ thống: Trạng thái luồng camera đã được gạt sang [${nextState ? 'ONLINE' : 'OFFLINE'}] bởi quản trị viên. ${!nextState ? 'Giữ nguyên số đếm cuối cùng để chống báo động giả.' : ''}`,
+                  type: nextState ? 'success' : 'error'
+                };
+                setLogs(l => [logMsg, ...l]);
+              }}
+              className={`text-[10px] px-2 py-1.5 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                isStreamOnline
+                  ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30'
+                  : 'bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600/30'
+              }`}
+            >
+              {isStreamOnline ? '🟢 Bật' : '🔴 Tắt'}
+            </button>
+
+            {/* AI toggle */}
+            <button
+              disabled={!isStreamOnline}
+              onClick={() => setIsAIMode(!isAIMode)}
+              className={`text-[10px] px-2 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed ${isAIMode ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              title={isAIMode ? "Chuyển sang Camera Thường" : "Bật AI Phân Tích"}
+            >
+              <Sparkles size={11} className={isAIMode ? "text-indigo-200" : "text-slate-400"} /> 
+              {isCompact ? 'AI' : (isAIMode ? 'AI' : 'AI')}
+            </button>
+
+            {/* Heatmap toggle */}
+            <button
+              disabled={!isStreamOnline}
+              onClick={() => setIsHeatmap(!isHeatmap)}
+              className={`text-[10px] px-2 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isHeatmap ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              title="Bản đồ nhiệt"
+            >
+              {isCompact ? '🔥' : '🔥 Nhiệt'}
+            </button>
+
+            {/* Divider */}
+            <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
+
+            {/* Play/Pause */}
+            <button
+              disabled={!isStreamOnline}
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded-lg text-slate-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={isPlaying ? "Tạm dừng luồng" : "Tiếp tục luồng"}
+            >
+              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+            </button>
+
+            {/* 3-dot menu — always at the far right */}
+            {(onEditCamera || onDeleteCamera || !isCompact) && (
+              <div className="relative">
+                {showMenu && (
+                  <div 
+                    className="fixed inset-0 z-40"
+                    onClick={(e) => { e.stopPropagation(); setShowMenu(false); }}
+                  />
+                )}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(!showMenu);
+                  }}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  title="Tùy chọn camera"
+                >
+                  <MoreVertical size={16} />
+                </button>
+                {showMenu && (
+                  <div className="absolute top-full right-0 mt-1 w-44 bg-slate-800 rounded-lg shadow-xl border border-slate-700 py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    {!isCompact && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowMenu(false);
+                            handleCycleSystemLoad();
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
+                        >
+                          <Activity size={12} /> Mô phỏng tải
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowMenu(false);
+                            handleExportClip();
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
+                        >
+                          💾 Xuất clip
+                        </button>
+                      </>
+                    )}
+                    {onEditCamera && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMenu(false);
+                          onEditCamera(camera.id);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
+                      >
+                        <Edit2 size={12} /> Sửa camera
+                      </button>
+                    )}
+                    {onDeleteCamera && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMenu(false);
+                          onDeleteCamera(camera.id);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs font-medium text-rose-400 hover:bg-slate-700 hover:text-rose-300 flex items-center gap-2"
+                      >
+                        <Trash2 size={12} /> Xoá camera
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Video Canvas Viewport */}
+        <div 
+          className={`relative aspect-video flex-1 overflow-hidden ${isCompact ? 'cursor-pointer h-full border-none' : 'bg-slate-950 border-b border-slate-100'}`}
+          onClick={isCompact && onExpand ? onExpand : undefined}
+          title={isCompact ? "Click để xem chi tiết camera này" : undefined}
+        >
+          {/* Brighten Overlay on Hover (only for compact mode) */}
+          {isCompact && (
+            <div className="absolute inset-0 bg-white/0 group-hover:bg-white/20 group-hover:backdrop-brightness-110 transition-all duration-300 z-50 pointer-events-none" />
+          )}
+
+          {/* PTZ Controls */}
+          {!isCompact && isStreamOnline && (
+            <div className="absolute bottom-4 left-4 z-40 bg-slate-900/80 backdrop-blur-md border border-slate-700/50 p-2 rounded-xl flex flex-col items-center gap-2 shadow-xl hover:bg-slate-900 transition-colors">
+              <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Activity size={10} /> PTZ Control
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <div></div>
+                <button className="bg-slate-800 hover:bg-slate-700 text-white w-6 h-6 flex items-center justify-center rounded text-[10px] cursor-pointer">▲</button>
+                <div></div>
+                <button className="bg-slate-800 hover:bg-slate-700 text-white w-6 h-6 flex items-center justify-center rounded text-[10px] cursor-pointer">◀</button>
+                <div className="bg-slate-900 flex items-center justify-center text-slate-500 rounded text-[10px] shadow-inner">●</div>
+                <button className="bg-slate-800 hover:bg-slate-700 text-white w-6 h-6 flex items-center justify-center rounded text-[10px] cursor-pointer">▶</button>
+                <div></div>
+                <button className="bg-slate-800 hover:bg-slate-700 text-white w-6 h-6 flex items-center justify-center rounded text-[10px] cursor-pointer">▼</button>
+                <div></div>
+              </div>
+              <div className="flex gap-1 w-full mt-1">
+                <button className="bg-slate-800 hover:bg-indigo-600 text-white py-1 flex-1 rounded text-xs font-bold cursor-pointer transition-colors">+</button>
+                <button className="bg-slate-800 hover:bg-indigo-600 text-white py-1 flex-1 rounded text-xs font-bold cursor-pointer transition-colors">-</button>
+              </div>
+            </div>
+          )}
+
+          {/* Simulated Scene background */}
+          {renderSimulationBackground()}
+
+          {/* Dark Grid Overlay UI for Compact Mode */}
+          {isCompact && (
+            <>
+              {/* Top Left: Status Badge */}
+              <div className={`absolute top-4 left-4 text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5 z-40 backdrop-blur-sm border shadow-sm ${
+                isStreamOnline 
+                  ? 'bg-emerald-900/60 border-emerald-500/30 text-emerald-400' 
+                  : 'bg-rose-900/60 border-rose-500/30 text-rose-400'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isStreamOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                {isStreamOnline ? 'LIVE' : 'OFFLINE'}
+              </div>
+            </>
+          )}
+
+          {/* Offline Overlay banner */}
+          {!isStreamOnline && (
+            <div className="absolute inset-0 bg-slate-950/90 z-30 flex flex-col items-center justify-center text-center p-6 space-y-4">
+              <span className="text-4xl animate-pulse">📡</span>
+              <div className="space-y-1">
+                <h4 className="font-bold text-sm text-rose-400 uppercase tracking-wider">Mất kết nối camera (Offline)</h4>
+                <p className="text-[11px] text-slate-400 max-w-md mx-auto leading-relaxed">
+                  Chế độ <strong>Auto-Reconnect</strong> đang hoạt động âm thầm. Hệ thống cố gắng kết nối lại mỗi 5 giây đồng thời giữ nguyên số đếm để triệt tiêu báo động giả.
+                </p>
+                <div className="text-[10px] text-indigo-400 font-bold bg-indigo-950/40 px-3 py-2 rounded-xl border border-indigo-900/40 w-fit mx-auto mt-2">
+                  🔒 Đang neo số đếm: {camera.type === 'conveyor' ? `${inCount} sản phẩm` : `${inCount} Lượt Vào / ${outCount} Lượt Ra`}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsStreamOnline(true);
+                  addLog('Hệ thống: Đã khôi phục kết nối luồng camera thành công.', 'success');
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-extrabold px-4 py-2 rounded-xl transition-all cursor-pointer active:scale-95"
+              >
+                🔄 Khôi phục luồng ngay lập tức
+              </button>
+            </div>
+          )}
+
+          {/* Simulated Heatmap Overlay */}
+          {isHeatmap && (
+            <div className="absolute inset-0 bg-radial-[at_50%_60%] from-orange-500/45 via-yellow-400/25 to-transparent pointer-events-none mix-blend-color-burn transition-all duration-500">
+              <div className="absolute top-[65%] left-[45%] w-32 h-32 rounded-full bg-red-500/50 filter blur-xl animate-pulse"></div>
+              <div className="absolute top-[35%] left-[25%] w-24 h-24 rounded-full bg-orange-500/35 filter blur-lg"></div>
+              <div className="absolute bottom-4 right-1/4 bg-slate-900/95 text-orange-400 text-[10px] font-bold px-2.5 py-1 rounded-md m-2 tracking-wide uppercase flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-orange-500 animate-ping"></span>
+                Đang trực quan mật độ đi lại
+              </div>
+            </div>
+          )}
+
+          {/* Bounding Boxes and Floating Objects */}
+          <AnimatePresence>
+            {simObjects.map((obj) => (
+              <motion.div
+                key={obj.id}
+                className="absolute pointer-events-none flex flex-col items-center justify-center"
+                style={{
+                  left: `${obj.x}%`,
+                  top: `${obj.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                {/* 3D-like icon representation */}
+                <div className="text-2xl relative select-none z-10 filter drop-shadow-md">
+                  {obj.icon}
+                  {obj.isInsideZone && camera.type === 'warehouse' && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 text-[7px] leading-none animate-bounce">
+                      🚨
+                    </span>
+                  )}
+                </div>
+
+                {/* Bounding Box Indicator styled as YOLO output */}
+                {isAIMode && (
+                  <div
+                    className="absolute -inset-4 border-2 rounded-lg pointer-events-none flex flex-col justify-start"
+                    style={{ borderColor: obj.color, boxShadow: `0 0 6px ${obj.color}40` }}
+                  >
+                    {/* Bounding box label block */}
+                    <span
+                      className="absolute bottom-full left-0 text-[9px] text-white px-1.5 py-0.5 font-bold rounded-t-sm whitespace-nowrap leading-none flex items-center gap-1 shadow-sm"
+                      style={{ backgroundColor: obj.color }}
+                    >
+                      <span>{obj.label}</span>
+                      <span className="opacity-80 text-[8px] font-mono">#{obj.trackId}</span>
+                    </span>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {/* Static bounding box examples when stream is empty for non-tech visual understanding */}
+          {simObjects.length === 0 && !isHeatmap && !isCompact && (
+            <div className="absolute inset-0 pointer-events-none">
+              {camera.type === 'retail' && (
+                <div className="absolute top-[65%] left-[28%] border border-dashed border-indigo-400 rounded-lg p-3 text-center bg-indigo-50/50 max-w-[180px]">
+                  <p className="text-[10px] text-indigo-700 font-bold">Khu vực phân tích quầy kệ</p>
+                  <span className="text-[8px] text-slate-500">Giám sát lượt tương tác của khách hàng</span>
+                </div>
+              )}
+              {camera.type === 'conveyor' && (
+                <div className="absolute top-[35%] left-[50%] -translate-x-1/2 border border-dashed border-purple-400 bg-purple-50/50 p-2 rounded text-center">
+                  <p className="text-[10px] text-purple-700 font-bold">Điểm đếm quang học AI</p>
+                  <span className="text-[8px] text-slate-500">Tự động phân lớp & Đếm sản lượng</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Compact Footer for Grid View */}
+        {isCompact && (
+          <div className="bg-slate-50 border-t border-slate-100 px-4 py-3 flex items-center justify-between text-[11px] relative z-20">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1 font-medium text-slate-600">
+                <Activity size={13} className={activePipelines.length > 0 ? "text-indigo-500" : "text-slate-400"} />
+                {activePipelines.length} Luồng AI
+              </span>
+              {unreadAlertsCount > 0 ? (
+                <span className="flex items-center gap-1.5 font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md animate-pulse shadow-sm">
+                  <AlertTriangle size={13} />
+                  {unreadAlertsCount} Cảnh báo mới
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 font-medium text-emerald-600">
+                  <CheckCircle size={13} />
+                  Bình thường
+                </span>
+              )}
+            </div>
+            
+            <div className="font-mono text-slate-700 font-bold bg-white border border-slate-200 px-2 py-0.5 rounded shadow-sm">
+              {camera.type === 'retail' || camera.type === 'parking' ? `Vào: ${inCount} | Ra: ${outCount}` : ''}
+              {camera.type === 'warehouse' ? `Tồn kho: ${shelfBoxCount} hộp` : ''}
+              {camera.type === 'conveyor' ? `Sản lượng: ${inCount}` : ''}
+            </div>
+          </div>
+        )}
+
+        {/* Action Triggers panel (extremely simple & visual) */}
+        {!isCompact && (
+          <div className="bg-slate-50 border-t border-slate-100 flex flex-col">
+            {/* View Mode Toggle */}
+            <div className="px-5 py-3 border-b border-slate-200/60 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white gap-3">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap">Luồng giám sát</h4>
+                <select className="bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-700 rounded-lg px-3 py-1.5 outline-none cursor-pointer hover:border-indigo-300 transition-colors w-full sm:w-auto">
+                  <option value="A">Luồng A (Mặc định)</option>
+                  <option value="B">Luồng B (Hồng ngoại)</option>
+                  <option value="C">Luồng C (Nhiệt phân giải cao)</option>
+                </select>
+              </div>
+              <div className="flex bg-slate-100 rounded-lg p-1 border border-slate-200/60 shadow-inner w-full sm:w-auto overflow-x-auto">
+                <button 
+                  onClick={() => setIsAIMode(false)}
+                  className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${!isAIMode ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Camera Thường
+                </button>
+                <button 
+                  onClick={() => setIsAIMode(true)}
+                  className={`flex-1 sm:flex-none justify-center px-3 py-1.5 rounded-md text-[10px] font-bold transition-all flex items-center gap-1.5 ${isAIMode ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <Sparkles size={12} /> AI Phân Tích
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-indigo-500" />
+                  Bấm để gửi vật thể chạy thử (Trình mô phỏng)
+                </h4>
+                <span className="text-[11px] text-slate-400">Xem camera nhận diện và đếm tức thì bên dưới</span>
+              </div>
+
+          <div className="flex flex-wrap gap-2.5">
+            {camera.type === 'retail' && (
+              <>
+                <button
+                  onClick={() => spawnObject('customer_in')}
+                  className="flex items-center gap-2 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 px-3.5 py-2 rounded-xl text-xs font-medium shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>🚶</span> Khách đi vào cửa
+                </button>
+                <button
+                  onClick={() => spawnObject('customer_out')}
+                  className="flex items-center gap-2 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 px-3.5 py-2 rounded-xl text-xs font-medium shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>🚶</span> Khách đi ra ngoài
+                </button>
+              </>
+            )}
+
+            {camera.type === 'warehouse' && (
+              <>
+                <button
+                  onClick={() => spawnObject('worker_intrusion')}
+                  className="flex items-center gap-2 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-700 hover:text-rose-700 px-3.5 py-2 rounded-xl text-xs font-medium shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>👷</span> Nhân viên vào vùng cấm
+                </button>
+                <button
+                  onClick={() => spawnObject('forklift_entry')}
+                  className="flex items-center gap-2 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 px-3.5 py-2 rounded-xl text-xs font-medium shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>🚜</span> Cho xe nâng hoạt động
+                </button>
+                <button
+                  onClick={() => setShelfBoxCount(prev => prev + 1)}
+                  className="flex items-center gap-2 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-slate-700 hover:text-emerald-700 px-3.5 py-2 rounded-xl text-xs font-medium shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <Plus size={14} className="text-emerald-500" /> Đặt thêm hộp lên kệ #1
+                </button>
+              </>
+            )}
+
+            {camera.type === 'parking' && (
+              <>
+                <button
+                  onClick={() => spawnObject('car_in')}
+                  className="flex items-center gap-2 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 px-3.5 py-2 rounded-xl text-xs font-medium shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>🚗</span> Xe đi VÀO bãi đỗ
+                </button>
+                <button
+                  onClick={() => spawnObject('car_out')}
+                  className="flex items-center gap-2 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 px-3.5 py-2 rounded-xl text-xs font-medium shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>🚗</span> Xe đi RA khỏi bãi
+                </button>
+              </>
+            )}
+
+            {camera.type === 'conveyor' && (
+              <>
+                <button
+                  onClick={() => spawnObject('box_conveyor')}
+                  className="flex items-center gap-2 bg-white hover:bg-purple-50 border border-slate-200 hover:border-purple-200 text-slate-700 hover:text-purple-700 px-3.5 py-2 rounded-xl text-xs font-medium shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>📦</span> Thêm hộp sản phẩm
+                </button>
+                <button
+                  onClick={() => spawnObject('defective_box')}
+                  className="flex items-center gap-2 bg-white hover:bg-red-50 border border-slate-200 hover:border-red-200 text-slate-700 hover:text-red-700 px-3.5 py-2 rounded-xl text-xs font-medium shadow-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <span>⚠️</span> Thêm sản phẩm LỖI MÓP
+                </button>
+              </>
+            )}
+
+            <button
+              onClick={() => {
+                setSimObjects([]);
+                if (camera.id === 'cam-retail') {
+                  setInCount(0);
+                  setOutCount(0);
+                } else if (camera.id === 'cam-warehouse') {
+                  setCurrentZoneCount(0);
+                } else if (camera.id === 'cam-parking') {
+                  setInCount(0);
+                  setOutCount(0);
+                }
+                addLog('Đã hoàn tác và đặt lại tất cả thông số đếm thử nghiệm.', 'info');
+              }}
+              className="flex items-center gap-1.5 ml-auto text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-xl transition-colors text-xs cursor-pointer"
+              title="Đặt lại bộ mô phỏng"
+            >
+              <RefreshCw size={14} /> Đặt lại
+            </button>
+          </div>
+        </div>
+        </div>
+        )}
+      </div>
+
+      {/* Real-time Statistics & Instant Logs (Right Panel) */}
+      {!isCompact && (
+      <div className="lg:col-span-4 flex flex-col gap-6">
+        {/* Real-time counters block */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4 border-b border-slate-50 pb-3">
+            <h3 className="font-semibold text-sm text-slate-800">Thông số bộ đếm AI</h3>
+            <span className="bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wide">Thời gian thực</span>
+          </div>
+
+          {/* Render specific counters based on active pipelines */}
+          <div className="grid grid-cols-2 gap-4">
+            {camera.type === 'retail' && (
+              <>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
+                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide">Khách ĐI VÀO</p>
+                  <p className="text-3xl font-black text-emerald-600 mt-1 font-mono">{inCount}</p>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-center">
+                  <p className="text-[10px] font-bold text-indigo-800 uppercase tracking-wide">Khách ĐI RA</p>
+                  <p className="text-3xl font-black text-indigo-600 mt-1 font-mono">{outCount}</p>
+                </div>
+                <div className="col-span-2 bg-slate-50 rounded-xl p-3 text-center text-xs text-slate-500">
+                  Tổng lượt khách ghé thăm: <strong className="text-slate-800 font-bold">{inCount}</strong> lượt
+                </div>
+              </>
+            )}
+
+            {camera.type === 'warehouse' && (
+              <>
+                <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 text-center">
+                  <p className="text-[10px] font-bold text-rose-800 uppercase tracking-wide">Xe nâng & Người</p>
+                  <p className="text-3xl font-black text-rose-600 mt-1 font-mono">{currentZoneCount}</p>
+                  <p className="text-[9px] text-rose-500 mt-1">Đang trong Vùng cấm</p>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center flex flex-col justify-center">
+                  <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wide">Kệ Hàng #01</p>
+                  <p className="text-3xl font-black text-amber-600 mt-1 font-mono">{shelfBoxCount}</p>
+                  <p className="text-[9px] text-amber-500 mt-1">Hộp carton nâu</p>
+                </div>
+                <div className="col-span-2 bg-slate-50 rounded-xl p-3 flex justify-between items-center text-xs text-slate-500">
+                  <span>Trạng thái khu kho:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${currentZoneCount > 0 ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>
+                    {currentZoneCount > 0 ? '⚠️ CÓ XE NÂNG / NGƯỜI' : '✓ AN TOÀN'}
+                  </span>
+                </div>
+              </>
+            )}
+
+            {camera.type === 'parking' && (
+              <>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
+                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wide">Lượt XE VÀO</p>
+                  <p className="text-3xl font-black text-emerald-600 mt-1 font-mono">{inCount}</p>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-center">
+                  <p className="text-[10px] font-bold text-indigo-800 uppercase tracking-wide">Lượt XE RA</p>
+                  <p className="text-3xl font-black text-indigo-600 mt-1 font-mono">{outCount}</p>
+                </div>
+                <div className="col-span-2 bg-indigo-900 text-white rounded-xl p-3 flex justify-between items-center text-xs">
+                  <span>Sức chứa bãi đỗ (Mẫu):</span>
+                  <span className="font-bold font-mono">Đã đỗ {Math.max(0, inCount - outCount)} / 100 xe</span>
+                </div>
+              </>
+            )}
+
+            {camera.type === 'conveyor' && (
+              <>
+                <div className="col-span-2 bg-purple-50 border border-purple-100 rounded-xl p-4 text-center">
+                  <p className="text-[10px] font-bold text-purple-800 uppercase tracking-wide">Sản Lượng Băng Chuyền</p>
+                  <p className="text-4xl font-black text-purple-600 mt-1 font-mono">{inCount}</p>
+                  <p className="text-[10px] text-purple-500 mt-1">Sản phẩm đã đi qua điểm quét</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Live alerts */}
+        <div className="bg-white border border-slate-100 rounded-2xl flex-1 flex flex-col shadow-sm overflow-hidden min-h-[300px]">
+          {/* Header */}
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100">
+            <CheckCircle size={14} className="text-indigo-600" />
+            <span className="text-xs font-bold text-slate-700">Cảnh báo kích hoạt</span>
+          </div>
+
+          {/* Alert list */}
+          <div className="flex-1 overflow-y-auto p-4 max-h-[400px]">
+            <div className="space-y-3">
+              {alerts.map((evt) => {
+                const statusLabel: Record<string, { text: string; color: string }> = {
+                  new: { text: 'Mới', color: 'bg-rose-100 text-rose-800' },
+                  read: { text: 'Đã đọc', color: 'bg-amber-100 text-amber-800' },
+                  processing: { text: 'Đang xử lý', color: 'bg-blue-100 text-blue-800' },
+                  closed: { text: 'Đã đóng', color: 'bg-slate-200 text-slate-600' },
+                };
+                const st = statusLabel[evt.status] ?? statusLabel.closed;
+                const isActive = evt.status === 'new' || evt.status === 'read' || evt.status === 'processing';
+                return (
+                <div key={evt.id} className={`p-3 rounded-lg border flex gap-2.5 items-start ${evt.status === 'new' ? 'bg-rose-50/70 border-rose-100 text-rose-900' : 'bg-slate-50 border-slate-100 text-slate-700'}`}>
+                  <AlertTriangle size={15} className={`flex-shrink-0 mt-0.5 ${evt.status === 'new' ? 'text-rose-500 animate-pulse' : 'text-slate-400'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider">
+                        {evt.type === 'intrusion' ? '🚨 Xâm Nhập' : evt.type === 'overlimit' ? '⚠️ Quá Giới Hạn' : evt.type === 'safety_hazard' ? '🔥 Vi Phạm An Toàn' : '⚙️ Lỗi Vật Thể'}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${st.color}`}>{st.text}</span>
+                        <span className="text-[10px] font-mono opacity-60">{new Date(evt.timestamp).toLocaleTimeString('vi-VN')}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs font-medium mt-1 leading-normal break-words">{evt.message}</p>
+
+                    {evt.note && (
+                      <div className="mt-1.5 text-[10px] bg-slate-100 rounded px-2 py-1 italic text-slate-500">
+                        Ghi chú: {evt.note}
+                      </div>
+                    )}
+                    
+                    {evt.assignee && (
+                      <div className="mt-1.5 text-[10px] bg-blue-50/50 rounded px-2 py-1 text-blue-700 flex items-center gap-1 border border-blue-100 w-fit">
+                        <User size={10} /> {evt.status === 'closed' ? 'Đã xử lý bởi:' : 'Đang xử lý bởi:'} <span className="font-semibold">{evt.assignee}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between mt-2 text-[10px] opacity-80 flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span>Độ khớp: {evt.score}%</span>
+                        <span className="bg-white/60 text-slate-800 font-bold px-1.5 py-0.5 rounded border border-black/5">Zalo Gửi đi</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* ACK button — only for new/read */}
+                        {(evt.status === 'new' || evt.status === 'read') && (
+                          <button
+                            onClick={() => {
+                              const currentUser = role === 'admin' ? 'Quản trị viên' : role === 'operator' ? 'Trực ban Camera' : 'Viewer';
+                              setAlerts(prev => prev.map(a => a.id === evt.id ? { ...a, status: 'processing' as const, assignee: currentUser } : a));
+                            }}
+                            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-md shadow-sm text-[10px] font-bold cursor-pointer transition-colors"
+                            title="Xác nhận tiếp nhận và xử lý cảnh báo này"
+                          >
+                            <User size={12} /> Tiếp nhận xử lý
+                          </button>
+                        )}
+
+                        {/* Close button — only for processing */}
+                        {evt.status === 'processing' && closingAlertId !== evt.id && (
+                          <button
+                            onClick={() => { setClosingAlertId(evt.id); setCloseNote(''); }}
+                            className="bg-slate-700 hover:bg-slate-800 text-white px-2 py-1 rounded shadow-sm text-[10px] font-bold cursor-pointer transition-colors"
+                          >
+                            Đóng cảnh báo
+                          </button>
+                        )}
+
+                        {/* Show Đúng / Báo Giả only for active alerts */}
+                        {isActive && (
+                          <>
+                            <button
+                              onClick={() => {
+                                alert('💚 Cảm ơn bạn! Phản hồi báo đúng đã được gửi đi để tối ưu hóa mạng nơ-ron.');
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded shadow-sm text-[10px] font-bold cursor-pointer transition-colors"
+                            >
+                              ✓ Đúng
+                            </button>
+                            <button
+                              onClick={() => {
+                                setFalseAlarms(f => f + 1);
+                                alert('⚠️ Đã báo nhận Báo Động Giả! Phản hồi này sẽ được gửi tới đội AI Engine của VisionOS để tinh chỉnh mô hình.');
+                              }}
+                              className="bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded shadow-sm text-[10px] font-bold cursor-pointer transition-colors"
+                            >
+                              ✗ Báo Giả
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Ghi chú textarea when closing */}
+                    {closingAlertId === evt.id && (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={closeNote}
+                          onChange={e => setCloseNote(e.target.value)}
+                          placeholder="Nhập ghi chú lý do đóng..."
+                          className="flex-1 text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-400"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => {
+                            setAlerts(prev => prev.map(a => a.id === evt.id ? { ...a, status: 'closed' as const, note: closeNote } : a));
+                            setClosingAlertId(null);
+                            setCloseNote('');
+                          }}
+                          className="text-xs bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 font-bold cursor-pointer transition-colors"
+                        >
+                          Xác nhận
+                        </button>
+                        <button
+                          onClick={() => { setClosingAlertId(null); setCloseNote(''); }}
+                          className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded hover:bg-slate-300 font-bold cursor-pointer transition-colors"
+                        >
+                          Hủy
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                );
+              })}
+              {alerts.length === 0 && (
+                <div className="text-center py-10 text-slate-400">
+                  <p className="text-xs">Chưa có cảnh báo bạo động nào.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+    </div>
+  );
+}

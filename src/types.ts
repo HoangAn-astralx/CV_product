@@ -1,0 +1,107 @@
+export interface Camera {
+  id: string;
+  name: string;
+  location: string;
+  type: 'retail' | 'warehouse' | 'parking' | 'conveyor';
+  status: 'online' | 'offline';
+  fps: number;
+  resolution: string;
+  latency: number; // in ms
+  site: 'Hà Nội' | 'TP.HCM' | 'Bình Dương';
+}
+
+export interface Detection {
+  id: string;
+  label: string;
+  confidence: number;
+  boundingBox: { x: number; y: number; width: number; height: number };
+  color: string;
+  trackId: string;
+}
+
+export type PipelineStep = 'camera' | 'task' | 'zone' | 'rule' | 'alert';
+
+export interface CountingZone {
+  id: string;
+  name: string;
+  type: 'zone' | 'line';
+  points: { x: number; y: number }[]; // simple visual coordinates (0-100 scale)
+  lineStart?: { x: number; y: number };
+  lineEnd?: { x: number; y: number };
+  count: number;
+  inCount?: number;
+  outCount?: number;
+  maxLimit?: number;
+}
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  cameraId: string;
+  modelId: string;
+  detectorName: string; // "YOLO-NAS" or "LocateAnything"
+  searchQuery?: string; // For LocateAnything custom prompts
+  countingZones: CountingZone[];
+  alertChannels: {
+    zalo: boolean;
+    email: boolean;
+    telegram: boolean;
+    webhook: boolean;
+  };
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AlertEvent {
+  id: string;
+  timestamp: string;
+  cameraName: string;
+  pipelineName: string;
+  type: 'intrusion' | 'overlimit' | 'unusual_behavior' | 'safety_hazard';
+  message: string;
+  status: 'new' | 'read' | 'processing' | 'closed';
+  snapshotUrl?: string;
+  score: number;
+  note?: string;
+  assignee?: string;
+}
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  cameraId: string;
+  pipelineId?: string;
+  isActive: boolean;
+  targetObject: string; // e.g. "Nhân viên", "Xe nâng", "Hộp carton"
+  condition: string;    // e.g. "Vào vùng cấm", "Vượt vạch", "Không đồ bảo hộ"
+  action: string;       // e.g. "Gửi cảnh báo Khẩn cấp", "Kích hoạt còi", "Gửi Email"
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  createdAt: string;
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  cameraId: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'operator' | 'viewer';
+  status: 'active' | 'inactive';
+  lastLogin: string;
+}
+
+export interface StorageConfig {
+  globalRetentionDays: number;
+  totalQuotaGB: number;
+  usedGB: number;
+  cameraSettings: {
+    cameraId: string;
+    retentionDays: number;
+  }[];
+}
