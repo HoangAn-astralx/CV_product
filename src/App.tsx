@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Camera, Pipeline, AlertEvent, LogEntry, AlertRule } from './types';
 import { INITIAL_CAMERAS, INITIAL_PIPELINES, INITIAL_ALERTS, INITIAL_LOGS, INITIAL_RULES } from './mockData';
 import LiveMonitor from './components/LiveMonitor';
@@ -6,79 +6,128 @@ import PipelineBuilder from './components/PipelineBuilder';
 import Playback from './components/Playback';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import AdminPanel from './components/AdminPanel';
-import { Plus, BarChart3, Settings, ShieldAlert, Shield, Eye, Search, ToggleRight, ToggleLeft, Camera as CameraIcon, AlertTriangle, HelpCircle, Activity, Sparkles, Check, Edit2, Trash2, MoreVertical } from 'lucide-react';
+import { Plus, BarChart3, Settings, Camera as CameraIcon, AlertTriangle, Search, Eye, ChevronDown, ChevronLeft, ChevronRight, LogOut, LayoutGrid } from 'lucide-react';
+
+type Page = 'monitor' | 'builder' | 'playback' | 'analytics' | 'admin';
+type GridLayout = '1x1' | '2x2' | '3x3' | '4x4' | '1+2' | '2+1';
+
+const layoutConfigs: Record<GridLayout, { label: string; cols: number; rows: number; cells: number; templateColumns: string; templateRows: string }> = {
+  '1x1': { label: '1x1', cols: 1, rows: 1, cells: 1, templateColumns: '1fr', templateRows: '1fr' },
+  '2x2': { label: '2x2', cols: 2, rows: 2, cells: 4, templateColumns: '1fr 1fr', templateRows: '1fr 1fr' },
+  '3x3': { label: '3x3', cols: 3, rows: 3, cells: 9, templateColumns: 'repeat(3, 1fr)', templateRows: 'repeat(3, 1fr)' },
+  '4x4': { label: '4x4', cols: 4, rows: 4, cells: 16, templateColumns: 'repeat(4, 1fr)', templateRows: 'repeat(4, 1fr)' },
+  '1+2': { label: '1+2', cols: 2, rows: 2, cells: 3, templateColumns: '2fr 1fr', templateRows: '1fr 1fr' },
+  '2+1': { label: '2+1', cols: 2, rows: 2, cells: 3, templateColumns: '1fr 2fr', templateRows: '1fr 1fr' },
+};
+
+const layoutCells: Record<GridLayout, { gridColumn: string; gridRow: string }[]> = {
+  '1x1': [{ gridColumn: '1', gridRow: '1' }],
+  '2x2': [
+    { gridColumn: '1', gridRow: '1' }, { gridColumn: '2', gridRow: '1' },
+    { gridColumn: '1', gridRow: '2' }, { gridColumn: '2', gridRow: '2' },
+  ],
+  '3x3': [
+    { gridColumn: '1', gridRow: '1' }, { gridColumn: '2', gridRow: '1' }, { gridColumn: '3', gridRow: '1' },
+    { gridColumn: '1', gridRow: '2' }, { gridColumn: '2', gridRow: '2' }, { gridColumn: '3', gridRow: '2' },
+    { gridColumn: '1', gridRow: '3' }, { gridColumn: '2', gridRow: '3' }, { gridColumn: '3', gridRow: '3' },
+  ],
+  '4x4': [
+    { gridColumn: '1', gridRow: '1' }, { gridColumn: '2', gridRow: '1' }, { gridColumn: '3', gridRow: '1' }, { gridColumn: '4', gridRow: '1' },
+    { gridColumn: '1', gridRow: '2' }, { gridColumn: '2', gridRow: '2' }, { gridColumn: '3', gridRow: '2' }, { gridColumn: '4', gridRow: '2' },
+    { gridColumn: '1', gridRow: '3' }, { gridColumn: '2', gridRow: '3' }, { gridColumn: '3', gridRow: '3' }, { gridColumn: '4', gridRow: '3' },
+    { gridColumn: '1', gridRow: '4' }, { gridColumn: '2', gridRow: '4' }, { gridColumn: '3', gridRow: '4' }, { gridColumn: '4', gridRow: '4' },
+  ],
+  '1+2': [
+    { gridColumn: '1 / 2', gridRow: '1 / 3' },
+    { gridColumn: '2 / 3', gridRow: '1 / 2' },
+    { gridColumn: '2 / 3', gridRow: '2 / 3' },
+  ],
+  '2+1': [
+    { gridColumn: '1 / 2', gridRow: '1 / 2' },
+    { gridColumn: '1 / 2', gridRow: '2 / 3' },
+    { gridColumn: '2 / 3', gridRow: '1 / 3' },
+  ],
+};
 
 export default function App() {
-  const [activeSection, setActiveSection] = useState<'monitor' | 'builder' | 'playback' | 'analytics' | 'admin'>('monitor');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  const [activeSection, setActiveSection] = useState<Page>('monitor');
   const [selectedCameraId, setSelectedCameraId] = useState<string>('cam-retail');
-  const [viewMode, setViewMode] = useState<'single' | 'grid'>('grid');
+  const [gridLayout, setGridLayout] = useState<GridLayout>('4x4');
+  const [previousGridLayout, setPreviousGridLayout] = useState<GridLayout>('4x4');
+  const [showGridMenu, setShowGridMenu] = useState(false);
   const [pipelines, setPipelines] = useState<Pipeline[]>(INITIAL_PIPELINES);
   const [alerts, setAlerts] = useState<AlertEvent[]>(INITIAL_ALERTS);
   const [logs, setLogs] = useState<LogEntry[]>(INITIAL_LOGS);
   const [rules, setRules] = useState<AlertRule[]>(INITIAL_RULES);
-  const [gridLayout, setGridLayout] = useState<'1x1' | '2x2' | '3x3' | '4x4'>('2x2');
-  const [gridSlots, setGridSlots] = useState<Record<number, string | null>>({});
-  const [isCameraListOpen, setIsCameraListOpen] = useState(false);
-  const [role, setRole] = useState<'admin' | 'operator' | 'viewer'>('operator');
   const [selectedSite, setSelectedSite] = useState<'Tất cả' | 'Hà Nội' | 'TP.HCM' | 'Bình Dương'>('Tất cả');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [camListOpen, setCamListOpen] = useState(false);
 
   const [cameras, setCameras] = useState<Camera[]>(() => {
-    const saved = localStorage.getItem('visionos_cameras');
+    const saved = localStorage.getItem('visionos_cameras_v2');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === 10) return parsed;
+      } catch (e) {}
     }
+    localStorage.removeItem('visionos_cameras');
     return INITIAL_CAMERAS;
   });
 
   useEffect(() => {
-    localStorage.setItem('visionos_cameras', JSON.stringify(cameras));
+    localStorage.setItem('visionos_cameras_v2', JSON.stringify(cameras));
   }, [cameras]);
 
   useEffect(() => {
-    if (Object.keys(gridSlots).length === 0 && cameras.length > 0) {
-      const initialSlots: Record<number, string | null> = {};
-      cameras.slice(0, 4).forEach((cam, idx) => {
-        initialSlots[idx] = cam.id;
-      });
-      setGridSlots(initialSlots);
+    if (cameras.length > 0 && !cameras.some(c => c.id === selectedCameraId)) {
+      setSelectedCameraId(cameras[0].id);
     }
-  }, [cameras, gridSlots]);
-
-  const getGridClass = () => {
-    switch (gridLayout) {
-      case '1x1': return 'grid-cols-1';
-      case '2x2': return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2';
-      case '3x3': return 'grid-cols-1 md:grid-cols-3 lg:grid-cols-3';
-      case '4x4': return 'grid-cols-2 md:grid-cols-4 lg:grid-cols-4';
-      default: return 'grid-cols-2';
-    }
-  };
-
-  const getSlotCount = () => {
-    switch (gridLayout) {
-      case '1x1': return 1;
-      case '2x2': return 4;
-      case '3x3': return 9;
-      case '4x4': return 16;
-      default: return 4;
-    }
-  };
+  }, [cameras, selectedCameraId]);
 
   const [showAddCamera, setShowAddCamera] = useState(false);
-  const [openCameraMenuId, setOpenCameraMenuId] = useState<string | null>(null);
   const [editingCameraId, setEditingCameraId] = useState<string | null>(null);
-  const [newCamera, setNewCamera] = useState<Partial<Camera>>({ type: 'retail', site: 'Hà Nội', name: '', location: '' });
+  const [newCamera, setNewCamera] = useState<Partial<Camera>>({
+    type: 'retail', kind: 'ip', site: 'Hà Nội', name: '', location: '',
+    username: 'admin', password: 'admin123'
+  });
+
+  const [gridCameras, setGridCameras] = useState<Camera[]>([]);
+  const [draggedCamId, setDraggedCamId] = useState<string | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const filteredCameras = selectedSite === 'Tất cả' ? cameras : cameras.filter(c => c.site === selectedSite);
   const activeCamera = filteredCameras.find(c => c.id === selectedCameraId) || filteredCameras[0] || cameras[0];
+  const unreadAlertsCount = alerts.filter(a => a.status === 'new').length;
 
-  const handleSaveCamera = () => {
-    if (role === 'viewer') {
-      alert('🔒 Bạn không có quyền thêm/sửa camera.');
+  useEffect(() => {
+    const cells = layoutConfigs[gridLayout].cells;
+    if (gridLayout !== '1x1' && gridCameras.length === 0 && filteredCameras.length > 0) {
+      setGridCameras(filteredCameras.slice(0, cells));
+    }
+  }, [gridLayout, filteredCameras]);
+
+  const handleLogin = () => {
+    if (!loginUsername.trim() || !loginPassword.trim()) {
+      alert('Vui lòng nhập tên đăng nhập và mật khẩu.');
       return;
     }
-    if (!newCamera.name || !newCamera.location) {
-      alert('Vui lòng nhập đầy đủ tên và vị trí camera.');
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setLoginUsername('');
+    setLoginPassword('');
+  };
+
+  const handleSaveCamera = () => {
+    if (!newCamera.name || !newCamera.location || !newCamera.username || !newCamera.password) {
+      alert('Vui lòng nhập đầy đủ thông tin camera.');
       return;
     }
 
@@ -90,7 +139,10 @@ export default function App() {
             name: newCamera.name!,
             location: newCamera.location!,
             type: newCamera.type as any,
-            site: newCamera.site as any
+            kind: newCamera.kind as any,
+            site: newCamera.site as any,
+            username: newCamera.username!,
+            password: newCamera.password!,
           };
         }
         return c;
@@ -101,11 +153,14 @@ export default function App() {
         name: newCamera.name,
         location: newCamera.location,
         type: newCamera.type as 'retail' | 'warehouse' | 'parking' | 'conveyor',
+        kind: newCamera.kind as 'ip' | 'onvif' | 'usb',
         site: newCamera.site as 'Hà Nội' | 'TP.HCM' | 'Bình Dương',
         status: 'online',
         fps: 30,
         resolution: '1920x1080',
         latency: 100,
+        username: newCamera.username || 'admin',
+        password: newCamera.password || 'admin123',
       };
       setCameras(prev => [...prev, camera]);
       setSelectedCameraId(camera.id);
@@ -113,15 +168,11 @@ export default function App() {
 
     setShowAddCamera(false);
     setEditingCameraId(null);
-    setNewCamera({ type: 'retail', site: 'Hà Nội', name: '', location: '' });
+    setNewCamera({ type: 'retail', kind: 'ip', site: 'Hà Nội', name: '', location: '', username: 'admin', password: 'admin123' });
   };
 
   const handleDeleteCamera = (id: string) => {
-    if (role === 'viewer') {
-      alert('🔒 Bạn không có quyền xoá camera.');
-      return;
-    }
-    if (confirm('Bạn có chắc chắn muốn xoá camera này? Các luồng AI gắn với camera này cũng sẽ bị ảnh hưởng.')) {
+    if (confirm('Bạn có chắc chắn muốn xoá camera này?')) {
       setCameras(prev => prev.filter(c => c.id !== id));
       if (selectedCameraId === id) {
         const remaining = cameras.filter(c => c.id !== id);
@@ -133,10 +184,6 @@ export default function App() {
   };
 
   const togglePipeline = (pipelineId: string) => {
-    if (role === 'viewer') {
-      alert('🔒 Bạn không có quyền bật/tắt luồng AI với vai trò Viewer.');
-      return;
-    }
     setPipelines(prev =>
       prev.map(p => {
         if (p.id === pipelineId) {
@@ -147,7 +194,7 @@ export default function App() {
             id: `log-sys-${Date.now()}`,
             timestamp: timeStr,
             cameraId: p.cameraId,
-            message: `Hệ thống: Luồng AI "${p.name}" đã được ${nextState ? 'BẬT' : 'TẮT'} bởi quản trị viên.`,
+            message: `Hệ thống: Luồng AI "${p.name}" đã được ${nextState ? 'BẬT' : 'TẮT'}.`,
             type: nextState ? 'success' : 'warning'
           };
           setLogs(l => [logMsg, ...l]);
@@ -159,10 +206,6 @@ export default function App() {
   };
 
   const deletePipeline = (id: string) => {
-    if (role === 'viewer') {
-      alert('🔒 Bạn không có quyền xóa luồng AI với vai trò Viewer.');
-      return;
-    }
     if (confirm('Bạn có chắc chắn muốn xóa Luồng AI này?')) {
       setPipelines(prev => prev.filter(p => p.id !== id));
     }
@@ -172,334 +215,371 @@ export default function App() {
     setAlerts(prev => prev.map(a => ({ ...a, status: 'read' })));
   };
 
-  const unreadAlertsCount = alerts.filter(a => a.status === 'unread').length;
+  const camerasBySite = useMemo(() => {
+    const grouped: Record<string, Camera[]> = {};
+    cameras.forEach(c => {
+      if (!grouped[c.site]) grouped[c.site] = [];
+      grouped[c.site].push(c);
+    });
+    return grouped;
+  }, [cameras]);
+
+  const handleDragStart = (camId: string) => {
+    setDraggedCamId(camId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setDragOverIdx(idx);
+  };
+
+  const handleDrop = (idx: number) => {
+    if (!draggedCamId) return;
+    const fromIdx = gridCameras.findIndex(c => c.id === draggedCamId);
+    const draggedCam = cameras.find(c => c.id === draggedCamId);
+    if (!draggedCam) return;
+    const newOrder = [...gridCameras];
+    if (fromIdx !== -1) {
+      const [moved] = newOrder.splice(fromIdx, 1);
+      newOrder.splice(idx, 0, moved);
+    } else {
+      newOrder.splice(idx, 0, draggedCam);
+    }
+    setGridCameras(newOrder);
+    setDraggedCamId(null);
+    setDragOverIdx(null);
+  };
+
+  const openCameraDetail = (cameraId: string) => {
+    if (gridLayout !== '1x1') {
+      setPreviousGridLayout(gridLayout);
+    }
+    setSelectedCameraId(cameraId);
+    setActiveSection('monitor');
+    setGridLayout('1x1');
+  };
+
+  const backToCameraGrid = () => {
+    const layout = previousGridLayout === '1x1' ? '4x4' : previousGridLayout;
+    setGridLayout(layout);
+    if (gridCameras.length === 0) {
+      setGridCameras(filteredCameras.slice(0, layoutConfigs[layout].cells));
+    }
+  };
+
+  const allLayouts: { id: GridLayout }[] = [
+    { id: '1x1' }, { id: '2x2' }, { id: '3x3' }, { id: '4x4' },
+    { id: '1+2' }, { id: '2+1' },
+  ];
+
+  const navItems: { id: Page; label: string; icon: any }[] = [
+    { id: 'monitor', label: 'Giám sát', icon: <Eye size={18} /> },
+    { id: 'builder', label: 'Cấu hình', icon: <CameraIcon size={18} /> },
+    { id: 'playback', label: 'Xem lại', icon: <Search size={18} /> },
+    { id: 'analytics', label: 'Báo cáo', icon: <BarChart3 size={18} /> },
+    { id: 'admin', label: 'Quản trị', icon: <Settings size={18} /> },
+  ];
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-neutral-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden border border-neutral-200">
+          <div className="bg-neutral-900 p-6 text-center">
+            <div className="h-14 w-14 rounded-2xl bg-emerald-600 flex items-center justify-center text-white mx-auto mb-3">
+              <Eye size={28} />
+            </div>
+            <h1 className="text-xl font-bold text-white">VisionOS</h1>
+            <p className="text-sm text-neutral-400 mt-1">Nền tảng Giám sát & Đếm thông minh AI</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 mb-1.5">Tên đăng nhập</label>
+              <input
+                type="text"
+                value={loginUsername}
+                onChange={e => setLoginUsername(e.target.value)}
+                placeholder="admin"
+                className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-neutral-700 mb-1.5">Mật khẩu</label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={e => setLoginPassword(e.target.value)}
+                placeholder="••••••"
+                className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              />
+            </div>
+            <button
+              onClick={handleLogin}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-lg transition-colors cursor-pointer text-sm"
+            >
+              Đăng nhập
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 text-slate-800 font-sans antialiased">
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 lg:px-8 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-5">
-          <div className="h-14 w-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-sm shadow-indigo-600/20">
-            <Eye size={32} />
+    <div className="min-h-screen bg-neutral-50 text-neutral-800 font-sans antialiased flex">
+      {/* Sidebar */}
+      <aside className={`bg-neutral-950 text-white flex flex-col border-r border-neutral-900 transition-all duration-300 ${sidebarOpen ? 'w-56' : 'w-0 overflow-hidden'}`}>
+        <div className="p-4 border-b border-neutral-900 flex items-center gap-3">
+          <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white flex-shrink-0">
+            <Eye size={16} />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-black text-3xl tracking-tight text-slate-900 leading-none">VisionOS</h1>
-            </div>
-            <p className="text-sm text-slate-500 font-medium mt-1">Nền tảng Giám sát &amp; Đếm thông minh AI</p>
-          </div>
+          <h1 className="font-bold text-sm flex-1">VisionOS</h1>
+          <button
+            onClick={handleLogout}
+            className="text-neutral-600 hover:text-white p-1.5 rounded-lg hover:bg-neutral-900 transition-colors cursor-pointer"
+            title="Đăng xuất"
+          >
+            <LogOut size={16} />
+          </button>
         </div>
 
-        <nav className="hidden md:flex items-center bg-slate-100 rounded-2xl p-2 gap-2">
-          <button
-            onClick={() => setActiveSection('monitor')}
-            className={`flex items-center gap-2.5 text-base font-bold px-6 py-3 rounded-xl transition-all cursor-pointer ${activeSection === 'monitor' ? 'bg-white text-indigo-700 shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
-          >
-            <Eye size={20} />
-            Giám sát trực tiếp
-          </button>
-          <button
-            onClick={() => setActiveSection('builder')}
-            className={`flex items-center gap-2.5 text-base font-bold px-6 py-3 rounded-xl transition-all cursor-pointer ${activeSection === 'builder' ? 'bg-white text-indigo-700 shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
-          >
-            <CameraIcon size={20} />
-            Cấu hình Camera
-          </button>
-          <button
-            onClick={() => setActiveSection('playback')}
-            className={`flex items-center gap-2.5 text-base font-bold px-6 py-3 rounded-xl transition-all cursor-pointer ${activeSection === 'playback' ? 'bg-white text-indigo-700 shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
-          >
-            <Search size={20} />
-            Xem lại camera
-          </button>
-          <button
-            onClick={() => setActiveSection('analytics')}
-            className={`flex items-center gap-2.5 text-base font-bold px-6 py-3 rounded-xl transition-all cursor-pointer ${activeSection === 'analytics' ? 'bg-white text-indigo-700 shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
-          >
-            <BarChart3 size={20} />
-            Báo cáo &amp; Biểu đồ
-          </button>
-          <button
-            onClick={() => setActiveSection('admin')}
-            className={`flex items-center gap-2.5 text-base font-bold px-6 py-3 rounded-xl transition-all cursor-pointer ${activeSection === 'admin' ? 'bg-white text-indigo-700 shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
-          >
-            <Settings size={20} />
-            Quản trị hệ thống
-          </button>
-        </nav>
-
-        <div className="flex items-center gap-5">
-          {unreadAlertsCount > 0 && (
-            <button
-              onClick={() => {
-                setActiveSection('monitor');
-                markAllAlertsAsRead();
-              }}
-              className="bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-700 rounded-2xl px-5 py-2.5 text-base font-bold flex items-center gap-2 animate-pulse cursor-pointer transition-colors"
-            >
-              <AlertTriangle size={20} />
-              {unreadAlertsCount} Cảnh báo
-            </button>
-          )}
-
-          <div className="h-12 w-px bg-slate-200" />
-
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              {role === 'admin' ? <Shield size={24} /> : role === 'operator' ? <Settings size={24} /> : <Eye size={24} />}
-            </div>
-            <div className="hidden lg:block text-left">
-              <p className="text-base font-bold text-slate-800 leading-none">{role === 'admin' ? 'Admin' : role === 'operator' ? 'Operator' : 'User'}</p>
-              <p className="text-sm text-slate-500 mt-1.5 capitalize">{role} Account</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="md:hidden bg-white border-b border-slate-100 p-2 flex justify-around">
-        <button
-          onClick={() => setActiveSection('monitor')}
-          className={`flex flex-col items-center p-2 text-[10px] font-bold ${activeSection === 'monitor' ? 'text-indigo-600' : 'text-slate-400'}`}
-        >
-          <Eye size={16} />
-          <span>Giám sát</span>
-        </button>
-        <button
-          onClick={() => setActiveSection('builder')}
-          className={`flex flex-col items-center p-2 text-[10px] font-bold ${activeSection === 'builder' ? 'text-indigo-600' : 'text-slate-400'}`}
-        >
-          <CameraIcon size={16} />
-          <span>Cấu hình</span>
-        </button>
-        <button
-          onClick={() => setActiveSection('playback')}
-          className={`flex flex-col items-center p-2 text-[10px] font-bold ${activeSection === 'playback' ? 'text-indigo-600' : 'text-slate-400'}`}
-        >
-          <Search size={16} />
-          <span>Xem lại</span>
-        </button>
-        <button
-          onClick={() => setActiveSection('analytics')}
-          className={`flex flex-col items-center p-2 text-[10px] font-bold ${activeSection === 'analytics' ? 'text-indigo-600' : 'text-slate-400'}`}
-        >
-          <BarChart3 size={16} />
-          <span>Báo cáo</span>
-        </button>
-      </div>
-
-      <section className="bg-indigo-900 text-white px-6 py-3 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Activity size={18} className="text-indigo-300 animate-pulse" />
-          <span className="text-sm font-medium text-indigo-100">
-            Trạng thái hệ thống: <strong className="text-white font-bold">Hoạt động bình thường</strong> • Đã kết nối 4 camera IP
-          </span>
-        </div>
-
-        <div className="flex items-center gap-4 text-sm">
-          <span>Tổng luồng AI: <strong className="text-indigo-300 font-bold">{pipelines.length}</strong></span>
-          <span>•</span>
-          <span>Đang chạy: <strong className="text-indigo-300 font-bold">{pipelines.filter(p => p.isActive).length}</strong></span>
-        </div>
-      </section>
-
-      <main className="w-full px-4 lg:px-8 py-6 space-y-6">
-        
-        <section className="bg-white border border-slate-100 rounded-3xl p-5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-5">
-          <div className="flex-1 space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-800 text-xs font-black px-2.5 py-1 rounded uppercase tracking-wider">Mô phỏng Phân quyền (RBAC) &amp; Multi-site</span>
-              <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">● Demo hoạt động</span>
-            </div>
-            <h3 className="font-extrabold text-base text-slate-800 mt-2">Thử nghiệm Giao diện theo vai trò người dùng</h3>
-            <p className="text-sm text-slate-500 leading-relaxed">
-              Hãy chuyển đổi giữa <strong>Admin</strong>, <strong>Operator</strong> và <strong>Viewer</strong> để quan sát sự thay đổi quyền hạn giao diện và giới hạn địa lý thực tế.
-            </p>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="space-y-1.5 flex-1 sm:flex-initial">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">Phạm vi Địa điểm (Site):</label>
-              <select
-                value={selectedSite}
-                onChange={(e) => {
-                  const siteVal = e.target.value as any;
-                  setSelectedSite(siteVal);
-                  const filtered = siteVal === 'Tất cả' ? INITIAL_CAMERAS : INITIAL_CAMERAS.filter(c => c.site === siteVal);
-                  if (filtered.length > 0 && !filtered.some(c => c.id === selectedCameraId)) {
-                    setSelectedCameraId(filtered[0].id);
-                  }
+        {(activeSection === 'monitor' || activeSection === 'playback') && (
+        /* Camera Tree */
+        <div className="flex-1 overflow-y-auto border-t border-neutral-900 mt-2">
+          <div className="p-3">
+            <div className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider mb-2 px-2 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setCamListOpen(!camListOpen)}
+                  className="p-0.5 rounded-sm text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
+                >
+                  <ChevronDown size={11} className={camListOpen ? '' : '-rotate-90'} />
+                </button>
+                <span>Camera ({filteredCameras.length})</span>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveSection('monitor');
+                  const count = filteredCameras.length;
+                  let layout: GridLayout = '4x4';
+                  if (count <= 1) layout = '1x1';
+                  else if (count <= 4) layout = '2x2';
+                  else if (count <= 9) layout = '3x3';
+                  setGridLayout(layout);
+                  setGridCameras(filteredCameras.slice(0, layoutConfigs[layout].cells));
                 }}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-700 font-bold focus:outline-hidden cursor-pointer"
+                className="p-0.5 rounded-sm text-neutral-500 hover:text-emerald-400 hover:bg-neutral-800 transition-colors cursor-pointer"
+                title="Xem tất cả trên lưới"
               >
-                <option value="Tất cả">Tất cả địa điểm</option>
-                <option value="Hà Nội">Chi nhánh Hà Nội</option>
-                <option value="TP.HCM">Chi nhánh TP.HCM</option>
-                <option value="Bình Dương">Kho Bình Dương</option>
-              </select>
+                <Eye size={11} />
+              </button>
             </div>
-
-            <div className="space-y-1.5 flex-1 sm:flex-initial">
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wide">Vai trò người dùng (Role):</label>
-              <div className="flex bg-slate-100 p-1 rounded-xl">
-                {[
-                  { id: 'admin', label: 'Admin', icon: <Shield size={14} /> },
-                  { id: 'operator', label: 'Operator', icon: <Settings size={14} /> },
-                  { id: 'viewer', label: 'Viewer', icon: <Eye size={14} /> }
-                ].map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => {
-                      setRole(r.id as any);
-                      const now = new Date();
-                      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-                      const logMsg: LogEntry = {
-                        id: `log-role-${Date.now()}`,
-                        timestamp: timeStr,
-                        cameraId: activeCamera.id,
-                        message: `Hệ thống: Tài khoản đã chuyển sang quyền [${r.label.toUpperCase()}]. Giao diện thích ứng ngay lập tức.`,
-                        type: 'info'
-                      };
-                      setLogs(l => [logMsg, ...l]);
-                    }}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${role === r.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                  >
-                    <span>{r.icon}</span>
-                    <span>{r.label}</span>
-                  </button>
-                ))}
-              </div>
+            {camListOpen && (
+            <div className="space-y-0.5">
+              {filteredCameras.map(cam => (
+                <button
+                  key={cam.id}
+                  draggable
+                  onDragStart={(e) => { e.dataTransfer.setData('text/plain', cam.id); handleDragStart(cam.id); }}
+                  onClick={() => openCameraDetail(cam.id)}
+                  className={`w-full text-left px-2 py-1 rounded text-xs transition-colors cursor-pointer flex items-center gap-2 ${
+                    selectedCameraId === cam.id && activeSection === 'monitor' && gridLayout === '1x1'
+                      ? 'text-emerald-400'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cam.status === 'online' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                  <span className="truncate">{cam.name}</span>
+                </button>
+              ))}
             </div>
+            )}
           </div>
-        </section>
+        </div>
+        )}
+      </aside>
 
-        {activeSection === 'monitor' && (
-          <div className="space-y-6">
-            <div className="space-y-2">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Bar */}
+        <header className="bg-white border-b border-neutral-100 px-4 lg:px-6 py-3 grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-1.5 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer justify-self-start"
+          >
+            {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
+
+          <nav className="flex items-center justify-center gap-1 min-w-0 overflow-x-auto">
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                  activeSection === item.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'
+                }`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+                {item.id === 'monitor' && unreadAlertsCount > 0 && (
+                  <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded-full font-bold ml-0.5">
+                    {unreadAlertsCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-3 justify-self-end">
+            <select
+              value={selectedSite}
+              onChange={(e) => {
+                const siteVal = e.target.value as any;
+                setSelectedSite(siteVal);
+                const filtered = siteVal === 'Tất cả' ? cameras : cameras.filter(c => c.site === siteVal);
+                if (filtered.length > 0 && !filtered.some(c => c.id === selectedCameraId)) {
+                  setSelectedCameraId(filtered[0].id);
+                }
+              }}
+              className="bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-700 focus:outline-hidden cursor-pointer"
+            >
+              <option value="Tất cả">Tất cả địa điểm</option>
+              <option value="Hà Nội">Hà Nội</option>
+              <option value="TP.HCM">TP.HCM</option>
+              <option value="Bình Dương">Bình Dương</option>
+            </select>
+          </div>
+        </header>
+
+
+
+        {/* Main Content Area */}
+        <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
+          {activeSection === 'monitor' && (
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-black text-slate-500 uppercase tracking-wider">
-                  {viewMode === 'single' ? `Chọn camera giám sát (${filteredCameras.length} trong site này)` : `Lưới giám sát tổng hợp (${filteredCameras.length} camera)`}
-                </h2>
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setShowAddCamera(true)}
-                    className="px-4 py-2 text-sm font-bold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200 cursor-pointer flex items-center gap-1"
-                  >
-                    <Plus size={16} /> Thêm Camera Mới
-                  </button>
-                  <div className="flex bg-slate-100 rounded-lg p-1.5">
+                  <div className="relative">
                     <button
-                      onClick={() => setViewMode('grid')}
-                      className={`px-4 py-1.5 text-sm font-bold rounded-md transition-colors cursor-pointer ${viewMode === 'grid' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      onClick={() => setShowGridMenu(!showGridMenu)}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-300 transition-colors cursor-pointer flex items-center gap-1.5"
                     >
-                      Xem nhiều cam (Lưới)
+                      <LayoutGrid size={12} />
+                      {layoutConfigs[gridLayout].label}
                     </button>
-                    <button
-                      onClick={() => setViewMode('single')}
-                      className={`px-4 py-1.5 text-sm font-bold rounded-md transition-colors cursor-pointer ${viewMode === 'single' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                      Xem chi tiết (Đơn)
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {viewMode === 'single' ? (
-              <LiveMonitor
-                camera={activeCamera}
-                pipelines={pipelines}
-                alerts={alerts}
-                setAlerts={setAlerts}
-                logs={logs}
-                setLogs={setLogs}
-                role={role}
-                onEditCamera={(id) => {
-                  setEditingCameraId(id);
-                  const cam = cameras.find(c => c.id === id);
-                  if (cam) {
-                    setNewCamera({ name: cam.name, location: cam.location, type: cam.type, site: cam.site });
-                  }
-                  setShowAddCamera(true);
-                }}
-                onDeleteCamera={handleDeleteCamera}
-              />
-            ) : (
-              <div className="flex flex-col lg:flex-row gap-4 items-start">
-                <div className="w-full lg:w-64 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex-shrink-0 transition-all">
-                  <div className="flex flex-col gap-3 mb-4">
-                    <div className="flex items-center justify-between">
-                      <h3 
-                        onClick={() => setIsCameraListOpen(!isCameraListOpen)}
-                        className="font-bold text-sm text-slate-800 cursor-pointer flex items-center justify-between w-full hover:text-indigo-600 transition-colors"
-                      >
-                        Danh sách Camera
-                        <span className="text-slate-400">{isCameraListOpen ? '▼' : '▶'}</span>
-                      </h3>
-                    </div>
-                    <div className="flex bg-slate-100 rounded-lg p-1 self-start">
-                      {['1x1', '2x2', '3x3', '4x4'].map((layout) => (
-                        <button
-                          key={layout}
-                          onClick={() => setGridLayout(layout as any)}
-                          className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors cursor-pointer ${gridLayout === layout ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                          {layout}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {isCameraListOpen && (
-                    <div className="animate-in slide-in-from-top-2 fade-in duration-200">
-                      <p className="text-xs text-slate-400 mb-3 font-medium">Kéo thả camera vào ô trống bên phải để xem</p>
-                      <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                        {filteredCameras.map((cam) => (
-                          <div
-                            key={cam.id}
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('cameraId', cam.id);
-                            }}
-                            className="bg-slate-50 border border-slate-200 p-3 rounded-xl cursor-grab active:cursor-grabbing hover:bg-slate-100 transition-colors flex items-center gap-3"
-                          >
-                            <div className={`w-2.5 h-2.5 rounded-full ${cam.status === 'online' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                            <div>
-                              <p className="text-sm font-bold text-slate-800 leading-tight">{cam.name}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">{cam.location}</p>
-                            </div>
+                    {showGridMenu && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowGridMenu(false)} />
+                        <div className="absolute top-full left-0 mt-1 bg-white border border-neutral-200 rounded-xl shadow-lg p-3 z-50 min-w-[220px]">
+                          <div className="text-xs font-medium text-neutral-500 mb-2 px-1">Chọn bố cục lưới</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {allLayouts.map(layout => (
+                              <button
+                                key={layout.id}
+                                onClick={() => {
+                                  setGridLayout(layout.id);
+                                  setShowGridMenu(false);
+                                  if (layout.id !== '1x1') {
+                                    const cells = layoutConfigs[layout.id].cells;
+                                    setGridCameras(filteredCameras.slice(0, cells));
+                                  }
+                                }}
+                                className={`p-2 rounded-lg text-[10px] font-medium transition-colors cursor-pointer flex flex-col items-center gap-1.5 ${
+                                  gridLayout === layout.id
+                                    ? 'bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700'
+                                    : 'bg-neutral-50 border border-neutral-100 text-neutral-600 hover:border-neutral-200'
+                                }`}
+                              >
+                                <div
+                                  className="w-10 h-8 grid gap-px"
+                                  style={{
+                                    gridTemplateColumns: layoutConfigs[layout.id].templateColumns,
+                                    gridTemplateRows: layoutConfigs[layout.id].templateRows,
+                                  }}
+                                >
+                                  {layoutCells[layout.id].map((cell, i) => (
+                                    <div
+                                      key={i}
+                                      style={{ gridColumn: cell.gridColumn, gridRow: cell.gridRow }}
+                                      className={`rounded-sm ${gridLayout === layout.id ? 'bg-emerald-300' : 'bg-neutral-300'}`}
+                                    />
+                                  ))}
+                                </div>
+                                <span>{layoutConfigs[layout.id].label}</span>
+                              </button>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
+                <button
+                  onClick={() => setShowAddCamera(true)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Plus size={14} /> Thêm Camera
+                </button>
+              </div>
 
-                <div className={`flex-1 w-full grid ${getGridClass()} gap-4`}>
-                  {Array.from({ length: getSlotCount() }).map((_, slotIndex) => {
-                    const cameraId = gridSlots[slotIndex];
-                    const cam = cameraId ? cameras.find(c => c.id === cameraId) : null;
-
+              {gridLayout === '1x1' ? (
+                <div className="space-y-3">
+                  <button
+                    onClick={backToCameraGrid}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <ChevronLeft size={14} />
+                    Quay lại
+                  </button>
+                  <LiveMonitor
+                    camera={activeCamera}
+                    pipelines={pipelines}
+                    alerts={alerts}
+                    setAlerts={setAlerts}
+                    logs={logs}
+                    setLogs={setLogs}
+                    onEditCamera={(id) => {
+                      setEditingCameraId(id);
+                      const cam = cameras.find(c => c.id === id);
+                      if (cam) {
+                        setNewCamera({
+                          name: cam.name, location: cam.location, type: cam.type,
+                          kind: cam.kind, site: cam.site, username: cam.username, password: cam.password
+                        });
+                      }
+                      setShowAddCamera(true);
+                    }}
+                    onDeleteCamera={handleDeleteCamera}
+                    onTogglePipeline={togglePipeline}
+                  />
+                </div>
+              ) : (
+                <div
+                  className="grid gap-4"
+                  style={{
+                    gridTemplateColumns: layoutConfigs[gridLayout].templateColumns,
+                    gridTemplateRows: layoutConfigs[gridLayout].templateRows,
+                  }}
+                >
+                  {layoutCells[gridLayout].map((cell, idx) => {
+                    const cam = gridCameras[idx];
                     return (
                       <div
-                        key={slotIndex}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          const draggedCamId = e.dataTransfer.getData('cameraId');
-                          if (draggedCamId) {
-                            setGridSlots(prev => ({ ...prev, [slotIndex]: draggedCamId }));
-                          }
-                        }}
-                        className={`bg-slate-100/50 rounded-2xl border-2 border-dashed ${cam ? 'border-transparent bg-transparent' : 'border-slate-300 flex items-center justify-center min-h-[250px]'}`}
+                        key={idx}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDragLeave={() => setDragOverIdx(null)}
+                        onDrop={() => handleDrop(idx)}
+                        style={{ gridColumn: cell.gridColumn, gridRow: cell.gridRow }}
+                        className={`border rounded-xl overflow-hidden transition-all ${
+                          dragOverIdx === idx ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-neutral-100'
+                        } ${cam ? 'bg-white' : 'bg-neutral-50 border-dashed flex items-center justify-center min-h-[200px]'}`}
                       >
                         {cam ? (
-                          <div className="relative h-full w-full group">
-                            <button
-                              onClick={() => setGridSlots(prev => ({ ...prev, [slotIndex]: null }))}
-                              className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-rose-500/80 hover:bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                              title="Gỡ camera khỏi ô này"
-                            >
-                              <Plus size={14} className="rotate-45" />
-                            </button>
+                          <div className="relative h-full">
                             <LiveMonitor
                               camera={cam}
                               pipelines={pipelines}
@@ -507,214 +587,121 @@ export default function App() {
                               setAlerts={setAlerts}
                               logs={logs}
                               setLogs={setLogs}
-                              role={role}
                               isCompact={true}
-                              onExpand={() => {
-                                setSelectedCameraId(cam.id);
-                                setViewMode('single');
-                              }}
+                              onExpand={() => openCameraDetail(cam.id)}
                               onEditCamera={(id) => {
                                 setEditingCameraId(id);
                                 const c = cameras.find(c => c.id === id);
                                 if (c) {
-                                  setNewCamera({ name: c.name, location: c.location, type: c.type, site: c.site });
+                                  setNewCamera({
+                                    name: c.name, location: c.location, type: c.type,
+                                    kind: c.kind, site: c.site, username: c.username, password: c.password
+                                  });
                                 }
                                 setShowAddCamera(true);
                               }}
                               onDeleteCamera={handleDeleteCamera}
+                              onTogglePipeline={togglePipeline}
                             />
                           </div>
                         ) : (
-                          <div className="text-slate-400 text-center pointer-events-none">
-                            <Plus size={24} className="mx-auto mb-2 opacity-50" />
-                            <p className="text-xs font-medium">Kéo thả camera vào đây</p>
+                          <div className="text-neutral-400 text-xs text-center p-4">
+                            <Plus size={24} className="mx-auto mb-1 opacity-50" />
+                            Kéo thả camera từ thanh bên trái vào đây
                           </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            )}
-
-            {viewMode === 'single' && (
-            <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-50 pb-4">
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900">Danh sách Luồng AI trên camera này</h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Bật hoặc tắt mô hình AI chỉ với 1 click gạt nút</p>
-                </div>
-                <button
-                  onClick={() => setActiveSection('builder')}
-                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
-                >
-                  <Plus size={13} /> Thiết lập luồng AI mới
-                </button>
-              </div>
-
-              <div className="space-y-3">
-                {pipelines.filter(p => p.cameraId === selectedCameraId).map((pipe) => (
-                  <div key={pipe.id} className="border border-slate-100 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:bg-slate-50/40 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-sm ${pipe.isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'}`}>
-                        ⚙️
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-semibold text-xs text-slate-800">{pipe.name}</h4>
-                          <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-bold">
-                            {pipe.detectorName}
-                          </span>
-                          {pipe.searchQuery && (
-                            <span className="text-[9px] bg-purple-50 text-purple-700 border border-purple-100/50 px-1.5 py-0.5 rounded font-medium">
-                              Mô tả: "{pipe.searchQuery}"
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Vùng: {pipe.countingZones.map(z => `${z.name} (${z.type === 'line' ? 'Vạch kẻ' : 'Khu vực'})`).join(', ')} • Tạo ngày {new Date(pipe.createdAt).toLocaleDateString('vi-VN')}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-50">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold ${pipe.isActive ? 'text-indigo-600' : 'text-slate-400'}`}>
-                          {pipe.isActive ? 'ĐANG CHẠY' : 'ĐÃ TẮT'}
-                        </span>
-                        <button
-                          onClick={() => togglePipeline(pipe.id)}
-                          className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                          title={pipe.isActive ? "Tạm tắt luồng" : "Bật luồng"}
-                        >
-                          {pipe.isActive ? (
-                            <ToggleRight size={28} className="text-indigo-600" />
-                          ) : (
-                            <ToggleLeft size={28} className="text-slate-300" />
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="h-4 w-px bg-slate-200 hidden md:block" />
-
-                      <button
-                        onClick={() => deletePipeline(pipe.id)}
-                        className="text-[10px] text-slate-400 hover:text-rose-600 font-bold px-2.5 py-1 rounded-md hover:bg-rose-50 cursor-pointer transition-colors"
-                      >
-                        Xóa luồng
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {pipelines.filter(p => p.cameraId === selectedCameraId).length === 0 && (
-                  <div className="text-center py-6 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
-                    <p className="text-xs">Chưa có luồng giám sát thông minh AI nào cho camera này.</p>
-                    <p className="text-[10px] mt-0.5">Click vào nút "Thiết lập luồng AI mới" để tạo tức thì!</p>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-            )}
-          </div>
-        )}
+          )}
 
-        {activeSection === 'builder' && (
-          role === 'viewer' ? (
-            <div className="bg-white border border-slate-100 rounded-3xl p-10 text-center space-y-4 max-w-lg mx-auto shadow-sm">
-              <div className="h-14 w-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto text-2xl">
-                🔒
-              </div>
-              <h3 className="font-extrabold text-slate-900 text-base">Tính năng này bị Khóa</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Giao diện hiện tại đang chạy ở quyền <strong>Viewer (Người chỉ xem)</strong>. Quyền này chỉ cho phép bạn giám sát trực tiếp camera &amp; số đếm thời gian thực.
-              </p>
-              <p className="text-[11px] text-indigo-600 font-bold bg-indigo-50/50 p-2.5 rounded-xl border border-indigo-100/30">
-                Hãy chuyển vai trò người dùng thành <strong>Operator (Vận hành)</strong> hoặc <strong>Admin</strong> ở đầu trang để tự tay cấu hình luồng AI mới!
-              </p>
-            </div>
-          ) : (
+          {activeSection === 'builder' && (
             <PipelineBuilder
               cameras={cameras}
               pipelines={pipelines}
               setPipelines={setPipelines}
               setRules={setRules}
-              role={role}
+              onSelectCamera={(id) => setSelectedCameraId(id)}
               onComplete={() => {
                 setActiveSection('monitor');
                 const alertMsg = document.createElement('div');
-                alertMsg.className = "fixed bottom-5 right-5 bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-bounce";
-                alertMsg.innerHTML = `✓ Kích hoạt luồng AI mới thành công!`;
+                alertMsg.className = "fixed bottom-5 right-5 bg-emerald-600 text-white text-xs font-medium px-4 py-2.5 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-bounce";
+                alertMsg.innerHTML = '✓ Kích hoạt luồng AI mới thành công!';
                 document.body.appendChild(alertMsg);
                 setTimeout(() => alertMsg.remove(), 3000);
               }}
             />
-          )
-        )}
+          )}
 
-        {activeSection === 'playback' && (
-          <Playback role={role} cameras={filteredCameras} alerts={alerts} />
-        )}
+          {activeSection === 'playback' && (
+            <Playback cameras={filteredCameras} alerts={alerts} />
+          )}
 
-        {activeSection === 'analytics' && (
-          <AnalyticsPanel alerts={alerts} pipelines={pipelines} />
-        )}
+          {activeSection === 'analytics' && (
+            <AnalyticsPanel alerts={alerts} pipelines={pipelines} />
+          )}
 
-        {activeSection === 'admin' && (
-          <AdminPanel
-            cameras={cameras}
-            onEditCamera={(id) => {
-              setEditingCameraId(id);
-              const cam = cameras.find(c => c.id === id);
-              if (cam) {
-                setNewCamera({ name: cam.name, location: cam.location, type: cam.type, site: cam.site });
-              }
-              setShowAddCamera(true);
-            }}
-            onDeleteCamera={handleDeleteCamera}
-          />
-        )}
-
-      </main>
+          {activeSection === 'admin' && (
+            <AdminPanel
+              cameras={cameras}
+              onEditCamera={(id) => {
+                setEditingCameraId(id);
+                const cam = cameras.find(c => c.id === id);
+                if (cam) {
+                  setNewCamera({
+                    name: cam.name, location: cam.location, type: cam.type,
+                    kind: cam.kind, site: cam.site, username: cam.username, password: cam.password
+                  });
+                }
+                setShowAddCamera(true);
+              }}
+              onDeleteCamera={handleDeleteCamera}
+            />
+          )}
+        </main>
+      </div>
 
       {/* Add Camera Modal */}
       {showAddCamera && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="bg-gradient-to-r from-slate-900 to-indigo-900 p-4 text-white">
+            <div className="bg-neutral-900 p-4 text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <CameraIcon size={18} className="text-indigo-400" />
+                <CameraIcon size={18} className="text-emerald-400" />
                 {editingCameraId ? 'Cập nhật Camera' : 'Thêm Camera Mới'}
               </h2>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Tên Camera</label>
-                <input 
-                  type="text" 
-                  value={newCamera.name}
+                <label className="block text-xs font-medium text-neutral-700 mb-1">Tên Camera</label>
+                <input
+                  type="text"
+                  value={newCamera.name || ''}
                   onChange={e => setNewCamera({...newCamera, name: e.target.value})}
                   placeholder="VD: Camera Kho A"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                  className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Vị trí lắp đặt</label>
-                <input 
-                  type="text" 
-                  value={newCamera.location}
+                <label className="block text-xs font-medium text-neutral-700 mb-1">Vị trí lắp đặt</label>
+                <input
+                  type="text"
+                  value={newCamera.location || ''}
                   onChange={e => setNewCamera({...newCamera, location: e.target.value})}
                   placeholder="VD: Khu vực Lối ra vào"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                  className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Phân loại</label>
-                  <select 
+                  <label className="block text-xs font-medium text-neutral-700 mb-1">Phân loại</label>
+                  <select
                     value={newCamera.type}
                     onChange={e => setNewCamera({...newCamera, type: e.target.value})}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                    className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
                   >
                     <option value="retail">Cửa hàng Bán lẻ</option>
                     <option value="warehouse">Kho hàng</option>
@@ -723,41 +710,74 @@ export default function App() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Site</label>
-                  <select 
-                    value={newCamera.site}
-                    onChange={e => setNewCamera({...newCamera, site: e.target.value})}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500"
+                  <label className="block text-xs font-medium text-neutral-700 mb-1">Kết nối</label>
+                  <select
+                    value={newCamera.kind}
+                    onChange={e => setNewCamera({...newCamera, kind: e.target.value})}
+                    className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
                   >
-                    <option value="Hà Nội">Hà Nội</option>
-                    <option value="TP.HCM">TP.HCM</option>
-                    <option value="Bình Dương">Bình Dương</option>
+                    <option value="ip">IP Camera</option>
+                    <option value="onvif">ONVIF</option>
+                    <option value="usb">USB Camera</option>
                   </select>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-700 mb-1">Tên đăng nhập</label>
+                  <input
+                    type="text"
+                    value={newCamera.username || ''}
+                    onChange={e => setNewCamera({...newCamera, username: e.target.value})}
+                    placeholder="admin"
+                    className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-700 mb-1">Mật khẩu</label>
+                  <input
+                    type="password"
+                    value={newCamera.password || ''}
+                    onChange={e => setNewCamera({...newCamera, password: e.target.value})}
+                    placeholder="admin123"
+                    className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-neutral-700 mb-1">Site</label>
+                <select
+                  value={newCamera.site}
+                  onChange={e => setNewCamera({...newCamera, site: e.target.value})}
+                  className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-500"
+                >
+                  <option value="Hà Nội">Hà Nội</option>
+                  <option value="TP.HCM">TP.HCM</option>
+                  <option value="Bình Dương">Bình Dương</option>
+                </select>
+              </div>
             </div>
-            <div className="bg-slate-50 border-t border-slate-100 p-4 flex justify-end gap-2">
-              <button 
+            <div className="bg-neutral-50 border-t border-neutral-100 p-4 flex justify-end gap-2">
+              <button
                 onClick={() => {
                   setShowAddCamera(false);
                   setEditingCameraId(null);
-                  setNewCamera({ type: 'retail', site: 'Hà Nội', name: '', location: '' });
+                  setNewCamera({ type: 'retail', kind: 'ip', site: 'Hà Nội', name: '', location: '', username: 'admin', password: 'admin123' });
                 }}
-                className="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-200/50 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                className="px-4 py-2 text-sm font-medium text-neutral-600 bg-neutral-200/50 hover:bg-neutral-200 rounded-lg transition-colors cursor-pointer"
               >
                 Hủy bỏ
               </button>
-              <button 
+              <button
                 onClick={handleSaveCamera}
-                className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
               >
-                <Check size={16} /> {editingCameraId ? 'Lưu thay đổi' : 'Tạo mới'}
+                + {editingCameraId ? 'Lưu thay đổi' : 'Tạo mới'}
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

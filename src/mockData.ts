@@ -1,71 +1,49 @@
 import { Camera, Pipeline, AlertEvent, LogEntry } from './types';
 
-export const INITIAL_CAMERAS: Camera[] = [
-  {
-    id: 'cam-retail',
-    name: 'Camera Cửa hàng Bán lẻ',
-    location: 'Khu vực Lối ra vào & Quầy kệ',
-    type: 'retail',
-    status: 'online',
-    fps: 30,
-    resolution: '1920x1080',
-    latency: 120,
-    site: 'Hà Nội',
-  },
-  {
-    id: 'cam-warehouse',
-    name: 'Camera Kho hàng Trung tâm',
-    location: 'Khu vực bốc xếp & Lưu trữ',
-    type: 'warehouse',
-    status: 'online',
-    fps: 25,
-    resolution: '1920x1080',
-    latency: 180,
-    site: 'Bình Dương',
-  },
-  {
-    id: 'cam-parking',
-    name: 'Camera Bãi đỗ xe thông minh',
-    location: 'Cổng vào & Khu bãi đỗ',
-    type: 'parking',
-    status: 'online',
-    fps: 30,
-    resolution: '2560x1440',
-    latency: 150,
-    site: 'TP.HCM',
-  },
-  {
-    id: 'cam-conveyor',
-    name: 'Camera Băng chuyền Nhà máy',
-    location: 'Dây chuyền Đóng gói Sản phẩm',
-    type: 'conveyor',
-    status: 'online',
-    fps: 60,
-    resolution: '1280x720',
-    latency: 45,
-    site: 'Bình Dương',
-  }
-];
+const generateCameras = (count: number): Camera[] => {
+  const sites: ('Hà Nội' | 'TP.HCM' | 'Bình Dương')[] = ['Hà Nội', 'TP.HCM', 'Bình Dương'];
+  const types: ('retail' | 'warehouse' | 'parking' | 'conveyor')[] = ['retail', 'warehouse', 'parking', 'conveyor'];
+  const kinds: ('ip' | 'onvif' | 'usb')[] = ['ip', 'onvif', 'usb'];
+  const resolutions = ['1920x1080', '1280x720', '2560x1440', '3840x2160'];
+  const baseNames = ['Cửa chính', 'Hành lang', 'Nhà kho', 'Bãi xe', 'Khu A', 'Khu B', 'Cổng ra', 'Khu bốc dỡ', 'Khu trưng bày', 'Khu chế xuất'];
 
-export const MODEL_OPTIONS = [
-  {
-    id: 'model-yolo',
-    name: 'Đếm Số Lượng Tốc Độ Cao',
-    description: 'AI tự động nhận diện và đếm các đồ vật quen thuộc (người, xe, hộp, chai...) ngay lập tức. Tối ưu cho tốc độ và ổn định.',
-    classes: ['Người', 'Xe máy', 'Ô tô', 'Hộp giấy', 'Chai nước'],
-    isCustom: false,
-  },
-  {
-    id: 'model-locate',
-    name: 'Nhận Diện Tùy Chỉnh Nâng Cao',
-    description: 'Bạn có thể đếm bất kỳ đồ vật nào bằng cách tự nhập mô tả bằng tiếng Việt (ví dụ: "hộp carton màu vàng", "xe tải màu trắng"). Phù hợp với nhu cầu đặc thù.',
-    classes: ['Mọi thứ mô tả bằng văn bản'],
-    isCustom: true,
-  }
-];
+  const specificCameras: Camera[] = [
+    { id: 'cam-retail', name: 'Camera Cửa hàng Bán lẻ', location: 'Khu vực Lối ra vào & Quầy kệ', type: 'retail', kind: 'ip', status: 'online', fps: 30, resolution: '1920x1080', latency: 120, site: 'Hà Nội', username: 'admin', password: 'admin123' },
+    { id: 'cam-warehouse', name: 'Camera Kho hàng Trung tâm', location: 'Khu vực bốc xếp & Lưu trữ', type: 'warehouse', kind: 'onvif', status: 'online', fps: 25, resolution: '1920x1080', latency: 180, site: 'Bình Dương', username: 'admin', password: 'admin123' },
+    { id: 'cam-parking', name: 'Camera Bãi đỗ xe thông minh', location: 'Cổng vào & Khu bãi đỗ', type: 'parking', kind: 'ip', status: 'online', fps: 30, resolution: '2560x1440', latency: 150, site: 'TP.HCM', username: 'admin', password: 'admin123' },
+    { id: 'cam-conveyor', name: 'Camera Băng chuyền Nhà máy', location: 'Dây chuyền Đóng gói Sản phẩm', type: 'conveyor', kind: 'usb', status: 'online', fps: 60, resolution: '1280x720', latency: 45, site: 'Bình Dương', username: 'admin', password: 'admin123' }
+  ];
+
+  const generated = Array.from({ length: count - 4 }, (_, i) => {
+    const site = sites[Math.floor(Math.random() * sites.length)];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    const resolution = resolutions[Math.floor(Math.random() * resolutions.length)];
+    const status: 'online' | 'offline' = Math.random() > 0.05 ? 'online' : 'offline';
+    const baseName = baseNames[Math.floor(Math.random() * baseNames.length)];
+
+    return {
+      id: `cam-${i + 1}-${type}-${Math.random().toString(36).substring(2, 6)}`,
+      name: `Cam ${i + 5} - ${baseName} (${site})`,
+      location: `Khu vực ${baseName}`,
+      type,
+      kind,
+      status,
+      fps: Math.random() > 0.5 ? 30 : (Math.random() > 0.5 ? 25 : 60),
+      resolution,
+      latency: Math.floor(Math.random() * 200) + 20,
+      site,
+      username: 'admin',
+      password: 'admin123',
+    };
+  });
+
+  return [...specificCameras, ...generated];
+};
+
+export const INITIAL_CAMERAS: Camera[] = generateCameras(10);
 
 export const AI_USECASES = [
-  // NHẬN DIỆN ĐỐI TƯỢNG
   {
     id: 'uc-ppe',
     category: 'Nhận diện đối tượng',
@@ -73,11 +51,9 @@ export const AI_USECASES = [
     description: 'Phát hiện công nhân không đội mũ bảo hộ, không mặc áo phản quang.',
     icon: '🦺',
     tags: ['Zone Alert', 'LocateAnything'],
-    modelId: 'model-locate',
     searchQuery: 'người không đội mũ bảo hộ, người không mặc áo phản quang',
     countingType: 'zone',
   },
-
   {
     id: 'uc-defect',
     category: 'Nhận diện đối tượng',
@@ -85,12 +61,9 @@ export const AI_USECASES = [
     description: 'Nhận diện các vết xước, móp méo, hoặc sản phẩm không đạt chuẩn trên dây chuyền.',
     icon: '🔍',
     tags: ['Anomaly', 'LocateAnything'],
-    modelId: 'model-locate',
     searchQuery: 'vết xước, vết nứt, móp méo, sản phẩm lỗi',
     countingType: 'zone',
   },
-
-  // ĐẾM NGƯỜI
   {
     id: 'uc-people-count',
     category: 'Đếm người',
@@ -98,7 +71,6 @@ export const AI_USECASES = [
     description: 'Đếm số lượt người đi qua cổng, cửa hàng theo hai chiều (Vào/Ra).',
     icon: '👥',
     tags: ['Line Count', 'YOLO'],
-    modelId: 'model-yolo',
     countingType: 'line',
   },
   {
@@ -108,7 +80,6 @@ export const AI_USECASES = [
     description: 'Đếm lượng người đang xếp hàng chờ và cảnh báo nếu hàng quá dài.',
     icon: '🧍‍♂️',
     tags: ['Zone Count', 'YOLO'],
-    modelId: 'model-yolo',
     countingType: 'zone',
   },
   {
@@ -118,11 +89,8 @@ export const AI_USECASES = [
     description: 'Đo lường thời gian khách ở lại quầy dịch vụ và cảnh báo nếu phục vụ quá lâu.',
     icon: '⏱️',
     tags: ['Dwell Time', 'YOLO'],
-    modelId: 'model-yolo',
     countingType: 'zone',
   },
-
-  // ĐẾM ĐỒ VẬT
   {
     id: 'uc-vehicle',
     category: 'Đếm đồ vật',
@@ -130,7 +98,6 @@ export const AI_USECASES = [
     description: 'Giám sát lưu lượng xe ô tô, xe máy qua trạm kiểm soát hoặc bãi đỗ.',
     icon: '🚗',
     tags: ['Line Count', 'YOLO'],
-    modelId: 'model-yolo',
     countingType: 'line',
   },
   {
@@ -140,7 +107,6 @@ export const AI_USECASES = [
     description: 'Đếm số lượng thùng carton, kiện hàng di chuyển trên băng chuyền.',
     icon: '📦',
     tags: ['Line Count', 'LocateAnything'],
-    modelId: 'model-locate',
     searchQuery: 'hộp carton, kiện hàng',
     countingType: 'line',
   },
@@ -151,12 +117,9 @@ export const AI_USECASES = [
     description: 'Kiểm kê tự động số lượng hàng hoá đang có mặt trên các kệ kho.',
     icon: '🏢',
     tags: ['Zone Count', 'LocateAnything'],
-    modelId: 'model-locate',
     searchQuery: 'hàng hoá trên kệ',
     countingType: 'zone',
   },
-
-  // CẢNH BÁO
   {
     id: 'uc-intrusion',
     category: 'Gửi cảnh báo theo rule',
@@ -164,7 +127,6 @@ export const AI_USECASES = [
     description: 'Báo động ngay lập tức khi phát hiện có người lạ đi vào khu vực hạn chế.',
     icon: '🚨',
     tags: ['Zone Alert', 'YOLO'],
-    modelId: 'model-yolo',
     countingType: 'zone',
   },
   {
@@ -174,7 +136,6 @@ export const AI_USECASES = [
     description: 'Gửi thông báo khi lượng người trong một khu vực vượt quá giới hạn an toàn.',
     icon: '⚠️',
     tags: ['Zone Alert', 'YOLO'],
-    modelId: 'model-yolo',
     countingType: 'zone',
   },
   {
@@ -184,7 +145,6 @@ export const AI_USECASES = [
     description: 'Phát hiện phương tiện dừng/đỗ quá thời gian cho phép tại khu vực cấm.',
     icon: '🛑',
     tags: ['Dwell Time', 'YOLO'],
-    modelId: 'model-yolo',
     countingType: 'zone',
   }
 ];
@@ -195,7 +155,6 @@ export const PIPELINE_TEMPLATES = [
     name: 'Đếm khách vào ra',
     description: 'Tôi muốn đếm số lượng khách hàng đi vào và đi ra khỏi cửa hàng',
     cameraId: 'cam-retail',
-    modelId: 'model-yolo',
     detectorName: 'YOLO-NAS-S',
     countingType: 'line',
     ruleCondition: 'count_gt_max',
@@ -205,7 +164,6 @@ export const PIPELINE_TEMPLATES = [
     name: 'Đếm xe bãi đỗ',
     description: 'Tôi cần đếm số lượng ô tô và xe máy đi qua cổng bãi đỗ',
     cameraId: 'cam-parking',
-    modelId: 'model-yolo',
     detectorName: 'YOLO-NAS-S',
     countingType: 'line',
     ruleCondition: 'count_gt_max',
@@ -215,7 +173,6 @@ export const PIPELINE_TEMPLATES = [
     name: 'Cảnh báo xâm nhập',
     description: 'Cảnh báo khi có người lạ đi vào khu vực bốc xếp hàng hóa',
     cameraId: 'cam-warehouse',
-    modelId: 'model-yolo',
     detectorName: 'YOLO-NAS-S',
     countingType: 'zone',
     ruleCondition: 'intrusion',
@@ -225,7 +182,6 @@ export const PIPELINE_TEMPLATES = [
     name: 'Kiểm kê kệ hàng',
     description: 'Đếm số lượng hộp carton màu vàng đang có trên kệ',
     cameraId: 'cam-warehouse',
-    modelId: 'model-locate',
     detectorName: 'LocateAnything-3B',
     searchQuery: 'hộp carton màu vàng',
     countingType: 'zone',
@@ -236,7 +192,6 @@ export const PIPELINE_TEMPLATES = [
     name: 'Giám sát an toàn vùng nguy hiểm',
     description: 'Phát hiện công nhân không đội mũ bảo hộ trong vùng máy móc',
     cameraId: 'cam-warehouse',
-    modelId: 'model-yolo-locate',
     detectorName: 'YOLO + Locate Crop',
     searchQuery: 'người không đội mũ bảo hộ',
     countingType: 'zone',
@@ -247,7 +202,6 @@ export const PIPELINE_TEMPLATES = [
     name: 'Phát hiện hành vi bất thường',
     description: 'Phát hiện hàng hóa bị móp méo trên băng chuyền',
     cameraId: 'cam-conveyor',
-    modelId: 'model-locate',
     detectorName: 'LocateAnything-3B',
     searchQuery: 'hàng hóa móp méo, sản phẩm lỗi',
     countingType: 'zone',
@@ -260,7 +214,6 @@ export const INITIAL_PIPELINES: Pipeline[] = [
     id: 'pipe-rt-1',
     name: 'Đếm khách ra vào Cửa hàng',
     cameraId: 'cam-retail',
-    modelId: 'model-yolo',
     detectorName: 'YOLO-NAS-S',
     countingZones: [
       {
@@ -283,7 +236,6 @@ export const INITIAL_PIPELINES: Pipeline[] = [
     id: 'pipe-wh-1',
     name: 'Giám sát An toàn Lao động (PPE & Xe nâng)',
     cameraId: 'cam-warehouse',
-    modelId: 'model-yolo',
     detectorName: 'YOLO-NAS-S',
     countingZones: [
       {
@@ -308,7 +260,6 @@ export const INITIAL_PIPELINES: Pipeline[] = [
     id: 'pipe-wh-2',
     name: 'Kiểm kê Hộp carton vàng',
     cameraId: 'cam-warehouse',
-    modelId: 'model-locate',
     detectorName: 'LocateAnything-3B',
     searchQuery: 'hộp carton màu vàng',
     countingZones: [
@@ -395,7 +346,6 @@ export const INITIAL_LOGS: LogEntry[] = [
   }
 ];
 
-// Analytical reports mock data
 export const VISITOR_CHART_DATA = [
   { hour: '08:00', 'Vào': 15, 'Ra': 8, 'Trong vùng': 7 },
   { hour: '09:00', 'Vào': 32, 'Ra': 20, 'Trong vùng': 19 },

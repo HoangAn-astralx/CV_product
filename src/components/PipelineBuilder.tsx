@@ -1,127 +1,303 @@
-import { useState, Dispatch, SetStateAction, useEffect } from 'react';
+import { useState, Dispatch, SetStateAction } from 'react';
 import { Camera, Pipeline, CountingZone, PipelineStep, AlertRule } from '../types';
-import { INITIAL_CAMERAS, MODEL_OPTIONS, PIPELINE_TEMPLATES, AI_USECASES } from '../mockData';
-import { Check, Camera as CamIcon, Cpu, Sliders, Bell, AlertCircle, ArrowRight, ArrowLeft, MessageSquare, Send, Mail, Webhook, FileText } from 'lucide-react';
+import { PIPELINE_TEMPLATES } from '../mockData';
+import { Check, Camera as CamIcon, Cpu, Sliders, Bell, AlertCircle, ArrowRight, ArrowLeft, MessageSquare, Send, Mail, Webhook, FileText, Clock, ChevronRight, Trash2, Pencil } from 'lucide-react';
 
 interface PipelineBuilderProps {
   cameras: Camera[];
   pipelines: Pipeline[];
   setPipelines: Dispatch<SetStateAction<Pipeline[]>>;
   setRules?: Dispatch<SetStateAction<AlertRule[]>>;
-  role: 'admin' | 'operator' | 'viewer';
   onComplete: () => void;
+  onSelectCamera?: (id: string) => void;
 }
+
+type InferredMonitoringConfig = {
+  mode: 'standard' | 'smart';
+  model: string;
+  target?: string;
+  rule: string;
+  scope: 'whole_scene' | 'roi';
+  countingType: 'zone' | 'line';
+  searchQuery?: string;
+  config: Record<string, string | number | boolean | undefined>;
+};
 
 export default function PipelineBuilder({
   cameras,
   pipelines,
   setPipelines,
   setRules,
-  role,
   onComplete,
+  onSelectCamera,
 }: PipelineBuilderProps) {
   const [currentStep, setCurrentStep] = useState<PipelineStep | 'list'>('list');
-  
-  // Builder Draft State
-  const [selectedCameraId, setSelectedCameraId] = useState(cameras[0]?.id || '');
+
+  const [selectedCameraIds, setSelectedCameraIds] = useState<string[]>([]);
   const [selectedUseCaseId, setSelectedUseCaseId] = useState('');
-  const [selectedModelId, setSelectedModelId] = useState('model-yolo');
+  const [flowName, setFlowName] = useState('');
+  const [monitoringMode, setMonitoringMode] = useState<'standard' | 'smart'>('smart');
   const [userDescription, setUserDescription] = useState('');
   const [routedModelName, setRoutedModelName] = useState('YOLO-NAS-S');
   const [routedModelReason, setRoutedModelReason] = useState('Mặc định');
-  
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [cameraSearch, setCameraSearch] = useState('');
+  const [scheduleStart, setScheduleStart] = useState('00:00');
+  const [scheduleEnd, setScheduleEnd] = useState('23:59');
   const [countingType, setCountingType] = useState<'zone' | 'line'>('line');
-  const [drawPoints, setDrawPoints] = useState<{x: number, y: number}[]>([]);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [zoneName, setZoneName] = useState('Vùng giám sát A');
   const [maxLimit, setMaxLimit] = useState(5);
+  const [detectionTarget, setDetectionTarget] = useState('person');
+  const [customTarget, setCustomTarget] = useState('');
+  const [detectionRule, setDetectionRule] = useState('enter_area');
+  const [alertDuration, setAlertDuration] = useState(10);
+  const [alertCount, setAlertCount] = useState(1);
+  const [cooldown, setCooldown] = useState(60);
+  const [confidence, setConfidence] = useState(0.65);
+  const [iou, setIou] = useState(0.45);
+  const [tracker, setTracker] = useState('bytetrack');
+  const [frameSkip, setFrameSkip] = useState(0);
+  const [inferenceFps, setInferenceFps] = useState(15);
+  const [searchScope, setSearchScope] = useState<'whole_scene' | 'roi'>('whole_scene');
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.78);
+  const [retrievalTopK, setRetrievalTopK] = useState(5);
   const [channels, setChannels] = useState({
     zalo: true,
     email: false,
     telegram: false,
     webhook: false,
   });
-  const [alertActions, setAlertActions] = useState({
-    recordVideo: true,
-    showPopup: true,
-    takeSnapshot: true,
-  });
 
-  // Rule Draft State
+  const [zoneDrawings, setZoneDrawings] = useState<Record<string, { x: number; y: number }[]>>({});
+  const [activeZoneCamIdx, setActiveZoneCamIdx] = useState(0);
+  const [savedToast, setSavedToast] = useState(false);
+  const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
+
   const [ruleCondition, setRuleCondition] = useState('count_lt_min');
   const [ruleSeverity, setRuleSeverity] = useState<'info' | 'warning' | 'error' | 'critical'>('warning');
   const [ruleAction, setRuleAction] = useState('Gửi cảnh báo đa kênh');
 
-  const activeCamera = cameras.find(c => c.id === selectedCameraId);
+  const activeCamera = cameras.find(c => c.id === selectedCameraIds[0]);
+  const activeCamId = selectedCameraIds[activeZoneCamIdx] || selectedCameraIds[0] || '';
+  const currentDrawPoints = zoneDrawings[activeCamId] || [];
+
+  const hydratePipelineForEdit = (pipe: Pipeline) => {
+    const cam = cameras.find(c => c.id === pipe.cameraId);
+    const zone = pipe.countingZones[0];
+    const restoredPoints = zone
+      ? zone.type === 'line'
+        ? [zone.lineStart, zone.lineEnd].filter(Boolean).map(p => p as { x: number; y: number })
+        : zone.points
+      : [];
+
+    setEditingPipelineId(pipe.id);
+    setSelectedCameraIds([pipe.cameraId]);
+    setFlowName(pipe.name);
+    setMonitoringMode(pipe.monitoringMode || 'smart');
+    setUserDescription(pipe.description || pipe.searchQuery || '');
+    setRoutedModelName(pipe.detectorName || 'Chưa xác định');
+    setRoutedModelReason('Đã nạp từ luồng hiện có.');
+    setSearchQuery(pipe.searchQuery || '');
+    setSearchScope(pipe.searchScope || 'whole_scene');
+    setCountingType(zone?.type || 'zone');
+    setZoneName(zone?.name || 'Vùng giám sát A');
+    setScheduleStart(pipe.scheduleStart || '00:00');
+    setScheduleEnd(pipe.scheduleEnd || '23:59');
+    setChannels(pipe.alertChannels);
+    setZoneDrawings({ [pipe.cameraId]: restoredPoints });
+    setActiveZoneCamIdx(0);
+    setCurrentStep('task');
+
+    if (pipe.monitoringMode === 'standard') {
+      setDetectionTarget(pipe.detectionTarget || 'person');
+      setDetectionRule(pipe.detectionRule || 'enter_area');
+      setAlertDuration(Number(pipe.config?.alertDuration || 10));
+      setAlertCount(Number(pipe.config?.alertCount || 1));
+      setCooldown(Number(pipe.config?.cooldown || 60));
+      setConfidence(Number(pipe.config?.confidence || 0.65));
+      setIou(Number(pipe.config?.iou || 0.45));
+      setTracker(String(pipe.config?.tracker || 'bytetrack'));
+      setFrameSkip(Number(pipe.config?.frameSkip || 0));
+      setInferenceFps(Number(pipe.config?.inferenceFps || 15));
+    } else {
+      setSimilarityThreshold(Number(pipe.config?.similarityThreshold || 0.78));
+      setRetrievalTopK(Number(pipe.config?.retrievalTopK || 5));
+      setCooldown(Number(pipe.config?.cooldown || 60));
+    }
+  };
+
+  const resetBuilderState = () => {
+    setEditingPipelineId(null);
+    setSelectedCameraIds([]);
+    setFlowName('');
+    setMonitoringMode('smart');
+    setUserDescription('');
+    setRoutedModelName('YOLO-NAS-S');
+    setRoutedModelReason('Mặc định');
+    setSearchQuery('');
+    setCameraSearch('');
+    setScheduleStart('00:00');
+    setScheduleEnd('23:59');
+    setCountingType('line');
+    setZoneName('Vùng giám sát A');
+    setDetectionTarget('person');
+    setCustomTarget('');
+    setDetectionRule('enter_area');
+    setAlertDuration(10);
+    setAlertCount(1);
+    setCooldown(60);
+    setConfidence(0.65);
+    setIou(0.45);
+    setTracker('bytetrack');
+    setFrameSkip(0);
+    setInferenceFps(15);
+    setSearchScope('whole_scene');
+    setSimilarityThreshold(0.78);
+    setRetrievalTopK(5);
+    setChannels({ zalo: true, email: false, telegram: false, webhook: false });
+    setZoneDrawings({});
+    setActiveZoneCamIdx(0);
+    setRuleCondition('count_lt_min');
+    setRuleSeverity('warning');
+    setRuleAction('Gửi cảnh báo đa kênh');
+  };
+
+  const inferMonitoringConfig = (text: string, hasRoi: boolean): InferredMonitoringConfig => {
+    const lowerText = text.toLowerCase();
+    const ppeKeywords = ['mũ', 'áo phản quang', 'bảo hộ', 'ppe', 'an toàn'];
+    const vehicleKeywords = ['xe', 'ô tô', 'oto', 'ôto', 'xe máy', 'motorcycle', 'truck', 'tải'];
+    const personKeywords = ['người', 'khách', 'nhân viên', 'công nhân', 'person'];
+    const countKeywords = ['đếm', 'số lượng', 'bao nhiêu', 'count'];
+    const lineKeywords = ['vào ra', 'ra vào', 'đi qua', 'qua cổng', 'cross', 'line'];
+    const intrusionKeywords = ['xâm nhập', 'đi vào', 'vào khu vực', 'enter'];
+    const exitKeywords = ['rời khỏi', 'đi ra', 'exit'];
+    const loiteringKeywords = ['lảng vảng', 'ở lại lâu', 'loiter', 'quá lâu'];
+    const defectKeywords = ['lỗi', 'móp', 'rách', 'xước', 'hỏng', 'defect'];
+    const abandonedKeywords = ['bỏ lại', 'leaving', 'balo', 'ba lô', 'túi'];
+    const removalKeywords = ['lấy hàng', 'lấy khỏi', 'remove', 'removes'];
+
+    const hasPpe = ppeKeywords.some(kw => lowerText.includes(kw));
+    const hasVehicle = vehicleKeywords.some(kw => lowerText.includes(kw));
+    const hasPerson = personKeywords.some(kw => lowerText.includes(kw));
+    const asksCount = countKeywords.some(kw => lowerText.includes(kw));
+    const usesLine = lineKeywords.some(kw => lowerText.includes(kw));
+    const usesKnownTarget = hasPerson || hasVehicle;
+    const needsOpenVocabulary = hasPpe
+      || defectKeywords.some(kw => lowerText.includes(kw))
+      || abandonedKeywords.some(kw => lowerText.includes(kw))
+      || removalKeywords.some(kw => lowerText.includes(kw))
+      || (!usesKnownTarget && text.trim().length > 0);
+
+    if (!needsOpenVocabulary && usesKnownTarget) {
+      const target = hasVehicle ? 'vehicle' : 'person';
+      const rule = usesLine
+        ? 'cross_line'
+        : exitKeywords.some(kw => lowerText.includes(kw))
+          ? 'exit_area'
+          : intrusionKeywords.some(kw => lowerText.includes(kw))
+            ? 'enter_area'
+            : loiteringKeywords.some(kw => lowerText.includes(kw))
+              ? 'loitering'
+              : asksCount
+                ? 'object_counting'
+                : 'appear';
+
+      return {
+        mode: 'standard',
+        model: 'YOLO-NAS-S',
+        target,
+        rule,
+        scope: hasRoi ? 'roi' : 'whole_scene',
+        countingType: usesLine || rule === 'cross_line' ? 'line' : 'zone',
+        config: {
+          alertDuration: loiteringKeywords.some(kw => lowerText.includes(kw)) ? 60 : 10,
+          alertCount: asksCount ? maxLimit : 1,
+          cooldown: lowerText.includes('ngay') ? 15 : 60,
+          confidence: 0.65,
+          iou: 0.45,
+          tracker: 'bytetrack',
+          frameSkip: usesLine ? 0 : 1,
+          inferenceFps: 15,
+        },
+      };
+    }
+
+    const rule = hasPpe
+      ? 'safety_violation'
+      : defectKeywords.some(kw => lowerText.includes(kw))
+        ? 'defect_detected'
+        : abandonedKeywords.some(kw => lowerText.includes(kw))
+          ? 'abandoned_object'
+          : removalKeywords.some(kw => lowerText.includes(kw))
+            ? 'object_removed'
+            : intrusionKeywords.some(kw => lowerText.includes(kw))
+              ? 'enter_area'
+              : asksCount
+                ? 'object_counting'
+                : 'semantic_match';
+
+    return {
+      mode: 'smart',
+      model: hasPpe ? 'YOLO-NAS + LocateAnything (Crop Mode)' : 'LocateAnything-3B',
+      rule,
+      scope: hasRoi ? 'roi' : 'whole_scene',
+      countingType: 'zone',
+      searchQuery: hasPpe ? 'người không đội mũ bảo hộ, người không mặc áo phản quang' : text,
+      config: {
+        similarityThreshold: defectKeywords.some(kw => lowerText.includes(kw)) ? 0.82 : 0.78,
+        retrievalTopK: hasRoi ? 5 : 8,
+        cooldown: lowerText.includes('ngay') ? 15 : 60,
+      },
+    };
+  };
 
   const handleDescriptionChange = (text: string) => {
     setUserDescription(text);
-    
+
     if (text.trim().length === 0) {
       setRoutedModelName('Chưa xác định');
       setRoutedModelReason('Vui lòng mô tả yêu cầu của bạn.');
       return;
     }
-    
-    const lowerText = text.toLowerCase();
-    
-    const ppeKeywords = ['mũ', 'áo phản quang', 'bảo hộ', 'ppe', 'an toàn'];
-    const cocoKeywords = ['người', 'khách', 'xe', 'ô tô', 'xâm nhập', 'đỗ', 'vào ra'];
-    
-    let isPPE = ppeKeywords.some(kw => lowerText.includes(kw));
-    let isCOCO = cocoKeywords.some(kw => lowerText.includes(kw));
-    
-    if (isPPE) {
-      setSelectedModelId('model-yolo-locate');
-      setRoutedModelName('YOLO-NAS + LocateAnything (Crop Mode)');
-      setRoutedModelReason('Phát hiện kết hợp: Tìm người bằng YOLO sau đó cắt vùng ảnh để LocateAnything kiểm tra đồ bảo hộ.');
-      setCountingType('zone');
-      setRuleCondition('safety_violation');
-      setSearchQuery('không đội mũ bảo hộ, không mặc áo phản quang');
-    } else if (isCOCO && !lowerText.includes('móp') && !lowerText.includes('lỗi')) {
-      setSelectedModelId('model-yolo');
-      setRoutedModelName('YOLO-NAS-S (Fast & Accurate)');
-      setRoutedModelReason('Phát hiện các đối tượng phổ thông (bộ dữ liệu COCO). Tối ưu để chạy tốc độ cao.');
-      
-      if (lowerText.includes('vào ra') || lowerText.includes('đi qua')) {
-        setCountingType('line');
-        setRuleCondition('count_gt_max');
-      } else {
-        setCountingType('zone');
-        setRuleCondition(lowerText.includes('xâm nhập') ? 'intrusion' : 'count_gt_max');
-      }
+
+    const inferred = inferMonitoringConfig(text, currentDrawPoints.length > 0);
+    setMonitoringMode(inferred.mode);
+    setRoutedModelName(inferred.model);
+    setRoutedModelReason(inferred.mode === 'standard'
+      ? 'Tự suy luận cấu hình YOLO chuẩn từ đối tượng và rule trong mô tả.'
+      : 'Tự suy luận cấu hình LocateAnything từ mô tả ngôn ngữ tự nhiên.');
+    setCountingType(inferred.countingType);
+    setRuleCondition(inferred.rule);
+    setSearchScope(inferred.scope);
+    setSearchQuery(inferred.searchQuery || '');
+
+    if (inferred.mode === 'standard') {
+      setDetectionTarget(inferred.target || 'person');
+      setDetectionRule(inferred.rule);
+      setAlertDuration(Number(inferred.config.alertDuration || 10));
+      setAlertCount(Number(inferred.config.alertCount || 1));
+      setConfidence(Number(inferred.config.confidence || 0.65));
+      setIou(Number(inferred.config.iou || 0.45));
+      setTracker(String(inferred.config.tracker || 'bytetrack'));
+      setFrameSkip(Number(inferred.config.frameSkip || 0));
+      setInferenceFps(Number(inferred.config.inferenceFps || 15));
     } else {
-      setSelectedModelId('model-locate');
-      setRoutedModelName('LocateAnything-3B (Zero-shot)');
-      setRoutedModelReason('Tìm kiếm đối tượng đặc thù không có sẵn trong tập huấn luyện.');
-      setSearchQuery(text); // auto fill search query
-      setCountingType('zone');
-      if (lowerText.includes('lỗi') || lowerText.includes('móp') || lowerText.includes('rách')) {
-        setRuleCondition('defect_detected');
-      } else {
-        setRuleCondition('count_lt_min');
-      }
+      setSimilarityThreshold(Number(inferred.config.similarityThreshold || 0.78));
+      setRetrievalTopK(Number(inferred.config.retrievalTopK || 5));
     }
+    setCooldown(Number(inferred.config.cooldown || 60));
   };
 
-  // Apply a quick preset template to make setup even easier for non-techs!
   const applyTemplate = (tpl: any) => {
-    setSelectedCameraId(tpl.cameraId);
     handleDescriptionChange(tpl.description || '');
     if (tpl.countingType) setCountingType(tpl.countingType);
     if (tpl.ruleCondition) setRuleCondition(tpl.ruleCondition);
     setZoneName(tpl.countingType === 'line' ? 'Vạch kiểm soát chính' : 'Vùng giới hạn an toàn');
-    addLogMessage(`Đã áp dụng mẫu thiết lập: "${tpl.name}"`);
-  };
-
-  const addLogMessage = (msg: string) => {
-    // Console notice
-    console.log(msg);
   };
 
   const handleNext = () => {
-    const stepOrder: PipelineStep[] = ['camera', 'task', 'zone', 'alert'];
+    const stepOrder: PipelineStep[] = ['camera', 'task', 'zone', 'alert', 'preview'];
     const currentIndex = stepOrder.indexOf(currentStep as PipelineStep);
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1]);
@@ -129,7 +305,7 @@ export default function PipelineBuilder({
   };
 
   const handleBack = () => {
-    const stepOrder: PipelineStep[] = ['camera', 'task', 'zone', 'alert'];
+    const stepOrder: PipelineStep[] = ['camera', 'task', 'zone', 'alert', 'preview'];
     const currentIndex = stepOrder.indexOf(currentStep as PipelineStep);
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1]);
@@ -137,131 +313,116 @@ export default function PipelineBuilder({
   };
 
   const handleSave = () => {
-    // Generate new pipeline
-    const newZone: CountingZone = {
-      id: `zone-${Date.now()}`,
-      name: zoneName,
-      type: countingType,
-      points: countingType === 'zone' ? [
-        { x: 20, y: 30 }, { x: 80, y: 30 }, { x: 80, y: 75 }, { x: 20, y: 75 }
-      ] : [],
-      lineStart: countingType === 'line' ? { x: 15, y: 50 } : undefined,
-      lineEnd: countingType === 'line' ? { x: 85, y: 50 } : undefined,
-      count: 0,
-      inCount: countingType === 'line' ? 0 : undefined,
-      outCount: countingType === 'line' ? 0 : undefined,
-      maxLimit: countingType === 'zone' ? maxLimit : undefined,
-    };
+    const existingPipeline = editingPipelineId ? pipelines.find(p => p.id === editingPipelineId) : undefined;
+    const newPipelines = selectedCameraIds.map(cameraId => {
+      const cam = cameras.find(c => c.id === cameraId);
+      const camPoints = zoneDrawings[cameraId] || [];
+      const hasDrawnScope = camPoints.length > 0;
+      const inferred = inferMonitoringConfig(userDescription, hasDrawnScope);
+      const zonePoints = hasDrawnScope && countingType === 'zone'
+        ? camPoints
+        : [
+            { x: 0, y: 0 },
+            { x: 100, y: 0 },
+            { x: 100, y: 100 },
+            { x: 0, y: 100 },
+          ];
+      const zones: CountingZone[] = [{
+        id: `zone-${Date.now()}-${cameraId}`,
+        name: hasDrawnScope ? zoneName : 'Toàn khung hình',
+        type: hasDrawnScope ? countingType : 'zone',
+        points: zonePoints,
+        lineStart: hasDrawnScope && countingType === 'line' && camPoints.length >= 2 ? camPoints[0] : undefined,
+        lineEnd: hasDrawnScope && countingType === 'line' && camPoints.length >= 2 ? camPoints[camPoints.length - 1] : undefined,
+        count: 0,
+        inCount: hasDrawnScope && countingType === 'line' ? 0 : undefined,
+        outCount: hasDrawnScope && countingType === 'line' ? 0 : undefined,
+      }];
+      return {
+        id: editingPipelineId || `pipe-${Date.now()}-${cameraId}`,
+        name: flowName.trim() || `Luồng giám sát - ${cam?.name.split(' ')[1] || 'Camera'}`,
+        cameraId,
+        detectorName: inferred.model,
+        monitoringMode: inferred.mode,
+        detectionTarget: inferred.target,
+        detectionRule: inferred.rule,
+        searchScope: inferred.scope,
+        config: inferred.config,
+        searchQuery: inferred.searchQuery || undefined,
+        description: userDescription || undefined,
+        countingZones: zones,
+        alertChannels: channels,
+        scheduleStart: scheduleStart !== '00:00' || scheduleEnd !== '23:59' ? scheduleStart : undefined,
+        scheduleEnd: scheduleStart !== '00:00' || scheduleEnd !== '23:59' ? scheduleEnd : undefined,
+        isActive: existingPipeline?.isActive ?? true,
+        createdAt: existingPipeline?.createdAt || new Date().toISOString(),
+      } as Pipeline;
+    });
 
-    const newPipeline: Pipeline = {
-      id: `pipe-${Date.now()}`,
-      name: `Luồng giám sát - ${activeCamera?.name.split(' ')[1] || 'Camera'}`,
-      cameraId: selectedCameraId,
-      modelId: selectedModelId,
-      detectorName: routedModelName.split(' ')[0] || 'AI',
-      searchQuery: selectedModelId.includes('locate') ? searchQuery : undefined,
-      countingZones: [newZone],
-      alertChannels: channels,
-      alertActions: alertActions,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    if (setRules) {
-      let conditionText = ruleCondition;
-      if (ruleCondition === 'count_lt_min') conditionText = `Số lượng < ${maxLimit}`;
-      else if (ruleCondition === 'count_gt_max') conditionText = `Số lượng > ${maxLimit}`;
-      else if (ruleCondition === 'intrusion') conditionText = `Xâm nhập vùng: ${zoneName}`;
-      else if (ruleCondition === 'safety_violation') conditionText = `Vi phạm an toàn (Thiếu PPE)`;
-      else if (ruleCondition === 'parking_violation') conditionText = `Dừng đỗ sai quy định`;
-      else if (ruleCondition === 'defect_detected') conditionText = `Phát hiện sản phẩm lỗi/bất thường`;
-
-      const newRule: AlertRule = {
-        id: `rule-${Date.now()}`,
-        name: `Quy tắc: ${newPipeline.name}`,
-        cameraId: selectedCameraId,
-        pipelineId: newPipeline.id,
-        isActive: true,
-        targetObject: routedModelName || 'Đối tượng',
-        condition: conditionText,
-        action: ruleAction,
-        severity: ruleSeverity,
-        createdAt: new Date().toISOString(),
-      };
-      setRules(prev => [newRule, ...prev]);
+    setPipelines(prev => {
+      if (editingPipelineId) {
+        const next = prev.filter(p => p.id !== editingPipelineId);
+        return [...newPipelines, ...next];
+      }
+      return [...newPipelines, ...prev];
+    });
+    const savedCameraId = selectedCameraIds[0];
+    setCurrentStep('list');
+    setSavedToast(true);
+    setTimeout(() => setSavedToast(false), 2500);
+    if (onSelectCamera && savedCameraId) {
+      onSelectCamera(savedCameraId);
     }
-
-    setPipelines(prev => [newPipeline, ...prev]);
-    onComplete(); // callback to go back to Live Monitor view
+    resetBuilderState();
   };
 
   return (
     <div className="bg-white border border-slate-100 rounded-3xl shadow-xs overflow-hidden max-w-4xl mx-auto" id="pipeline-builder-container">
-      {/* Wizard Header Banner */}
-      <div className="bg-gradient-to-r from-indigo-900 to-slate-900 p-8 text-white">
+      {savedToast && (
+        <div className="fixed bottom-5 right-5 bg-emerald-600 text-white text-xs font-medium px-4 py-2.5 rounded-lg shadow-lg z-50 flex items-center gap-2">
+          ✓ Kích hoạt luồng AI mới thành công!
+        </div>
+      )}
+      <div className="bg-gradient-to-r from-emerald-900 to-slate-900 p-8 text-white">
         <h2 className="text-2xl font-black tracking-tight">Trợ lý Cấu hình AI thông minh</h2>
-        <p className="text-xs text-slate-300 mt-1 max-w-xl">
-          Tự tạo luồng đếm đồ vật hoặc cảnh báo an toàn qua camera chỉ với 4 bước đơn giản, không cần lập trình.
-        </p>
       </div>
 
-      {/* Progress Steps Indicators - Hide in list view */}
       {currentStep !== 'list' && (
         <div className="border-b border-slate-100 px-8 py-5 bg-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-4 w-full max-w-3xl overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
             {[
               { key: 'camera', label: '1. Camera', icon: <CamIcon size={14} /> },
-              { key: 'task', label: '2. Nhu cầu', icon: <Cpu size={14} /> },
-              { key: 'zone', label: '3. Vùng & Quy tắc', icon: <Sliders size={14} /> },
+              { key: 'task', label: '2. Mô tả', icon: <FileText size={14} /> },
+              { key: 'zone', label: '3. ROI', icon: <Sliders size={14} /> },
               { key: 'alert', label: '4. Thông báo', icon: <Bell size={14} /> },
+              { key: 'preview', label: '5. Preview', icon: <Check size={14} /> },
             ].map((s, idx) => {
-              const stepOrder = ['camera', 'task', 'zone', 'alert'];
+              const stepOrder = ['camera', 'task', 'zone', 'alert', 'preview'];
               const isCompleted = stepOrder.indexOf(currentStep as string) > idx;
               const isActive = currentStep === s.key;
-              
+
               return (
                 <div key={s.key} className="flex items-center gap-1.5 md:gap-2 shrink-0">
                   <div className={`flex items-center justify-center h-6 w-6 md:h-7 md:w-7 rounded-full text-xs font-bold transition-all ${
-                    isCompleted ? 'bg-indigo-600 text-white' : isActive ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-600/30' : 'bg-slate-200 text-slate-500'
+                    isCompleted ? 'bg-emerald-600 text-white' : isActive ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-600/30' : 'bg-slate-200 text-slate-500'
                   }`}>
                     {isCompleted ? <Check size={14} /> : idx + 1}
                   </div>
                   <span className={`text-[10px] md:text-xs font-bold whitespace-nowrap transition-colors ${
-                    isActive ? 'text-indigo-900' : isCompleted ? 'text-indigo-600' : 'text-slate-400'
+                    isActive ? 'text-emerald-900' : isCompleted ? 'text-emerald-600' : 'text-slate-400'
                   }`}>
                     {s.label.substring(3)}
                   </span>
-                  {idx < 3 && <div className="h-[1px] w-4 md:w-8 bg-slate-200 ml-1 md:ml-2" />}
+                  {idx < 4 && <div className="h-[1px] w-4 md:w-8 bg-slate-200 ml-1 md:ml-2" />}
                 </div>
               );
             })}
           </div>
 
-        {/* Templates dropdown for ease of use */}
-        {currentStep === 'camera' && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400 font-medium">Hoặc chọn mẫu nhanh:</span>
-            <select
-              onChange={(e) => {
-                const tpl = PIPELINE_TEMPLATES.find(t => t.id === e.target.value);
-                if (tpl) applyTemplate(tpl);
-              }}
-              defaultValue=""
-              className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 font-semibold focus:outline-hidden cursor-pointer shadow-2xs"
-            >
-              <option value="" disabled>--- Áp dụng mẫu ---</option>
-              {PIPELINE_TEMPLATES.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
         </div>
       )}
 
-      {/* Steps Workspace content */}
       <div className="p-8">
-        {/* STEP 0: ACTIVE PIPELINES LIST */}
         {currentStep === 'list' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-4">
@@ -269,9 +430,12 @@ export default function PipelineBuilder({
                 <h3 className="text-base font-bold text-slate-800">Luồng giám sát đang hoạt động ({pipelines.length})</h3>
                 <p className="text-xs text-slate-500 mt-1">Danh sách các AI Pipeline đang chạy trên các camera của bạn.</p>
               </div>
-              <button 
-                onClick={() => setCurrentStep('camera')}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
+              <button
+                onClick={() => {
+                  resetBuilderState();
+                  setCurrentStep('camera');
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
               >
                 <span>+ Tạo Luồng Mới</span>
               </button>
@@ -280,381 +444,574 @@ export default function PipelineBuilder({
             {pipelines.length === 0 ? (
               <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                 <p className="text-slate-500 text-sm">Chưa có luồng giám sát nào đang chạy.</p>
-                <button 
-                  onClick={() => setCurrentStep('camera')}
-                  className="text-indigo-600 font-bold text-sm mt-3 hover:underline"
+                <button
+                  onClick={() => {
+                    resetBuilderState();
+                    setCurrentStep('camera');
+                  }}
+                  className="text-emerald-600 font-bold text-sm mt-3 hover:underline"
                 >
                   Tạo ngay
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pipelines.map(pipe => {
-                  const cam = cameras.find(c => c.id === pipe.cameraId);
-                  return (
-                    <div key={pipe.id} className="border border-slate-200 rounded-2xl p-4 hover:shadow-md transition-all bg-white relative overflow-hidden group">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                            {pipe.name}
-                            {pipe.isActive && <span className="flex h-2 w-2 relative">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>}
-                          </h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
-                            <CamIcon size={12} /> {cam?.name || 'Camera'} ({cam?.location || ''})
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 mt-3">
-                        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-medium border border-slate-200/50 flex items-center gap-1">
-                          <Cpu size={10} /> {pipe.detectorName}
-                        </span>
-                        <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-medium border border-indigo-100 flex items-center gap-1">
-                          <Sliders size={10} /> {pipe.countingZones.length} Vùng
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Trạng thái</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Luồng giám sát</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Camera</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Cấu hình AI</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Lịch chạy</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {pipelines.map(pipe => {
+                        const cam = cameras.find(c => c.id === pipe.cameraId);
+                        const schedule = pipe.scheduleStart && pipe.scheduleEnd ? `${pipe.scheduleStart} - ${pipe.scheduleEnd}` : '24/7';
+                        const usesFullFrame = pipe.countingZones.length === 0 || pipe.countingZones.some(zone => zone.name === 'Toàn khung hình');
+                        return (
+                          <tr key={pipe.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-4 py-3 align-middle">
+                              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                pipe.isActive
+                                  ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
+                                  : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'
+                              }`}>
+                                {pipe.isActive && <span className="relative flex h-2 w-2">
+                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                                </span>}
+                                {pipe.isActive ? 'Đang bật' : 'Đang tắt'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 align-middle">
+                              <div className="font-bold text-sm text-slate-800">{pipe.name}</div>
+                              {pipe.searchQuery && (
+                                <div className="mt-1 max-w-[220px] truncate text-[11px] text-slate-400">{pipe.searchQuery}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 align-middle">
+                              <div className="flex items-start gap-2 text-xs text-slate-600">
+                                <CamIcon size={13} className="mt-0.5 shrink-0 text-slate-400" />
+                                <div className="min-w-0">
+                                  <div className="font-medium text-slate-700 truncate">{cam?.name || 'Camera'}</div>
+                                  <div className="mt-0.5 text-[11px] text-slate-400 truncate">{cam?.location || 'Chưa có vị trí'}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 align-middle">
+                              <div>
+                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-100">
+                                  <Sliders size={10} /> {usesFullFrame ? 'Toàn khung hình' : 'Vùng đã vẽ'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 align-middle text-xs font-medium text-slate-600">{schedule}</td>
+                            <td className="px-4 py-3 align-middle">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => hydratePipelineForEdit(pipe)}
+                                  className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-lg font-medium cursor-pointer transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800"
+                                  title="Sửa pipeline"
+                                >
+                                  <Pencil size={12} />
+                                  Sửa
+                                </button>
+                                <button
+                                  onClick={() => setPipelines(prev => prev.map(p2 => p2.id === pipe.id ? { ...p2, isActive: !p2.isActive } : p2))}
+                                  className={`text-[10px] px-2.5 py-1.5 rounded-lg font-medium cursor-pointer transition-colors ${
+                                    pipe.isActive
+                                      ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  {pipe.isActive ? 'Tắt' : 'Bật'}
+                                </button>
+                                <button
+                                  onClick={() => setPipelines(prev => prev.filter(p2 => p2.id !== pipe.id))}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                  title="Xoá pipeline"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
         )}
-        {/* STEP 1: CAMERA SELECTION */}
+
         {currentStep === 'camera' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-base font-bold text-slate-800">Chọn mắt camera bạn muốn áp dụng luồng AI</h3>
-              <p className="text-xs text-slate-500 mt-1">Hệ thống hỗ trợ kết nối mọi camera IP chuẩn RTSP hoặc Web.</p>
+              <h3 className="text-base font-bold text-slate-800">Chọn camera</h3>
+              <p className="text-xs text-slate-500 mt-1">Có thể chọn nhiều camera để áp dụng cùng một luồng AI.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {cameras.map((cam) => (
+            <div className="relative">
+              <input
+                type="text"
+                value={cameraSearch}
+                onChange={(e) => setCameraSearch(e.target.value)}
+                placeholder="Tìm camera..."
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all"
+              />
+            </div>
+
+            <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-[320px] overflow-y-auto">
+              {cameras
+                .filter(c => !cameraSearch || c.name.toLowerCase().includes(cameraSearch.toLowerCase()) || c.location.toLowerCase().includes(cameraSearch.toLowerCase()))
+                .map((cam) => (
                 <div
                   key={cam.id}
-                  onClick={() => setSelectedCameraId(cam.id)}
-                  className={`border rounded-2xl p-4 cursor-pointer transition-all flex gap-3.5 relative ${
-                    selectedCameraId === cam.id
-                      ? 'border-indigo-600 bg-indigo-50/15 ring-2 ring-indigo-600/10 shadow-xs'
-                      : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                  onClick={() => {
+                    setSelectedCameraIds(prev =>
+                      prev.includes(cam.id) ? prev.filter(id => id !== cam.id) : [...prev, cam.id]
+                    );
+                  }}
+                  className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
+                    selectedCameraIds.includes(cam.id) ? 'bg-emerald-50' : 'hover:bg-slate-50'
                   }`}
                 >
-                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${selectedCameraId === cam.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                    <CamIcon size={20} />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm text-slate-800">{cam.name}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">{cam.location}</p>
-                    <div className="flex items-center gap-3 mt-3 text-[10px] text-slate-400 font-medium">
-                      <span className="flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block"></span>
-                        Đang hoạt động
-                      </span>
-                      <span>•</span>
-                      <span>Độ phân giải: {cam.resolution}</span>
-                    </div>
-                  </div>
-
-                  {selectedCameraId === cam.id && (
-                    <div className="absolute top-4 right-4 bg-indigo-600 text-white rounded-full p-1">
-                      <Check size={12} />
-                    </div>
-                  )}
+                  <span className={`text-sm flex-1 ${
+                    selectedCameraIds.includes(cam.id) ? 'font-medium text-emerald-700' : 'text-slate-700'
+                  }`}>{cam.name}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cam.status === 'online' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                 </div>
               ))}
+              {cameras.filter(c => !cameraSearch || c.name.toLowerCase().includes(cameraSearch.toLowerCase()) || c.location.toLowerCase().includes(cameraSearch.toLowerCase())).length === 0 && (
+                <div className="px-4 py-8 text-center text-slate-400 text-sm">Không tìm thấy camera</div>
+              )}
             </div>
 
-            {/* Camera Configuration Block */}
-            {activeCamera && (
-              <div className="border-t border-slate-100 pt-5 mt-2">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-slate-800">Cấu hình luồng video (Tuỳ chọn)</h4>
-                  <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded font-medium">Tham số hệ thống</span>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Đường dẫn RTSP / Stream URL:</label>
-                    <input
-                      type="text"
-                      defaultValue={`rtsp://admin:*****@192.168.1.${activeCamera.id.length}:554/h264/ch1/main/av_stream`}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:outline-hidden font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Độ phân giải xử lý AI:</label>
-                    <select className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:outline-hidden cursor-pointer">
-                      <option value="auto">Giữ nguyên gốc ({activeCamera.resolution})</option>
-                      <option value="720p">Thu nhỏ còn 720p (Tối ưu tốc độ)</option>
-                      <option value="480p">Thu nhỏ còn 480p (Siêu mượt)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Khung hình trên giây (FPS):</label>
-                    <select className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 focus:outline-hidden cursor-pointer">
-                      <option value="max">Tối đa từ camera ({activeCamera.fps} FPS)</option>
-                      <option value="15">Giới hạn 15 FPS</option>
-                      <option value="5">Giới hạn 5 FPS (Tiết kiệm tài nguyên)</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2 pt-5">
-                    <input type="checkbox" id="gpu-accel" defaultChecked className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                    <label htmlFor="gpu-accel" className="text-xs font-bold text-slate-700 cursor-pointer">Kích hoạt bộ tăng tốc phần cứng (GPU/NPU)</label>
-                  </div>
-                </div>
+            {selectedCameraIds.length === 0 && (
+              <div className="text-xs text-rose-500 flex items-center gap-1">
+                <AlertCircle size={12} /> Vui lòng chọn ít nhất một camera
               </div>
             )}
           </div>
         )}
 
-        {/* STEP 2: MODEL SELECTION & CONFIG via NLP */}
         {currentStep === 'task' && (
           <div className="space-y-6">
             <div>
               <h3 className="text-base font-bold text-slate-800">Mô tả nhu cầu giám sát</h3>
-              <p className="text-xs text-slate-500 mt-1">Chỉ cần viết yêu cầu bằng tiếng Việt, hệ thống sẽ tự động phân tích và cấu hình nhận diện phù hợp nhất.</p>
+              <p className="text-xs text-slate-500 mt-1">Người dùng chỉ cần mô tả bài toán. Hệ thống tự chọn model, rule và tham số phù hợp ở phía sau.</p>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                <FileText className="text-indigo-600" size={18} />
-                Hệ thống có thể giúp gì cho bạn?
-              </label>
-              <div className="relative">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Tên luồng</label>
+                <input
+                  type="text"
+                  value={flowName}
+                  onChange={(e) => setFlowName(e.target.value)}
+                  placeholder="VD: Giám sát kệ hàng khu A"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:bg-white focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                  <FileText className="text-emerald-600" size={18} />
+                  Bạn muốn giám sát điều gì?
+                </label>
                 <textarea
                   value={userDescription}
                   onChange={(e) => handleDescriptionChange(e.target.value)}
-                  placeholder='Mô tả chi tiết nhu cầu giám sát bạn cần...'
-                  className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-sm text-slate-800 focus:bg-white focus:outline-hidden focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 resize-none transition-all"
+                  placeholder='Ví dụ: "Cảnh báo khi có người lấy hàng khỏi kệ A" hoặc "Tìm người bỏ lại balo trong khu vực chờ"'
+                  className="mt-3 w-full h-32 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-sm text-slate-800 focus:bg-white focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 resize-none transition-all"
                 />
               </div>
-              
-              {userDescription.length > 5 && (
-                <div className="mt-4 p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2">
-                  <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600 shrink-0">
-                    <Cpu size={18} />
-                  </div>
-                  <div>
-                    <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Mô hình AI tự động định tuyến</h4>
-                    <p className="text-sm font-bold text-indigo-700 flex items-center gap-2">
-                      {routedModelName}
-                      <span className="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-medium">Auto-selected</span>
-                    </p>
-                    <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{routedModelReason}</p>
-                  </div>
+
+              <details className="group">
+                <summary className="text-[11px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-600 transition-colors list-none flex items-center gap-1">
+                  <ChevronRight size={12} className="group-open:rotate-90 transition-transform" />
+                  Gợi ý nhanh
+                </summary>
+                <div className="mt-3 grid grid-cols-2 lg:grid-cols-3 gap-2">
+                  {PIPELINE_TEMPLATES.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => { applyTemplate(t); setScheduleStart('00:00'); setScheduleEnd('23:59'); }}
+                      className="text-left bg-white border border-slate-200 hover:border-emerald-300 p-2.5 rounded-lg transition-all group"
+                    >
+                      <h5 className="font-bold text-[11px] text-slate-700 group-hover:text-emerald-700 transition-colors">{t.name}</h5>
+                      <p className="text-[9px] text-slate-400 mt-0.5 line-clamp-2">{t.description}</p>
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-            
-            {/* Template Library directly accessible here as well if they want to switch */}
-            <div className="mt-6">
-              <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Hoặc chọn nhanh từ thư viện mẫu (Template Library)</h4>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                {PIPELINE_TEMPLATES.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => applyTemplate(t)}
-                    className="text-left bg-white border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/30 p-3 rounded-xl transition-all shadow-2xs group"
-                  >
-                    <h5 className="font-bold text-xs text-slate-800 group-hover:text-indigo-700 transition-colors">{t.name}</h5>
-                    <p className="text-[10px] text-slate-500 mt-1 line-clamp-2">{t.description}</p>
-                  </button>
-                ))}
+              </details>
+
+              <div className="flex items-center gap-4 pt-2">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Clock size={14} />
+                  <span>Lên lịch chạy:</span>
+                </div>
+                <input
+                  type="time"
+                  value={scheduleStart}
+                  onChange={(e) => setScheduleStart(e.target.value)}
+                  className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-emerald-500"
+                />
+                <span className="text-slate-400 text-xs">→</span>
+                <input
+                  type="time"
+                  value={scheduleEnd}
+                  onChange={(e) => setScheduleEnd(e.target.value)}
+                  className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-emerald-500"
+                />
+                <span className="text-[10px] text-slate-400">(00:00 - 23:59 = chạy 24/7)</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* STEP 3: ZONE DESIGNER & RULE (Combined) */}
+        {currentStep === 'config' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">
+                {monitoringMode === 'standard' ? 'Configure Standard Monitoring' : 'Configure Smart Monitoring'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                {monitoringMode === 'standard'
+                  ? 'Chọn đối tượng, luật phát hiện, ngưỡng cảnh báo và tham số nâng cao.'
+                  : 'Nhập mô tả tự nhiên, phạm vi tìm kiếm, thời gian chạy và tham số truy xuất.'}
+              </p>
+            </div>
+
+            {monitoringMode === 'standard' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Detection target</label>
+                    <select
+                      value={detectionTarget}
+                      onChange={(e) => setDetectionTarget(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-hidden focus:border-emerald-500"
+                    >
+                      <option value="person">Person</option>
+                      <option value="vehicle">Vehicle</option>
+                      <option value="bicycle">Bicycle</option>
+                      <option value="motorcycle">Motorcycle</option>
+                      <option value="truck">Truck</option>
+                      <option value="animal">Animal</option>
+                      <option value="custom">Custom class</option>
+                    </select>
+                  </div>
+                  {detectionTarget === 'custom' && (
+                    <input
+                      type="text"
+                      value={customTarget}
+                      onChange={(e) => setCustomTarget(e.target.value)}
+                      placeholder="Nhập custom class"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-hidden focus:border-emerald-500"
+                    />
+                  )}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Detection rule</label>
+                    <select
+                      value={detectionRule}
+                      onChange={(e) => setDetectionRule(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-hidden focus:border-emerald-500"
+                    >
+                      <option value="enter_area">Enter area</option>
+                      <option value="exit_area">Exit area</option>
+                      <option value="cross_line">Cross line</option>
+                      <option value="appear">Appear</option>
+                      <option value="disappear">Disappear</option>
+                      <option value="loitering">Loitering</option>
+                      <option value="object_counting">Object counting</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Duration</label>
+                      <input type="number" value={alertDuration} onChange={(e) => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Count</label>
+                      <input type="number" value={alertCount} onChange={(e) => setAlertCount(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Cooldown</label>
+                      <input type="number" value={cooldown} onChange={(e) => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Confidence</label>
+                      <input type="number" step="0.01" min="0" max="1" value={confidence} onChange={(e) => setConfidence(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">IOU</label>
+                      <input type="number" step="0.01" min="0" max="1" value={iou} onChange={(e) => setIou(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Tracker</label>
+                      <select value={tracker} onChange={(e) => setTracker(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs">
+                        <option value="bytetrack">ByteTrack</option>
+                        <option value="deepsort">DeepSORT</option>
+                        <option value="none">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Frame skip</label>
+                      <input type="number" min="0" value={frameSkip} onChange={(e) => setFrameSkip(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Inference FPS</label>
+                      <input type="number" min="1" value={inferenceFps} onChange={(e) => setInferenceFps(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                  <FileText className="text-emerald-600" size={18} />
+                  Natural language description
+                </label>
+                <textarea
+                  value={userDescription}
+                  onChange={(e) => handleDescriptionChange(e.target.value)}
+                  placeholder='Ví dụ: "Cảnh báo khi có người lấy hàng khỏi kệ A" hoặc "Tìm người bỏ lại balo trong khu vực chờ"'
+                  className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-sm text-slate-800 focus:bg-white focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 resize-none transition-all"
+                />
+
+                <details className="group">
+                  <summary className="text-[11px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-600 transition-colors list-none flex items-center gap-1">
+                    <ChevronRight size={12} className="group-open:rotate-90 transition-transform" />
+                    Gợi ý nhanh
+                  </summary>
+                  <div className="mt-3 grid grid-cols-2 lg:grid-cols-3 gap-2">
+                    {PIPELINE_TEMPLATES.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => { applyTemplate(t); setScheduleStart('00:00'); setScheduleEnd('23:59'); }}
+                        className="text-left bg-white border border-slate-200 hover:border-emerald-300 p-2.5 rounded-lg transition-all group"
+                      >
+                        <h5 className="font-bold text-[11px] text-slate-700 group-hover:text-emerald-700 transition-colors">{t.name}</h5>
+                        <p className="text-[9px] text-slate-400 mt-0.5 line-clamp-2">{t.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Search scope</label>
+                    <select value={searchScope} onChange={(e) => setSearchScope(e.target.value as 'whole_scene' | 'roi')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+                      <option value="whole_scene">Whole scene</option>
+                      <option value="roi">ROI</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Similarity threshold</label>
+                    <input type="number" step="0.01" min="0" max="1" value={similarityThreshold} onChange={(e) => setSimilarityThreshold(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Retrieval top-k</label>
+                    <input type="number" min="1" value={retrievalTopK} onChange={(e) => setRetrievalTopK(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Cooldown</label>
+                    <input type="number" min="0" value={cooldown} onChange={(e) => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4 pt-2">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Clock size={14} />
+                <span>Lên lịch chạy:</span>
+              </div>
+              <input
+                type="time"
+                value={scheduleStart}
+                onChange={(e) => setScheduleStart(e.target.value)}
+                className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-emerald-500"
+              />
+              <span className="text-slate-400 text-xs">→</span>
+              <input
+                type="time"
+                value={scheduleEnd}
+                onChange={(e) => setScheduleEnd(e.target.value)}
+                className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-emerald-500"
+              />
+              <span className="text-[10px] text-slate-400">(00:00 - 23:59 = chạy 24/7)</span>
+            </div>
+          </div>
+        )}
+
         {currentStep === 'zone' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-base font-bold text-slate-800">Cấu hình Zone & Đếm</h3>
-              <p className="text-xs text-slate-500 mt-1">Vẽ vùng giám sát trên camera và cấu hình chế độ đếm.</p>
+              <h3 className="text-base font-bold text-slate-800">Vùng giám sát</h3>
+              <p className="text-xs text-slate-500 mt-1">Click lên khung hình để vẽ vùng giám sát. Click chuột trái để thêm điểm.</p>
             </div>
 
+            {selectedCameraIds.length > 1 && (
+              <div className="flex gap-1 flex-wrap">
+                {selectedCameraIds.map((camId, idx) => {
+                  const cam = cameras.find(c => c.id === camId);
+                  return (
+                    <button
+                      key={camId}
+                      onClick={() => setActiveZoneCamIdx(idx)}
+                      className={`text-[11px] px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                        activeZoneCamIdx === idx
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {cam?.name || camId}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-              {/* Left: Canvas Area */}
               <div className="lg:col-span-3 border border-slate-200 rounded-2xl overflow-hidden bg-slate-900 relative aspect-video shadow-xs">
-                {/* Toolbar */}
                 <div className="absolute top-3 left-3 flex gap-1 z-10 bg-slate-900/60 backdrop-blur-md p-1 rounded-lg border border-white/10">
-                  <button onClick={() => {setCountingType('zone'); setDrawPoints([]);}} className={`w-8 h-8 rounded-md flex items-center justify-center text-xs ${countingType === 'zone' ? 'bg-indigo-500 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`} title="Khoanh vùng">⬠</button>
-                  <button onClick={() => {setCountingType('line'); setDrawPoints([]);}} className={`w-8 h-8 rounded-md flex items-center justify-center text-xs ${countingType === 'line' ? 'bg-indigo-500 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`} title="Đường kẻ">╱</button>
-                  <button onClick={() => setDrawPoints([])} className="w-8 h-8 rounded-md text-slate-300 hover:bg-white/10 hover:text-white flex items-center justify-center text-xs" title="Xóa tất cả">🗑</button>
+                  <button
+                        onClick={() => { setCountingType('line'); setZoneDrawings(prev => ({ ...prev, [activeCamId]: [] })); }}
+                    className={`w-8 h-8 rounded-md flex items-center justify-center text-xs transition-colors ${countingType === 'line' ? 'bg-emerald-500 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                    title="Kẻ vạch thẳng"
+                  >╱</button>
+                  <button
+                    onClick={() => { setCountingType('zone'); setZoneDrawings(prev => ({ ...prev, [activeCamId]: [] })); }}
+                    className={`w-8 h-8 rounded-md flex items-center justify-center text-xs transition-colors ${countingType === 'zone' ? 'bg-emerald-500 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                    title="Khoanh vùng tự do"
+                  >⬠</button>
+                  <span className="w-px bg-white/10 mx-1" />
+                  <button
+                    onClick={() => setZoneDrawings(prev => ({ ...prev, [activeCamId]: (prev[activeCamId] || []).slice(0, -1) }))}
+                    disabled={currentDrawPoints.length === 0}
+                    className="w-8 h-8 rounded-md flex items-center justify-center text-slate-300 hover:bg-white/10 hover:text-white text-xs transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Hoàn tác"
+                  >↩</button>
+                  <button
+                    onClick={() => setZoneDrawings(prev => ({ ...prev, [activeCamId]: [] }))}
+                    disabled={currentDrawPoints.length === 0}
+                    className="w-8 h-8 rounded-md flex items-center justify-center text-slate-300 hover:bg-white/10 hover:text-white text-xs transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Xóa tất cả"
+                  >🗑</button>
                 </div>
-                
-                {/* Interactive Camera Preview */}
-                <div 
-                  className="w-full h-full flex items-center justify-center relative cursor-crosshair"
-                  onMouseDown={(e) => {
+
+                <svg
+                  className="w-full h-full absolute inset-0 z-[5] cursor-crosshair"
+                  viewBox="0 0 1000 562.5"
+                  preserveAspectRatio="xMidYMid meet"
+                  onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = ((e.clientX - rect.left) / rect.width) * 100;
                     const y = ((e.clientY - rect.top) / rect.height) * 100;
-                    
-                    setIsDrawing(true);
-                    if (countingType === 'line') {
-                      setDrawPoints([{ x, y }, { x, y }]);
-                    } else {
-                      // Bounding box: top-left, top-right, bottom-right, bottom-left
-                      setDrawPoints([
-                        { x, y },
-                        { x, y },
-                        { x, y },
-                        { x, y }
-                      ]);
-                    }
+                    setZoneDrawings(prev => ({ ...prev, [activeCamId]: [...(prev[activeCamId] || []), { x, y }] }));
                   }}
-                  onMouseMove={(e) => {
-                    if (!isDrawing) return;
-                    
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-                    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
-                    
-                    if (countingType === 'line') {
-                      setDrawPoints(prev => [prev[0], { x, y }]);
-                    } else {
-                      // Update rectangle based on start point (prev[0]) and current point
-                      setDrawPoints(prev => {
-                        const p1 = prev[0];
-                        return [
-                          p1,
-                          { x, y: p1.y },
-                          { x, y },
-                          { x: p1.x, y }
-                        ];
-                      });
-                    }
-                  }}
-                  onMouseUp={() => setIsDrawing(false)}
-                  onMouseLeave={() => setIsDrawing(false)}
                 >
-                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_25%,rgba(255,255,255,0.05)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.05)_75%,rgba(255,255,255,0.05)_100%)] bg-[length:20px_20px] pointer-events-none"></div>
-                  <CamIcon size={48} className="text-slate-700 opacity-50 pointer-events-none" />
-                  
-                  {/* SVG for drawing lines/polygons */}
-                  <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    {countingType === 'line' && drawPoints.length === 2 && (
-                      <line 
-                        x1={drawPoints[0].x} y1={drawPoints[0].y} 
-                        x2={drawPoints[1].x} y2={drawPoints[1].y} 
-                        stroke="#818cf8" strokeWidth="0.5" strokeDasharray="1,1" vectorEffect="non-scaling-stroke"
+                  {currentDrawPoints.length > 1 && currentDrawPoints.map((p, i) => {
+                    if (i === 0) return null;
+                    const prev = currentDrawPoints[i - 1];
+                    return (
+                      <line
+                        key={`line-${i}`}
+                        x1={`${prev.x}%`} y1={`${prev.y}%`}
+                        x2={`${p.x}%`} y2={`${p.y}%`}
+                        stroke="#10b981"
+                        strokeWidth="3"
+                        strokeLinecap="round"
                       />
-                    )}
-                    {countingType === 'zone' && drawPoints.length > 1 && (
-                      <polygon 
-                        points={drawPoints.map(p => `${p.x},${p.y}`).join(' ')} 
-                        fill="rgba(99, 102, 241, 0.2)" 
-                        stroke="#818cf8" strokeWidth="0.5" vectorEffect="non-scaling-stroke"
-                      />
-                    )}
-                  </svg>
-
-                  {/* Points (Circles) rendered as DOM elements */}
-                  {drawPoints.map((pt, i) => (
-                    <div 
-                      key={i} 
-                      className="absolute w-2 h-2 bg-indigo-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none shadow-sm ring-2 ring-white/50"
-                      style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
+                    );
+                  })}
+                  {countingType === 'zone' && currentDrawPoints.length > 2 && (
+                    <polygon
+                      points={currentDrawPoints.map(p => `${p.x}% ${p.y}%`).join(' ')}
+                      fill="rgba(16,185,129,0.2)"
+                      stroke="#10b981"
+                      strokeWidth="3"
+                      strokeLinejoin="round"
                     />
-                  ))}
-                  
-                  {drawPoints.length === 0 && (
-                    <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none animate-pulse">
-                      <span className="bg-slate-900/80 text-white text-[10px] px-3 py-1.5 rounded-lg border border-slate-700 shadow-xl">
-                        Kéo thả chuột để vẽ vùng giám sát
-                      </span>
-                    </div>
                   )}
+                  {countingType === 'line' && currentDrawPoints.length === 1 && (
+                    <circle cx={`${currentDrawPoints[0].x}%`} cy={`${currentDrawPoints[0].y}%`} r="6" fill="#10b981" opacity="0.5" />
+                  )}
+                  {currentDrawPoints.map((p, i) => (
+                    <g key={`pt-${i}`}>
+                      <circle cx={`${p.x}%`} cy={`${p.y}%`} r="5" fill="#10b981" stroke="#fff" strokeWidth="2" />
+                      {i === currentDrawPoints.length - 1 && (
+                        <circle cx={`${p.x}%`} cy={`${p.y}%`} r="8" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.6">
+                          <animate attributeName="r" values="8;12;8" dur="1s" repeatCount="indefinite" />
+                          <animate attributeName="opacity" values="0.6;0.2;0.6" dur="1s" repeatCount="indefinite" />
+                        </circle>
+                      )}
+                    </g>
+                  ))}
+                </svg>
+                <div className="w-full h-full flex items-center justify-center relative">
+                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_25%,rgba(255,255,255,0.05)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.05)_75%,rgba(255,255,255,0.05)_100%)] bg-[length:20px_20px]"></div>
+                  <CamIcon size={48} className="text-slate-700 opacity-50" />
                 </div>
               </div>
 
-              {/* Right: Config Panel */}
               <div className="lg:col-span-2 space-y-4">
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Tên Zone</label>
-                    <input
-                      type="text"
-                      value={zoneName}
-                      onChange={(e) => setZoneName(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 focus:outline-hidden focus:border-indigo-500 shadow-2xs"
-                      placeholder="VD: Cổng A chính"
-                    />
-                  </div>
-
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Tên Zone</label>
+                  <input
+                    type="text"
+                    value={zoneName}
+                    onChange={(e) => setZoneName(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 focus:outline-hidden focus:border-emerald-500 shadow-2xs"
+                    placeholder="VD: Cổng A chính"
+                  />
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Loại vùng vẽ</label>
                     <div className="grid grid-cols-2 gap-3">
                       <div
-                        onClick={() => { setCountingType('line'); setDrawPoints([]); }}
+                    onClick={() => { setCountingType('line'); setZoneDrawings(prev => ({ ...prev, [activeCamId]: [] })); }}
                         className={`border rounded-xl p-3 cursor-pointer transition-all flex flex-col items-center text-center gap-2 ${
                           countingType === 'line'
-                            ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600 shadow-xs'
+                            ? 'border-emerald-600 bg-emerald-50/50 ring-1 ring-emerald-600 shadow-xs'
                             : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
                         }`}
                       >
                         <div className="w-full h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                          <div className="w-[60%] h-[1px] border-t-2 border-dashed border-indigo-400"></div>
+                          <div className="w-[60%] h-[1px] border-t-2 border-dashed border-emerald-400"></div>
                         </div>
                         <div>
                           <h5 className="font-bold text-xs text-slate-800">Kẻ vạch thẳng</h5>
-                          <p className="text-[9px] text-slate-500 mt-0.5">Đếm cắt ngang qua</p>
                         </div>
                       </div>
-
                       <div
-                        onClick={() => { setCountingType('zone'); setDrawPoints([]); }}
+                    onClick={() => { setCountingType('zone'); setZoneDrawings(prev => ({ ...prev, [activeCamId]: [] })); }}
                         className={`border rounded-xl p-3 cursor-pointer transition-all flex flex-col items-center text-center gap-2 ${
                           countingType === 'zone'
-                            ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600 shadow-xs'
+                            ? 'border-emerald-600 bg-emerald-50/50 ring-1 ring-emerald-600 shadow-xs'
                             : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
                         }`}
                       >
                         <div className="w-full h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                          <div className="w-[50%] h-[50%] border-2 border-indigo-400 bg-indigo-500/10 rounded-sm"></div>
+                          <div className="w-[50%] h-[50%] border-2 border-emerald-400 bg-emerald-500/10 rounded-sm"></div>
                         </div>
                         <div>
-                          <h5 className="font-bold text-xs text-slate-800">Kéo thả vùng chữ nhật</h5>
-                          <p className="text-[9px] text-slate-500 mt-0.5">Đếm số lượng bên trong</p>
+                          <h5 className="font-bold text-xs text-slate-800">Khoanh vùng tự do</h5>
                         </div>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 pt-5 border-t border-slate-200">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Quy tắc cảnh báo (Rule) đính kèm vùng này</label>
-                    <div className="grid grid-cols-1 gap-3">
-                      <select
-                        value={ruleCondition}
-                        onChange={(e) => setRuleCondition(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 focus:outline-hidden focus:border-indigo-500 shadow-2xs"
-                      >
-                        <option value="count_lt_min">Số lượng đối tượng ít hơn Ngưỡng (Thiếu hàng hóa)</option>
-                        <option value="count_gt_max">Số lượng đối tượng vượt Ngưỡng (Quá tải)</option>
-                        <option value="defect_detected">Phát hiện sản phẩm lỗi/bất thường</option>
-                        <option value="intrusion">Xâm nhập vùng giới hạn</option>
-                        <option value="safety_violation">Phát hiện vi phạm an toàn (Thiếu PPE, sai vị trí)</option>
-                        <option value="parking_violation">Phát hiện dừng đỗ sai quy định</option>
-                      </select>
-                      
-                      {['count_lt_min', 'count_gt_max'].includes(ruleCondition) && (
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 mt-2">Ngưỡng số lượng (Threshold)</label>
-                          <input
-                            type="number"
-                            value={maxLimit}
-                            onChange={(e) => setMaxLimit(parseInt(e.target.value) || 1)}
-                            className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-xs text-slate-800 focus:outline-hidden focus:border-indigo-500 shadow-2xs"
-                            min="1"
-                            placeholder="VD: 5"
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -663,129 +1020,109 @@ export default function PipelineBuilder({
           </div>
         )}
 
-        {/* STEP 4: ALERT NOTIFICATIONS */}
         {currentStep === 'alert' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-base font-bold text-slate-800">Hành động khi phát hiện vi phạm</h3>
-              <p className="text-xs text-slate-500 mt-1">Chọn các hành động hệ thống sẽ tự động thực hiện khi có sự kiện xảy ra.</p>
-              <div className="flex flex-wrap gap-6 mt-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={alertActions.recordVideo} onChange={() => setAlertActions(p => ({...p, recordVideo: !p.recordVideo}))} className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" />
-                  <span className="text-sm text-slate-700 font-medium">Ghi hình</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={alertActions.showPopup} onChange={() => setAlertActions(p => ({...p, showPopup: !p.showPopup}))} className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" />
-                  <span className="text-sm text-slate-700 font-medium">Pop-up cảnh báo</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={alertActions.takeSnapshot} onChange={() => setAlertActions(p => ({...p, takeSnapshot: !p.takeSnapshot}))} className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" />
-                  <span className="text-sm text-slate-700 font-medium">Chụp snapshot</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-100">
-              <h3 className="text-base font-bold text-slate-800">Kênh thông báo</h3>
+              <h3 className="text-base font-bold text-slate-800">Thiết lập nhận thông báo báo động</h3>
               <p className="text-xs text-slate-500 mt-1">Khi sự kiện kích hoạt, VisionOS tự động gửi cảnh báo tới hệ thống thông tin nội bộ.</p>
-              {role === 'operator' && (
-                <div className="mt-2 bg-amber-50 text-amber-700 text-[11px] font-medium px-3 py-2 rounded-lg border border-amber-100/50 flex items-center gap-1.5 w-fit">
-                  ⚠️ Chỉ Admin mới có quyền thay đổi cấu hình kênh thông báo.
-                </div>
-              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Channel 1: Zalo */}
-              <div
-                onClick={() => { if (role !== 'admin') return; setChannels(prev => ({ ...prev, zalo: !prev.zalo })) }}
-                className={`border rounded-2xl p-4 flex items-center justify-between ${role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} transition-colors ${
-                  channels.zalo ? 'border-emerald-500 bg-emerald-50/10' : 'border-slate-200 hover:bg-slate-50'
-                }`}
-              >
+              <label className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${
+                channels.zalo ? 'border-emerald-500 bg-emerald-50/10' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
                     <MessageSquare size={20} />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-xs text-slate-800">Gửi Zalo OA (Doanh nghiệp)</h4>
-                    <p className="text-[10px] text-slate-400">Tin nhắn Zalo trực tiếp về điện thoại nhân viên</p>
+                    <h4 className="font-semibold text-xs text-slate-800">Popup</h4>
+                    <p className="text-[10px] text-slate-400">Hiển thị cảnh báo trực tiếp trên giao diện</p>
                   </div>
                 </div>
-                <div className={`w-8 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${channels.zalo ? 'bg-emerald-500' : 'bg-slate-300'}`}>
-                  <div className={`bg-white h-4 w-4 rounded-full shadow-sm transform transition-transform ${channels.zalo ? 'translate-x-3' : 'translate-x-0'}`}></div>
-                </div>
-              </div>
+                <input type="checkbox" checked={channels.zalo} onChange={() => setChannels(prev => ({ ...prev, zalo: !prev.zalo }))} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+              </label>
 
-              {/* Channel 2: Telegram */}
-              <div
-                onClick={() => { if (role !== 'admin') return; setChannels(prev => ({ ...prev, telegram: !prev.telegram })) }}
-                className={`border rounded-2xl p-4 flex items-center justify-between ${role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} transition-colors ${
-                  channels.telegram ? 'border-sky-500 bg-sky-50/10' : 'border-slate-200 hover:bg-slate-50'
-                }`}
-              >
+              <label className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${
+                channels.email ? 'border-emerald-500 bg-emerald-50/10' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-sky-100 text-sky-600 rounded-xl">
-                    <Send size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-xs text-slate-800">Gửi Telegram Bot</h4>
-                    <p className="text-[10px] text-slate-400">Báo động tức thì vào group Telegram ban quản lý</p>
-                  </div>
-                </div>
-                <div className={`w-8 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${channels.telegram ? 'bg-sky-500' : 'bg-slate-300'}`}>
-                  <div className={`bg-white h-4 w-4 rounded-full shadow-sm transform transition-transform ${channels.telegram ? 'translate-x-3' : 'translate-x-0'}`}></div>
-                </div>
-              </div>
-
-              {/* Channel 3: Email */}
-              <div
-                onClick={() => { if (role !== 'admin') return; setChannels(prev => ({ ...prev, email: !prev.email })) }}
-                className={`border rounded-2xl p-4 flex items-center justify-between ${role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} transition-colors ${
-                  channels.email ? 'border-indigo-500 bg-indigo-50/10' : 'border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
+                  <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
                     <Mail size={20} />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-xs text-slate-800">Gửi Email Báo cáo</h4>
-                    <p className="text-[10px] text-slate-400">Gửi ảnh snapshot kèm thời điểm vi phạm</p>
+                    <h4 className="font-semibold text-xs text-slate-800">Email</h4>
+                    <p className="text-[10px] text-slate-400">Gửi ảnh và thông tin sự kiện qua email</p>
                   </div>
                 </div>
-                <div className={`w-8 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${channels.email ? 'bg-indigo-500' : 'bg-slate-300'}`}>
-                  <div className={`bg-white h-4 w-4 rounded-full shadow-sm transform transition-transform ${channels.email ? 'translate-x-3' : 'translate-x-0'}`}></div>
-                </div>
-              </div>
+                <input type="checkbox" checked={channels.email} onChange={() => setChannels(prev => ({ ...prev, email: !prev.email }))} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+              </label>
 
-              {/* Channel 4: Webhook */}
-              <div
-                onClick={() => { if (role !== 'admin') return; setChannels(prev => ({ ...prev, webhook: !prev.webhook })) }}
-                className={`border rounded-2xl p-4 flex items-center justify-between ${role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} transition-colors ${
-                  channels.webhook ? 'border-purple-500 bg-purple-50/10' : 'border-slate-200 hover:bg-slate-50'
-                }`}
-              >
+              <label className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${
+                channels.webhook ? 'border-emerald-500 bg-emerald-50/10' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 text-purple-600 rounded-xl">
+                  <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
                     <Webhook size={20} />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-xs text-slate-800">Webhook API Đẩy Dữ Liệu</h4>
-                    <p className="text-[10px] text-slate-400">Tích hợp vào phần mềm kế toán ERP / CRM sẵn có</p>
+                    <h4 className="font-semibold text-xs text-slate-800">Webhook</h4>
+                    <p className="text-[10px] text-slate-400">Gửi sự kiện sang hệ thống bên ngoài</p>
                   </div>
                 </div>
-                <div className={`w-8 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${channels.webhook ? 'bg-purple-500' : 'bg-slate-300'}`}>
-                  <div className={`bg-white h-4 w-4 rounded-full shadow-sm transform transition-transform ${channels.webhook ? 'translate-x-3' : 'translate-x-0'}`}></div>
+                <input type="checkbox" checked={channels.webhook} onChange={() => setChannels(prev => ({ ...prev, webhook: !prev.webhook }))} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+              </label>
+
+              <div className="border border-slate-200 rounded-2xl p-4 flex items-center justify-between bg-slate-50/50 opacity-60 cursor-not-allowed">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-slate-200 text-slate-500 rounded-xl">
+                    <Send size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-xs text-slate-800">Telegram Bot</h4>
+                    <p className="text-[10px] text-slate-400">Chưa được cấu hình</p>
+                  </div>
+                </div>
+                <span className="text-[10px] text-slate-400 bg-slate-200/50 px-2 py-1 rounded">Chưa cấu hình</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 'preview' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">Preview Configuration</h3>
+              <p className="text-xs text-slate-500 mt-1">Kiểm tra cấu hình trước khi lưu và triển khai luồng giám sát.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Thông tin chung</div>
+                <div className="text-sm font-bold text-slate-800">{flowName.trim() || 'Luồng giám sát mới'}</div>
+                <div className="text-xs text-slate-600">Camera: {selectedCameraIds.length} camera đã chọn</div>
+                <div className="text-xs text-slate-600">
+                  ROI: {currentDrawPoints.length > 0 ? 'Vùng/vạch đã vẽ' : 'Toàn khung hình'}
+                </div>
+                <div className="text-xs text-slate-600">Lịch chạy: {scheduleStart === '00:00' && scheduleEnd === '23:59' ? '24/7' : `${scheduleStart} - ${scheduleEnd}`}</div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Nhu cầu giám sát</div>
+                <div className="text-xs text-slate-600">{userDescription || 'Chưa nhập mô tả'}</div>
+                <div className="text-xs text-slate-600">
+                  Cảnh báo: {[
+                    channels.zalo ? 'Popup' : '',
+                    channels.email ? 'Email' : '',
+                    channels.webhook ? 'Webhook' : '',
+                  ].filter(Boolean).join(', ') || 'Không gửi'}
                 </div>
               </div>
             </div>
-
           </div>
         )}
       </div>
 
-      {/* Navigation Buttons footer */}
       <div className="border-t border-slate-100 px-8 py-5 bg-slate-50 flex items-center justify-between">
         {currentStep === 'list' ? (
           <button
@@ -803,17 +1140,17 @@ export default function PipelineBuilder({
               <ArrowLeft size={14} /> Quay lại
             </button>
 
-            {currentStep === 'alert' ? (
+            {currentStep === 'preview' ? (
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-3 rounded-xl shadow-md shadow-indigo-600/10 hover:shadow-lg hover:shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-6 py-3 rounded-xl shadow-md shadow-emerald-600/10 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer"
               >
-                <Check size={14} /> Hoàn tất &amp; Kích hoạt AI
+                <Check size={14} /> Lưu & Triển khai AI
               </button>
             ) : (
               <button
                 onClick={handleNext}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-3 rounded-xl shadow-md active:scale-95 transition-all cursor-pointer"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-6 py-3 rounded-xl shadow-md active:scale-95 transition-all cursor-pointer"
               >
                 Tiếp tục <ArrowRight size={14} />
               </button>
