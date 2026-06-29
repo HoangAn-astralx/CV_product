@@ -32,6 +32,8 @@ export default function PipelineBuilder({
   
   const [searchQuery, setSearchQuery] = useState('');
   const [countingType, setCountingType] = useState<'zone' | 'line'>('line');
+  const [drawPoints, setDrawPoints] = useState<{x: number, y: number}[]>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
   const [zoneName, setZoneName] = useState('Vùng giám sát A');
   const [maxLimit, setMaxLimit] = useState(5);
   const [channels, setChannels] = useState({
@@ -39,6 +41,11 @@ export default function PipelineBuilder({
     email: false,
     telegram: false,
     webhook: false,
+  });
+  const [alertActions, setAlertActions] = useState({
+    recordVideo: true,
+    showPopup: true,
+    takeSnapshot: true,
   });
 
   // Rule Draft State
@@ -155,6 +162,7 @@ export default function PipelineBuilder({
       searchQuery: selectedModelId.includes('locate') ? searchQuery : undefined,
       countingZones: [newZone],
       alertChannels: channels,
+      alertActions: alertActions,
       isActive: true,
       createdAt: new Date().toISOString(),
     };
@@ -474,22 +482,93 @@ export default function PipelineBuilder({
               <div className="lg:col-span-3 border border-slate-200 rounded-2xl overflow-hidden bg-slate-900 relative aspect-video shadow-xs">
                 {/* Toolbar */}
                 <div className="absolute top-3 left-3 flex gap-1 z-10 bg-slate-900/60 backdrop-blur-md p-1 rounded-lg border border-white/10">
-                  <button className="w-8 h-8 rounded-md bg-indigo-500 text-white flex items-center justify-center text-xs" title="Hình chữ nhật">▭</button>
-                  <button className="w-8 h-8 rounded-md text-slate-300 hover:bg-white/10 hover:text-white flex items-center justify-center text-xs" title="Polygon">⬠</button>
-                  <button className="w-8 h-8 rounded-md text-slate-300 hover:bg-white/10 hover:text-white flex items-center justify-center text-xs" title="Đường kẻ">╱</button>
-                  <button className="w-8 h-8 rounded-md text-slate-300 hover:bg-white/10 hover:text-white flex items-center justify-center text-xs" title="Xóa tất cả">🗑</button>
+                  <button onClick={() => {setCountingType('zone'); setDrawPoints([]);}} className={`w-8 h-8 rounded-md flex items-center justify-center text-xs ${countingType === 'zone' ? 'bg-indigo-500 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`} title="Khoanh vùng">⬠</button>
+                  <button onClick={() => {setCountingType('line'); setDrawPoints([]);}} className={`w-8 h-8 rounded-md flex items-center justify-center text-xs ${countingType === 'line' ? 'bg-indigo-500 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`} title="Đường kẻ">╱</button>
+                  <button onClick={() => setDrawPoints([])} className="w-8 h-8 rounded-md text-slate-300 hover:bg-white/10 hover:text-white flex items-center justify-center text-xs" title="Xóa tất cả">🗑</button>
                 </div>
                 
-                {/* Mock Camera Preview */}
-                <div className="w-full h-full flex items-center justify-center relative">
-                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_25%,rgba(255,255,255,0.05)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.05)_75%,rgba(255,255,255,0.05)_100%)] bg-[length:20px_20px]"></div>
-                  <CamIcon size={48} className="text-slate-700 opacity-50" />
+                {/* Interactive Camera Preview */}
+                <div 
+                  className="w-full h-full flex items-center justify-center relative cursor-crosshair"
+                  onMouseDown={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                    
+                    setIsDrawing(true);
+                    if (countingType === 'line') {
+                      setDrawPoints([{ x, y }, { x, y }]);
+                    } else {
+                      // Bounding box: top-left, top-right, bottom-right, bottom-left
+                      setDrawPoints([
+                        { x, y },
+                        { x, y },
+                        { x, y },
+                        { x, y }
+                      ]);
+                    }
+                  }}
+                  onMouseMove={(e) => {
+                    if (!isDrawing) return;
+                    
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+                    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+                    
+                    if (countingType === 'line') {
+                      setDrawPoints(prev => [prev[0], { x, y }]);
+                    } else {
+                      // Update rectangle based on start point (prev[0]) and current point
+                      setDrawPoints(prev => {
+                        const p1 = prev[0];
+                        return [
+                          p1,
+                          { x, y: p1.y },
+                          { x, y },
+                          { x: p1.x, y }
+                        ];
+                      });
+                    }
+                  }}
+                  onMouseUp={() => setIsDrawing(false)}
+                  onMouseLeave={() => setIsDrawing(false)}
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_25%,rgba(255,255,255,0.05)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.05)_75%,rgba(255,255,255,0.05)_100%)] bg-[length:20px_20px] pointer-events-none"></div>
+                  <CamIcon size={48} className="text-slate-700 opacity-50 pointer-events-none" />
                   
-                  {/* Mock drawn zone based on type */}
-                  {countingType === 'line' ? (
-                    <div className="absolute top-[50%] left-[20%] right-[20%] h-0.5 border-t-2 border-dashed border-indigo-400"></div>
-                  ) : (
-                    <div className="absolute top-[30%] left-[30%] right-[30%] bottom-[30%] border-2 border-indigo-400 bg-indigo-500/20 rounded-sm"></div>
+                  {/* SVG for drawing lines/polygons */}
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    {countingType === 'line' && drawPoints.length === 2 && (
+                      <line 
+                        x1={drawPoints[0].x} y1={drawPoints[0].y} 
+                        x2={drawPoints[1].x} y2={drawPoints[1].y} 
+                        stroke="#818cf8" strokeWidth="0.5" strokeDasharray="1,1" vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                    {countingType === 'zone' && drawPoints.length > 1 && (
+                      <polygon 
+                        points={drawPoints.map(p => `${p.x},${p.y}`).join(' ')} 
+                        fill="rgba(99, 102, 241, 0.2)" 
+                        stroke="#818cf8" strokeWidth="0.5" vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                  </svg>
+
+                  {/* Points (Circles) rendered as DOM elements */}
+                  {drawPoints.map((pt, i) => (
+                    <div 
+                      key={i} 
+                      className="absolute w-2 h-2 bg-indigo-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 pointer-events-none shadow-sm ring-2 ring-white/50"
+                      style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
+                    />
+                  ))}
+                  
+                  {drawPoints.length === 0 && (
+                    <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none animate-pulse">
+                      <span className="bg-slate-900/80 text-white text-[10px] px-3 py-1.5 rounded-lg border border-slate-700 shadow-xl">
+                        Kéo thả chuột để vẽ vùng giám sát
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -512,7 +591,7 @@ export default function PipelineBuilder({
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Loại vùng vẽ</label>
                     <div className="grid grid-cols-2 gap-3">
                       <div
-                        onClick={() => setCountingType('line')}
+                        onClick={() => { setCountingType('line'); setDrawPoints([]); }}
                         className={`border rounded-xl p-3 cursor-pointer transition-all flex flex-col items-center text-center gap-2 ${
                           countingType === 'line'
                             ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600 shadow-xs'
@@ -529,7 +608,7 @@ export default function PipelineBuilder({
                       </div>
 
                       <div
-                        onClick={() => setCountingType('zone')}
+                        onClick={() => { setCountingType('zone'); setDrawPoints([]); }}
                         className={`border rounded-xl p-3 cursor-pointer transition-all flex flex-col items-center text-center gap-2 ${
                           countingType === 'zone'
                             ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600 shadow-xs'
@@ -540,7 +619,7 @@ export default function PipelineBuilder({
                           <div className="w-[50%] h-[50%] border-2 border-indigo-400 bg-indigo-500/10 rounded-sm"></div>
                         </div>
                         <div>
-                          <h5 className="font-bold text-xs text-slate-800">Khoanh vùng tự do</h5>
+                          <h5 className="font-bold text-xs text-slate-800">Kéo thả vùng chữ nhật</h5>
                           <p className="text-[9px] text-slate-500 mt-0.5">Đếm số lượng bên trong</p>
                         </div>
                       </div>
@@ -588,15 +667,39 @@ export default function PipelineBuilder({
         {currentStep === 'alert' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-base font-bold text-slate-800">Thiết lập nhận thông báo báo động</h3>
+              <h3 className="text-base font-bold text-slate-800">Hành động khi phát hiện vi phạm</h3>
+              <p className="text-xs text-slate-500 mt-1">Chọn các hành động hệ thống sẽ tự động thực hiện khi có sự kiện xảy ra.</p>
+              <div className="flex flex-wrap gap-6 mt-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={alertActions.recordVideo} onChange={() => setAlertActions(p => ({...p, recordVideo: !p.recordVideo}))} className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" />
+                  <span className="text-sm text-slate-700 font-medium">Ghi hình</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={alertActions.showPopup} onChange={() => setAlertActions(p => ({...p, showPopup: !p.showPopup}))} className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" />
+                  <span className="text-sm text-slate-700 font-medium">Pop-up cảnh báo</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={alertActions.takeSnapshot} onChange={() => setAlertActions(p => ({...p, takeSnapshot: !p.takeSnapshot}))} className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" />
+                  <span className="text-sm text-slate-700 font-medium">Chụp snapshot</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">Kênh thông báo</h3>
               <p className="text-xs text-slate-500 mt-1">Khi sự kiện kích hoạt, VisionOS tự động gửi cảnh báo tới hệ thống thông tin nội bộ.</p>
+              {role === 'operator' && (
+                <div className="mt-2 bg-amber-50 text-amber-700 text-[11px] font-medium px-3 py-2 rounded-lg border border-amber-100/50 flex items-center gap-1.5 w-fit">
+                  ⚠️ Chỉ Admin mới có quyền thay đổi cấu hình kênh thông báo.
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Channel 1: Zalo */}
               <div
-                onClick={() => setChannels(prev => ({ ...prev, zalo: !prev.zalo }))}
-                className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${
+                onClick={() => { if (role !== 'admin') return; setChannels(prev => ({ ...prev, zalo: !prev.zalo })) }}
+                className={`border rounded-2xl p-4 flex items-center justify-between ${role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} transition-colors ${
                   channels.zalo ? 'border-emerald-500 bg-emerald-50/10' : 'border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -616,8 +719,8 @@ export default function PipelineBuilder({
 
               {/* Channel 2: Telegram */}
               <div
-                onClick={() => setChannels(prev => ({ ...prev, telegram: !prev.telegram }))}
-                className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${
+                onClick={() => { if (role !== 'admin') return; setChannels(prev => ({ ...prev, telegram: !prev.telegram })) }}
+                className={`border rounded-2xl p-4 flex items-center justify-between ${role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} transition-colors ${
                   channels.telegram ? 'border-sky-500 bg-sky-50/10' : 'border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -637,8 +740,8 @@ export default function PipelineBuilder({
 
               {/* Channel 3: Email */}
               <div
-                onClick={() => setChannels(prev => ({ ...prev, email: !prev.email }))}
-                className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${
+                onClick={() => { if (role !== 'admin') return; setChannels(prev => ({ ...prev, email: !prev.email })) }}
+                className={`border rounded-2xl p-4 flex items-center justify-between ${role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} transition-colors ${
                   channels.email ? 'border-indigo-500 bg-indigo-50/10' : 'border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -658,8 +761,8 @@ export default function PipelineBuilder({
 
               {/* Channel 4: Webhook */}
               <div
-                onClick={() => setChannels(prev => ({ ...prev, webhook: !prev.webhook }))}
-                className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${
+                onClick={() => { if (role !== 'admin') return; setChannels(prev => ({ ...prev, webhook: !prev.webhook })) }}
+                className={`border rounded-2xl p-4 flex items-center justify-between ${role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} transition-colors ${
                   channels.webhook ? 'border-purple-500 bg-purple-50/10' : 'border-slate-200 hover:bg-slate-50'
                 }`}
               >
