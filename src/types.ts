@@ -22,7 +22,7 @@ export interface Detection {
   trackId: string;
 }
 
-export type PipelineStep = 'camera' | 'task' | 'zone' | 'rule' | 'alert';
+export type PipelineStep = 'camera' | 'task' | 'mode' | 'config' | 'zone' | 'alert' | 'preview';
 
 export interface CountingZone {
   id: string;
@@ -42,7 +42,13 @@ export interface Pipeline {
   name: string;
   cameraId: string;
   detectorName: string;
+  monitoringMode?: 'standard' | 'smart';
+  detectionTarget?: string;
+  detectionRule?: string;
+  searchScope?: 'whole_scene' | 'roi';
+  config?: Record<string, string | number | boolean | undefined>;
   searchQuery?: string;
+  description?: string;
   countingZones: CountingZone[];
   alertChannels: {
     zalo: boolean;

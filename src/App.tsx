@@ -57,6 +57,7 @@ export default function App() {
   const [activeSection, setActiveSection] = useState<Page>('monitor');
   const [selectedCameraId, setSelectedCameraId] = useState<string>('cam-retail');
   const [gridLayout, setGridLayout] = useState<GridLayout>('4x4');
+  const [previousGridLayout, setPreviousGridLayout] = useState<GridLayout>('4x4');
   const [showGridMenu, setShowGridMenu] = useState(false);
   const [pipelines, setPipelines] = useState<Pipeline[]>(INITIAL_PIPELINES);
   const [alerts, setAlerts] = useState<AlertEvent[]>(INITIAL_ALERTS);
@@ -249,6 +250,23 @@ export default function App() {
     setDragOverIdx(null);
   };
 
+  const openCameraDetail = (cameraId: string) => {
+    if (gridLayout !== '1x1') {
+      setPreviousGridLayout(gridLayout);
+    }
+    setSelectedCameraId(cameraId);
+    setActiveSection('monitor');
+    setGridLayout('1x1');
+  };
+
+  const backToCameraGrid = () => {
+    const layout = previousGridLayout === '1x1' ? '4x4' : previousGridLayout;
+    setGridLayout(layout);
+    if (gridCameras.length === 0) {
+      setGridCameras(filteredCameras.slice(0, layoutConfigs[layout].cells));
+    }
+  };
+
   const allLayouts: { id: GridLayout }[] = [
     { id: '1x1' }, { id: '2x2' }, { id: '3x3' }, { id: '4x4' },
     { id: '1+2' }, { id: '2+1' },
@@ -326,29 +344,8 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="p-2 space-y-0.5">
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setActiveSection(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-                activeSection === item.id
-                  ? 'bg-emerald-600/10 text-emerald-400'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900/50'
-              }`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-              {item.id === 'monitor' && unreadAlertsCount > 0 && (
-                <span className="ml-auto text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded-full font-bold">
-                  {unreadAlertsCount}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-
-        {/* Camera Tree */}
+        {(activeSection === 'monitor' || activeSection === 'playback') && (
+        /* Camera Tree */
         <div className="flex-1 overflow-y-auto border-t border-neutral-900 mt-2">
           <div className="p-3">
             <div className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider mb-2 px-2 flex items-center justify-between">
@@ -386,7 +383,7 @@ export default function App() {
                   key={cam.id}
                   draggable
                   onDragStart={(e) => { e.dataTransfer.setData('text/plain', cam.id); handleDragStart(cam.id); }}
-                  onClick={() => { setSelectedCameraId(cam.id); setActiveSection('monitor'); setGridLayout('1x1'); }}
+                  onClick={() => openCameraDetail(cam.id)}
                   className={`w-full text-left px-2 py-1 rounded text-xs transition-colors cursor-pointer flex items-center gap-2 ${
                     selectedCameraId === cam.id && activeSection === 'monitor' && gridLayout === '1x1'
                       ? 'text-emerald-400'
@@ -401,22 +398,43 @@ export default function App() {
             )}
           </div>
         </div>
+        )}
       </aside>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="bg-white border-b border-neutral-100 px-4 lg:px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-1.5 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
-            >
-              {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-            </button>
-          </div>
+        <header className="bg-white border-b border-neutral-100 px-4 lg:px-6 py-3 grid grid-cols-[auto_1fr_auto] items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-1.5 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer justify-self-start"
+          >
+            {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+          </button>
 
-          <div className="flex items-center gap-3">
+          <nav className="flex items-center justify-center gap-1 min-w-0 overflow-x-auto">
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                  activeSection === item.id
+                    ? 'bg-emerald-600 text-white'
+                    : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'
+                }`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+                {item.id === 'monitor' && unreadAlertsCount > 0 && (
+                  <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded-full font-bold ml-0.5">
+                    {unreadAlertsCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-3 justify-self-end">
             <select
               value={selectedSite}
               onChange={(e) => {
@@ -509,27 +527,36 @@ export default function App() {
               </div>
 
               {gridLayout === '1x1' ? (
-                <LiveMonitor
-                  camera={activeCamera}
-                  pipelines={pipelines}
-                  alerts={alerts}
-                  setAlerts={setAlerts}
-                  logs={logs}
-                  setLogs={setLogs}
-                  onEditCamera={(id) => {
-                    setEditingCameraId(id);
-                    const cam = cameras.find(c => c.id === id);
-                    if (cam) {
-                      setNewCamera({
-                        name: cam.name, location: cam.location, type: cam.type,
-                        kind: cam.kind, site: cam.site, username: cam.username, password: cam.password
-                      });
-                    }
-                    setShowAddCamera(true);
-                  }}
-                  onDeleteCamera={handleDeleteCamera}
-                  onTogglePipeline={togglePipeline}
-                />
+                <div className="space-y-3">
+                  <button
+                    onClick={backToCameraGrid}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <ChevronLeft size={14} />
+                    Quay lại
+                  </button>
+                  <LiveMonitor
+                    camera={activeCamera}
+                    pipelines={pipelines}
+                    alerts={alerts}
+                    setAlerts={setAlerts}
+                    logs={logs}
+                    setLogs={setLogs}
+                    onEditCamera={(id) => {
+                      setEditingCameraId(id);
+                      const cam = cameras.find(c => c.id === id);
+                      if (cam) {
+                        setNewCamera({
+                          name: cam.name, location: cam.location, type: cam.type,
+                          kind: cam.kind, site: cam.site, username: cam.username, password: cam.password
+                        });
+                      }
+                      setShowAddCamera(true);
+                    }}
+                    onDeleteCamera={handleDeleteCamera}
+                    onTogglePipeline={togglePipeline}
+                  />
+                </div>
               ) : (
                 <div
                   className="grid gap-4"
@@ -561,7 +588,7 @@ export default function App() {
                               logs={logs}
                               setLogs={setLogs}
                               isCompact={true}
-                              onExpand={() => { setSelectedCameraId(cam.id); setGridLayout('1x1'); }}
+                              onExpand={() => openCameraDetail(cam.id)}
                               onEditCamera={(id) => {
                                 setEditingCameraId(id);
                                 const c = cameras.find(c => c.id === id);

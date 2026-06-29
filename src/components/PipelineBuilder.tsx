@@ -1,7 +1,7 @@
 import { useState, Dispatch, SetStateAction } from 'react';
 import { Camera, Pipeline, CountingZone, PipelineStep, AlertRule } from '../types';
 import { PIPELINE_TEMPLATES } from '../mockData';
-import { Check, Camera as CamIcon, Cpu, Sliders, Bell, AlertCircle, ArrowRight, ArrowLeft, MessageSquare, Send, Mail, Webhook, FileText, Clock, ChevronRight, Trash2 } from 'lucide-react';
+import { Check, Camera as CamIcon, Cpu, Sliders, Bell, AlertCircle, ArrowRight, ArrowLeft, MessageSquare, Send, Mail, Webhook, FileText, Clock, ChevronRight, Trash2, Pencil } from 'lucide-react';
 
 interface PipelineBuilderProps {
   cameras: Camera[];
@@ -11,6 +11,17 @@ interface PipelineBuilderProps {
   onComplete: () => void;
   onSelectCamera?: (id: string) => void;
 }
+
+type InferredMonitoringConfig = {
+  mode: 'standard' | 'smart';
+  model: string;
+  target?: string;
+  rule: string;
+  scope: 'whole_scene' | 'roi';
+  countingType: 'zone' | 'line';
+  searchQuery?: string;
+  config: Record<string, string | number | boolean | undefined>;
+};
 
 export default function PipelineBuilder({
   cameras,
@@ -24,6 +35,8 @@ export default function PipelineBuilder({
 
   const [selectedCameraIds, setSelectedCameraIds] = useState<string[]>([]);
   const [selectedUseCaseId, setSelectedUseCaseId] = useState('');
+  const [flowName, setFlowName] = useState('');
+  const [monitoringMode, setMonitoringMode] = useState<'standard' | 'smart'>('smart');
   const [userDescription, setUserDescription] = useState('');
   const [routedModelName, setRoutedModelName] = useState('YOLO-NAS-S');
   const [routedModelReason, setRoutedModelReason] = useState('Mặc định');
@@ -35,6 +48,20 @@ export default function PipelineBuilder({
   const [countingType, setCountingType] = useState<'zone' | 'line'>('line');
   const [zoneName, setZoneName] = useState('Vùng giám sát A');
   const [maxLimit, setMaxLimit] = useState(5);
+  const [detectionTarget, setDetectionTarget] = useState('person');
+  const [customTarget, setCustomTarget] = useState('');
+  const [detectionRule, setDetectionRule] = useState('enter_area');
+  const [alertDuration, setAlertDuration] = useState(10);
+  const [alertCount, setAlertCount] = useState(1);
+  const [cooldown, setCooldown] = useState(60);
+  const [confidence, setConfidence] = useState(0.65);
+  const [iou, setIou] = useState(0.45);
+  const [tracker, setTracker] = useState('bytetrack');
+  const [frameSkip, setFrameSkip] = useState(0);
+  const [inferenceFps, setInferenceFps] = useState(15);
+  const [searchScope, setSearchScope] = useState<'whole_scene' | 'roi'>('whole_scene');
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.78);
+  const [retrievalTopK, setRetrievalTopK] = useState(5);
   const [channels, setChannels] = useState({
     zalo: true,
     email: false,
@@ -45,6 +72,7 @@ export default function PipelineBuilder({
   const [zoneDrawings, setZoneDrawings] = useState<Record<string, { x: number; y: number }[]>>({});
   const [activeZoneCamIdx, setActiveZoneCamIdx] = useState(0);
   const [savedToast, setSavedToast] = useState(false);
+  const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
 
   const [ruleCondition, setRuleCondition] = useState('count_lt_min');
   const [ruleSeverity, setRuleSeverity] = useState<'info' | 'warning' | 'error' | 'critical'>('warning');
@@ -53,6 +81,176 @@ export default function PipelineBuilder({
   const activeCamera = cameras.find(c => c.id === selectedCameraIds[0]);
   const activeCamId = selectedCameraIds[activeZoneCamIdx] || selectedCameraIds[0] || '';
   const currentDrawPoints = zoneDrawings[activeCamId] || [];
+
+  const hydratePipelineForEdit = (pipe: Pipeline) => {
+    const cam = cameras.find(c => c.id === pipe.cameraId);
+    const zone = pipe.countingZones[0];
+    const restoredPoints = zone
+      ? zone.type === 'line'
+        ? [zone.lineStart, zone.lineEnd].filter(Boolean).map(p => p as { x: number; y: number })
+        : zone.points
+      : [];
+
+    setEditingPipelineId(pipe.id);
+    setSelectedCameraIds([pipe.cameraId]);
+    setFlowName(pipe.name);
+    setMonitoringMode(pipe.monitoringMode || 'smart');
+    setUserDescription(pipe.description || pipe.searchQuery || '');
+    setRoutedModelName(pipe.detectorName || 'Chưa xác định');
+    setRoutedModelReason('Đã nạp từ luồng hiện có.');
+    setSearchQuery(pipe.searchQuery || '');
+    setSearchScope(pipe.searchScope || 'whole_scene');
+    setCountingType(zone?.type || 'zone');
+    setZoneName(zone?.name || 'Vùng giám sát A');
+    setScheduleStart(pipe.scheduleStart || '00:00');
+    setScheduleEnd(pipe.scheduleEnd || '23:59');
+    setChannels(pipe.alertChannels);
+    setZoneDrawings({ [pipe.cameraId]: restoredPoints });
+    setActiveZoneCamIdx(0);
+    setCurrentStep('task');
+
+    if (pipe.monitoringMode === 'standard') {
+      setDetectionTarget(pipe.detectionTarget || 'person');
+      setDetectionRule(pipe.detectionRule || 'enter_area');
+      setAlertDuration(Number(pipe.config?.alertDuration || 10));
+      setAlertCount(Number(pipe.config?.alertCount || 1));
+      setCooldown(Number(pipe.config?.cooldown || 60));
+      setConfidence(Number(pipe.config?.confidence || 0.65));
+      setIou(Number(pipe.config?.iou || 0.45));
+      setTracker(String(pipe.config?.tracker || 'bytetrack'));
+      setFrameSkip(Number(pipe.config?.frameSkip || 0));
+      setInferenceFps(Number(pipe.config?.inferenceFps || 15));
+    } else {
+      setSimilarityThreshold(Number(pipe.config?.similarityThreshold || 0.78));
+      setRetrievalTopK(Number(pipe.config?.retrievalTopK || 5));
+      setCooldown(Number(pipe.config?.cooldown || 60));
+    }
+  };
+
+  const resetBuilderState = () => {
+    setEditingPipelineId(null);
+    setSelectedCameraIds([]);
+    setFlowName('');
+    setMonitoringMode('smart');
+    setUserDescription('');
+    setRoutedModelName('YOLO-NAS-S');
+    setRoutedModelReason('Mặc định');
+    setSearchQuery('');
+    setCameraSearch('');
+    setScheduleStart('00:00');
+    setScheduleEnd('23:59');
+    setCountingType('line');
+    setZoneName('Vùng giám sát A');
+    setDetectionTarget('person');
+    setCustomTarget('');
+    setDetectionRule('enter_area');
+    setAlertDuration(10);
+    setAlertCount(1);
+    setCooldown(60);
+    setConfidence(0.65);
+    setIou(0.45);
+    setTracker('bytetrack');
+    setFrameSkip(0);
+    setInferenceFps(15);
+    setSearchScope('whole_scene');
+    setSimilarityThreshold(0.78);
+    setRetrievalTopK(5);
+    setChannels({ zalo: true, email: false, telegram: false, webhook: false });
+    setZoneDrawings({});
+    setActiveZoneCamIdx(0);
+    setRuleCondition('count_lt_min');
+    setRuleSeverity('warning');
+    setRuleAction('Gửi cảnh báo đa kênh');
+  };
+
+  const inferMonitoringConfig = (text: string, hasRoi: boolean): InferredMonitoringConfig => {
+    const lowerText = text.toLowerCase();
+    const ppeKeywords = ['mũ', 'áo phản quang', 'bảo hộ', 'ppe', 'an toàn'];
+    const vehicleKeywords = ['xe', 'ô tô', 'oto', 'ôto', 'xe máy', 'motorcycle', 'truck', 'tải'];
+    const personKeywords = ['người', 'khách', 'nhân viên', 'công nhân', 'person'];
+    const countKeywords = ['đếm', 'số lượng', 'bao nhiêu', 'count'];
+    const lineKeywords = ['vào ra', 'ra vào', 'đi qua', 'qua cổng', 'cross', 'line'];
+    const intrusionKeywords = ['xâm nhập', 'đi vào', 'vào khu vực', 'enter'];
+    const exitKeywords = ['rời khỏi', 'đi ra', 'exit'];
+    const loiteringKeywords = ['lảng vảng', 'ở lại lâu', 'loiter', 'quá lâu'];
+    const defectKeywords = ['lỗi', 'móp', 'rách', 'xước', 'hỏng', 'defect'];
+    const abandonedKeywords = ['bỏ lại', 'leaving', 'balo', 'ba lô', 'túi'];
+    const removalKeywords = ['lấy hàng', 'lấy khỏi', 'remove', 'removes'];
+
+    const hasPpe = ppeKeywords.some(kw => lowerText.includes(kw));
+    const hasVehicle = vehicleKeywords.some(kw => lowerText.includes(kw));
+    const hasPerson = personKeywords.some(kw => lowerText.includes(kw));
+    const asksCount = countKeywords.some(kw => lowerText.includes(kw));
+    const usesLine = lineKeywords.some(kw => lowerText.includes(kw));
+    const usesKnownTarget = hasPerson || hasVehicle;
+    const needsOpenVocabulary = hasPpe
+      || defectKeywords.some(kw => lowerText.includes(kw))
+      || abandonedKeywords.some(kw => lowerText.includes(kw))
+      || removalKeywords.some(kw => lowerText.includes(kw))
+      || (!usesKnownTarget && text.trim().length > 0);
+
+    if (!needsOpenVocabulary && usesKnownTarget) {
+      const target = hasVehicle ? 'vehicle' : 'person';
+      const rule = usesLine
+        ? 'cross_line'
+        : exitKeywords.some(kw => lowerText.includes(kw))
+          ? 'exit_area'
+          : intrusionKeywords.some(kw => lowerText.includes(kw))
+            ? 'enter_area'
+            : loiteringKeywords.some(kw => lowerText.includes(kw))
+              ? 'loitering'
+              : asksCount
+                ? 'object_counting'
+                : 'appear';
+
+      return {
+        mode: 'standard',
+        model: 'YOLO-NAS-S',
+        target,
+        rule,
+        scope: hasRoi ? 'roi' : 'whole_scene',
+        countingType: usesLine || rule === 'cross_line' ? 'line' : 'zone',
+        config: {
+          alertDuration: loiteringKeywords.some(kw => lowerText.includes(kw)) ? 60 : 10,
+          alertCount: asksCount ? maxLimit : 1,
+          cooldown: lowerText.includes('ngay') ? 15 : 60,
+          confidence: 0.65,
+          iou: 0.45,
+          tracker: 'bytetrack',
+          frameSkip: usesLine ? 0 : 1,
+          inferenceFps: 15,
+        },
+      };
+    }
+
+    const rule = hasPpe
+      ? 'safety_violation'
+      : defectKeywords.some(kw => lowerText.includes(kw))
+        ? 'defect_detected'
+        : abandonedKeywords.some(kw => lowerText.includes(kw))
+          ? 'abandoned_object'
+          : removalKeywords.some(kw => lowerText.includes(kw))
+            ? 'object_removed'
+            : intrusionKeywords.some(kw => lowerText.includes(kw))
+              ? 'enter_area'
+              : asksCount
+                ? 'object_counting'
+                : 'semantic_match';
+
+    return {
+      mode: 'smart',
+      model: hasPpe ? 'YOLO-NAS + LocateAnything (Crop Mode)' : 'LocateAnything-3B',
+      rule,
+      scope: hasRoi ? 'roi' : 'whole_scene',
+      countingType: 'zone',
+      searchQuery: hasPpe ? 'người không đội mũ bảo hộ, người không mặc áo phản quang' : text,
+      config: {
+        similarityThreshold: defectKeywords.some(kw => lowerText.includes(kw)) ? 0.82 : 0.78,
+        retrievalTopK: hasRoi ? 5 : 8,
+        cooldown: lowerText.includes('ngay') ? 15 : 60,
+      },
+    };
+  };
 
   const handleDescriptionChange = (text: string) => {
     setUserDescription(text);
@@ -63,43 +261,32 @@ export default function PipelineBuilder({
       return;
     }
 
-    const lowerText = text.toLowerCase();
+    const inferred = inferMonitoringConfig(text, currentDrawPoints.length > 0);
+    setMonitoringMode(inferred.mode);
+    setRoutedModelName(inferred.model);
+    setRoutedModelReason(inferred.mode === 'standard'
+      ? 'Tự suy luận cấu hình YOLO chuẩn từ đối tượng và rule trong mô tả.'
+      : 'Tự suy luận cấu hình LocateAnything từ mô tả ngôn ngữ tự nhiên.');
+    setCountingType(inferred.countingType);
+    setRuleCondition(inferred.rule);
+    setSearchScope(inferred.scope);
+    setSearchQuery(inferred.searchQuery || '');
 
-    const ppeKeywords = ['mũ', 'áo phản quang', 'bảo hộ', 'ppe', 'an toàn'];
-    const cocoKeywords = ['người', 'khách', 'xe', 'ô tô', 'xâm nhập', 'đỗ', 'vào ra'];
-
-    let isPPE = ppeKeywords.some(kw => lowerText.includes(kw));
-    let isCOCO = cocoKeywords.some(kw => lowerText.includes(kw));
-
-    if (isPPE) {
-      setRoutedModelName('YOLO-NAS + LocateAnything (Crop Mode)');
-      setRoutedModelReason('Phát hiện kết hợp: Tìm người bằng YOLO sau đó cắt vùng ảnh để LocateAnything kiểm tra đồ bảo hộ.');
-      setCountingType('zone');
-      setZoneDrawings(prev => ({ ...prev, [activeCamId]: [] }));
-      setRuleCondition('safety_violation');
-      setSearchQuery('không đội mũ bảo hộ, không mặc áo phản quang');
-    } else if (isCOCO && !lowerText.includes('móp') && !lowerText.includes('lỗi')) {
-      setRoutedModelName('YOLO-NAS-S (Fast & Accurate)');
-      setRoutedModelReason('Phát hiện các đối tượng phổ thông (bộ dữ liệu COCO). Tối ưu để chạy tốc độ cao.');
-
-      if (lowerText.includes('vào ra') || lowerText.includes('đi qua')) {
-        setCountingType('line');
-        setRuleCondition('count_gt_max');
-      } else {
-        setCountingType('zone');
-        setRuleCondition(lowerText.includes('xâm nhập') ? 'intrusion' : 'count_gt_max');
-      }
+    if (inferred.mode === 'standard') {
+      setDetectionTarget(inferred.target || 'person');
+      setDetectionRule(inferred.rule);
+      setAlertDuration(Number(inferred.config.alertDuration || 10));
+      setAlertCount(Number(inferred.config.alertCount || 1));
+      setConfidence(Number(inferred.config.confidence || 0.65));
+      setIou(Number(inferred.config.iou || 0.45));
+      setTracker(String(inferred.config.tracker || 'bytetrack'));
+      setFrameSkip(Number(inferred.config.frameSkip || 0));
+      setInferenceFps(Number(inferred.config.inferenceFps || 15));
     } else {
-      setRoutedModelName('LocateAnything-3B (Zero-shot)');
-      setRoutedModelReason('Tìm kiếm đối tượng đặc thù không có sẵn trong tập huấn luyện.');
-      setSearchQuery(text);
-      setCountingType('zone');
-      if (lowerText.includes('lỗi') || lowerText.includes('móp') || lowerText.includes('rách')) {
-        setRuleCondition('defect_detected');
-      } else {
-        setRuleCondition('count_lt_min');
-      }
+      setSimilarityThreshold(Number(inferred.config.similarityThreshold || 0.78));
+      setRetrievalTopK(Number(inferred.config.retrievalTopK || 5));
     }
+    setCooldown(Number(inferred.config.cooldown || 60));
   };
 
   const applyTemplate = (tpl: any) => {
@@ -110,7 +297,7 @@ export default function PipelineBuilder({
   };
 
   const handleNext = () => {
-    const stepOrder: PipelineStep[] = ['camera', 'task', 'zone', 'alert'];
+    const stepOrder: PipelineStep[] = ['camera', 'task', 'zone', 'alert', 'preview'];
     const currentIndex = stepOrder.indexOf(currentStep as PipelineStep);
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1]);
@@ -118,7 +305,7 @@ export default function PipelineBuilder({
   };
 
   const handleBack = () => {
-    const stepOrder: PipelineStep[] = ['camera', 'task', 'zone', 'alert'];
+    const stepOrder: PipelineStep[] = ['camera', 'task', 'zone', 'alert', 'preview'];
     const currentIndex = stepOrder.indexOf(currentStep as PipelineStep);
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1]);
@@ -126,42 +313,67 @@ export default function PipelineBuilder({
   };
 
   const handleSave = () => {
+    const existingPipeline = editingPipelineId ? pipelines.find(p => p.id === editingPipelineId) : undefined;
     const newPipelines = selectedCameraIds.map(cameraId => {
       const cam = cameras.find(c => c.id === cameraId);
       const camPoints = zoneDrawings[cameraId] || [];
-      const zones: CountingZone[] = camPoints.length > 0 ? [{
+      const hasDrawnScope = camPoints.length > 0;
+      const inferred = inferMonitoringConfig(userDescription, hasDrawnScope);
+      const zonePoints = hasDrawnScope && countingType === 'zone'
+        ? camPoints
+        : [
+            { x: 0, y: 0 },
+            { x: 100, y: 0 },
+            { x: 100, y: 100 },
+            { x: 0, y: 100 },
+          ];
+      const zones: CountingZone[] = [{
         id: `zone-${Date.now()}-${cameraId}`,
-        name: zoneName,
-        type: countingType,
-        points: countingType === 'zone' ? camPoints : [],
-        lineStart: countingType === 'line' && camPoints.length >= 2 ? camPoints[0] : undefined,
-        lineEnd: countingType === 'line' && camPoints.length >= 2 ? camPoints[camPoints.length - 1] : undefined,
+        name: hasDrawnScope ? zoneName : 'Toàn khung hình',
+        type: hasDrawnScope ? countingType : 'zone',
+        points: zonePoints,
+        lineStart: hasDrawnScope && countingType === 'line' && camPoints.length >= 2 ? camPoints[0] : undefined,
+        lineEnd: hasDrawnScope && countingType === 'line' && camPoints.length >= 2 ? camPoints[camPoints.length - 1] : undefined,
         count: 0,
-        inCount: countingType === 'line' ? 0 : undefined,
-        outCount: countingType === 'line' ? 0 : undefined,
-      }] : [];
+        inCount: hasDrawnScope && countingType === 'line' ? 0 : undefined,
+        outCount: hasDrawnScope && countingType === 'line' ? 0 : undefined,
+      }];
       return {
-        id: `pipe-${Date.now()}-${cameraId}`,
-        name: `Luồng giám sát - ${cam?.name.split(' ')[1] || 'Camera'}`,
+        id: editingPipelineId || `pipe-${Date.now()}-${cameraId}`,
+        name: flowName.trim() || `Luồng giám sát - ${cam?.name.split(' ')[1] || 'Camera'}`,
         cameraId,
-        detectorName: routedModelName.split(' ')[0] || 'AI',
-        searchQuery: searchQuery || undefined,
+        detectorName: inferred.model,
+        monitoringMode: inferred.mode,
+        detectionTarget: inferred.target,
+        detectionRule: inferred.rule,
+        searchScope: inferred.scope,
+        config: inferred.config,
+        searchQuery: inferred.searchQuery || undefined,
+        description: userDescription || undefined,
         countingZones: zones,
         alertChannels: channels,
         scheduleStart: scheduleStart !== '00:00' || scheduleEnd !== '23:59' ? scheduleStart : undefined,
         scheduleEnd: scheduleStart !== '00:00' || scheduleEnd !== '23:59' ? scheduleEnd : undefined,
-        isActive: true,
-        createdAt: new Date().toISOString(),
+        isActive: existingPipeline?.isActive ?? true,
+        createdAt: existingPipeline?.createdAt || new Date().toISOString(),
       } as Pipeline;
     });
 
-    setPipelines(prev => [...newPipelines, ...prev]);
+    setPipelines(prev => {
+      if (editingPipelineId) {
+        const next = prev.filter(p => p.id !== editingPipelineId);
+        return [...newPipelines, ...next];
+      }
+      return [...newPipelines, ...prev];
+    });
+    const savedCameraId = selectedCameraIds[0];
     setCurrentStep('list');
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 2500);
-    if (onSelectCamera && selectedCameraIds[0]) {
-      onSelectCamera(selectedCameraIds[0]);
+    if (onSelectCamera && savedCameraId) {
+      onSelectCamera(savedCameraId);
     }
+    resetBuilderState();
   };
 
   return (
@@ -180,11 +392,12 @@ export default function PipelineBuilder({
           <div className="flex items-center gap-2 md:gap-4 w-full max-w-3xl overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
             {[
               { key: 'camera', label: '1. Camera', icon: <CamIcon size={14} /> },
-              { key: 'task', label: '2. Nhu cầu', icon: <Cpu size={14} /> },
-              { key: 'zone', label: '3. Vùng & Quy tắc', icon: <Sliders size={14} /> },
+              { key: 'task', label: '2. Mô tả', icon: <FileText size={14} /> },
+              { key: 'zone', label: '3. ROI', icon: <Sliders size={14} /> },
               { key: 'alert', label: '4. Thông báo', icon: <Bell size={14} /> },
+              { key: 'preview', label: '5. Preview', icon: <Check size={14} /> },
             ].map((s, idx) => {
-              const stepOrder = ['camera', 'task', 'zone', 'alert'];
+              const stepOrder = ['camera', 'task', 'zone', 'alert', 'preview'];
               const isCompleted = stepOrder.indexOf(currentStep as string) > idx;
               const isActive = currentStep === s.key;
 
@@ -200,7 +413,7 @@ export default function PipelineBuilder({
                   }`}>
                     {s.label.substring(3)}
                   </span>
-                  {idx < 3 && <div className="h-[1px] w-4 md:w-8 bg-slate-200 ml-1 md:ml-2" />}
+                  {idx < 4 && <div className="h-[1px] w-4 md:w-8 bg-slate-200 ml-1 md:ml-2" />}
                 </div>
               );
             })}
@@ -218,7 +431,10 @@ export default function PipelineBuilder({
                 <p className="text-xs text-slate-500 mt-1">Danh sách các AI Pipeline đang chạy trên các camera của bạn.</p>
               </div>
               <button
-                onClick={() => setCurrentStep('camera')}
+                onClick={() => {
+                  resetBuilderState();
+                  setCurrentStep('camera');
+                }}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2"
               >
                 <span>+ Tạo Luồng Mới</span>
@@ -229,59 +445,107 @@ export default function PipelineBuilder({
               <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                 <p className="text-slate-500 text-sm">Chưa có luồng giám sát nào đang chạy.</p>
                 <button
-                  onClick={() => setCurrentStep('camera')}
+                  onClick={() => {
+                    resetBuilderState();
+                    setCurrentStep('camera');
+                  }}
                   className="text-emerald-600 font-bold text-sm mt-3 hover:underline"
                 >
                   Tạo ngay
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pipelines.map(pipe => {
-                  const cam = cameras.find(c => c.id === pipe.cameraId);
-                  return (
-                    <div key={pipe.id} className="border border-slate-200 rounded-2xl p-4 hover:shadow-md transition-all bg-white relative overflow-hidden group">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                            {pipe.name}
-                            {pipe.isActive && <span className="flex h-2 w-2 relative">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>}
-                          </h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
-                            <CamIcon size={12} /> {cam?.name || 'Camera'} ({cam?.location || ''})
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => setPipelines(prev => prev.map(p2 => p2.id === pipe.id ? { ...p2, isActive: !p2.isActive } : p2))}
-                          className={`text-[10px] px-2.5 py-1 rounded-lg font-medium cursor-pointer transition-colors ${
-                            pipe.isActive
-                              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                          }`}
-                        >
-                          {pipe.isActive ? 'Bật' : 'Tắt'}
-                        </button>
-                        <button
-                          onClick={() => setPipelines(prev => prev.filter(p2 => p2.id !== pipe.id))}
-                          className="text-[10px] p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Xoá pipeline"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-3">
-                        <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-1 rounded font-medium border border-emerald-100 flex items-center gap-1">
-                          <Sliders size={10} /> {pipe.countingZones.length} Vùng
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Trạng thái</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Luồng giám sát</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Camera</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Cấu hình AI</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">Lịch chạy</th>
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 text-right">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {pipelines.map(pipe => {
+                        const cam = cameras.find(c => c.id === pipe.cameraId);
+                        const schedule = pipe.scheduleStart && pipe.scheduleEnd ? `${pipe.scheduleStart} - ${pipe.scheduleEnd}` : '24/7';
+                        const usesFullFrame = pipe.countingZones.length === 0 || pipe.countingZones.some(zone => zone.name === 'Toàn khung hình');
+                        return (
+                          <tr key={pipe.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-4 py-3 align-middle">
+                              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                pipe.isActive
+                                  ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
+                                  : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'
+                              }`}>
+                                {pipe.isActive && <span className="relative flex h-2 w-2">
+                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                                </span>}
+                                {pipe.isActive ? 'Đang bật' : 'Đang tắt'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 align-middle">
+                              <div className="font-bold text-sm text-slate-800">{pipe.name}</div>
+                              {pipe.searchQuery && (
+                                <div className="mt-1 max-w-[220px] truncate text-[11px] text-slate-400">{pipe.searchQuery}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 align-middle">
+                              <div className="flex items-start gap-2 text-xs text-slate-600">
+                                <CamIcon size={13} className="mt-0.5 shrink-0 text-slate-400" />
+                                <div className="min-w-0">
+                                  <div className="font-medium text-slate-700 truncate">{cam?.name || 'Camera'}</div>
+                                  <div className="mt-0.5 text-[11px] text-slate-400 truncate">{cam?.location || 'Chưa có vị trí'}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 align-middle">
+                              <div>
+                                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700 ring-1 ring-emerald-100">
+                                  <Sliders size={10} /> {usesFullFrame ? 'Toàn khung hình' : 'Vùng đã vẽ'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 align-middle text-xs font-medium text-slate-600">{schedule}</td>
+                            <td className="px-4 py-3 align-middle">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => hydratePipelineForEdit(pipe)}
+                                  className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1.5 rounded-lg font-medium cursor-pointer transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800"
+                                  title="Sửa pipeline"
+                                >
+                                  <Pencil size={12} />
+                                  Sửa
+                                </button>
+                                <button
+                                  onClick={() => setPipelines(prev => prev.map(p2 => p2.id === pipe.id ? { ...p2, isActive: !p2.isActive } : p2))}
+                                  className={`text-[10px] px-2.5 py-1.5 rounded-lg font-medium cursor-pointer transition-colors ${
+                                    pipe.isActive
+                                      ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  {pipe.isActive ? 'Tắt' : 'Bật'}
+                                </button>
+                                <button
+                                  onClick={() => setPipelines(prev => prev.filter(p2 => p2.id !== pipe.id))}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                  title="Xoá pipeline"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -341,21 +605,53 @@ export default function PipelineBuilder({
         {currentStep === 'task' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-base font-bold text-slate-800">Mô tả bài toán giám sát</h3>
-              <p className="text-xs text-slate-500 mt-1">Mô tả bất kỳ yêu cầu nào bằng tiếng Việt, hệ thống sẽ tự phân tích và đề xuất cấu hình phù hợp.</p>
+              <h3 className="text-base font-bold text-slate-800">Mô tả nhu cầu giám sát</h3>
+              <p className="text-xs text-slate-500 mt-1">Người dùng chỉ cần mô tả bài toán. Hệ thống tự chọn model, rule và tham số phù hợp ở phía sau.</p>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                <FileText className="text-emerald-600" size={18} />
-                Bạn muốn giám sát điều gì?
-              </label>
-              <textarea
-                value={userDescription}
-                onChange={(e) => handleDescriptionChange(e.target.value)}
-                placeholder='Ví dụ: "Nhận diện biển số xe ô tô màu đỏ ra vào cổng" hoặc "Đếm số lượng khách hàng ra vào cửa hàng và phát hiện xâm nhập trái phép sau 22h" hoặc "Phát hiện sản phẩm lỗi trên băng chuyền đóng gói"'
-                className="w-full h-36 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-sm text-slate-800 focus:bg-white focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 resize-none transition-all"
-              />
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Tên luồng</label>
+                <input
+                  type="text"
+                  value={flowName}
+                  onChange={(e) => setFlowName(e.target.value)}
+                  placeholder="VD: Giám sát kệ hàng khu A"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:bg-white focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                  <FileText className="text-emerald-600" size={18} />
+                  Bạn muốn giám sát điều gì?
+                </label>
+                <textarea
+                  value={userDescription}
+                  onChange={(e) => handleDescriptionChange(e.target.value)}
+                  placeholder='Ví dụ: "Cảnh báo khi có người lấy hàng khỏi kệ A" hoặc "Tìm người bỏ lại balo trong khu vực chờ"'
+                  className="mt-3 w-full h-32 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-sm text-slate-800 focus:bg-white focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 resize-none transition-all"
+                />
+              </div>
+
+              <details className="group">
+                <summary className="text-[11px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-600 transition-colors list-none flex items-center gap-1">
+                  <ChevronRight size={12} className="group-open:rotate-90 transition-transform" />
+                  Gợi ý nhanh
+                </summary>
+                <div className="mt-3 grid grid-cols-2 lg:grid-cols-3 gap-2">
+                  {PIPELINE_TEMPLATES.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => { applyTemplate(t); setScheduleStart('00:00'); setScheduleEnd('23:59'); }}
+                      className="text-left bg-white border border-slate-200 hover:border-emerald-300 p-2.5 rounded-lg transition-all group"
+                    >
+                      <h5 className="font-bold text-[11px] text-slate-700 group-hover:text-emerald-700 transition-colors">{t.name}</h5>
+                      <p className="text-[9px] text-slate-400 mt-0.5 line-clamp-2">{t.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </details>
 
               <div className="flex items-center gap-4 pt-2">
                 <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -375,31 +671,190 @@ export default function PipelineBuilder({
                   onChange={(e) => setScheduleEnd(e.target.value)}
                   className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-emerald-500"
                 />
-                <span className="text-[10px] text-slate-400">(Để trống nếu chạy 24/7)</span>
+                <span className="text-[10px] text-slate-400">(00:00 - 23:59 = chạy 24/7)</span>
               </div>
             </div>
+          </div>
+        )}
 
+        {currentStep === 'config' && (
+          <div className="space-y-6">
             <div>
-              <details className="group">
-                <summary className="text-[11px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-600 transition-colors list-none flex items-center gap-1">
-                  <ChevronRight size={12} className="group-open:rotate-90 transition-transform" />
-                  Gợi ý nhanh
-                </summary>
-                <div className="mt-3 grid grid-cols-2 lg:grid-cols-3 gap-2">
-                  {PIPELINE_TEMPLATES.map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => { applyTemplate(t); setScheduleStart('00:00'); setScheduleEnd('23:59'); }}
-                      className="text-left bg-white border border-slate-200 hover:border-emerald-300 p-2.5 rounded-lg transition-all group"
-                    >
-                      <h5 className="font-bold text-[11px] text-slate-700 group-hover:text-emerald-700 transition-colors">{t.name}</h5>
-                      <p className="text-[9px] text-slate-400 mt-0.5 line-clamp-2">{t.description}</p>
-                    </button>
-                  ))}
-                </div>
-              </details>
+              <h3 className="text-base font-bold text-slate-800">
+                {monitoringMode === 'standard' ? 'Configure Standard Monitoring' : 'Configure Smart Monitoring'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                {monitoringMode === 'standard'
+                  ? 'Chọn đối tượng, luật phát hiện, ngưỡng cảnh báo và tham số nâng cao.'
+                  : 'Nhập mô tả tự nhiên, phạm vi tìm kiếm, thời gian chạy và tham số truy xuất.'}
+              </p>
             </div>
 
+            {monitoringMode === 'standard' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Detection target</label>
+                    <select
+                      value={detectionTarget}
+                      onChange={(e) => setDetectionTarget(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-hidden focus:border-emerald-500"
+                    >
+                      <option value="person">Person</option>
+                      <option value="vehicle">Vehicle</option>
+                      <option value="bicycle">Bicycle</option>
+                      <option value="motorcycle">Motorcycle</option>
+                      <option value="truck">Truck</option>
+                      <option value="animal">Animal</option>
+                      <option value="custom">Custom class</option>
+                    </select>
+                  </div>
+                  {detectionTarget === 'custom' && (
+                    <input
+                      type="text"
+                      value={customTarget}
+                      onChange={(e) => setCustomTarget(e.target.value)}
+                      placeholder="Nhập custom class"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-hidden focus:border-emerald-500"
+                    />
+                  )}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Detection rule</label>
+                    <select
+                      value={detectionRule}
+                      onChange={(e) => setDetectionRule(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-hidden focus:border-emerald-500"
+                    >
+                      <option value="enter_area">Enter area</option>
+                      <option value="exit_area">Exit area</option>
+                      <option value="cross_line">Cross line</option>
+                      <option value="appear">Appear</option>
+                      <option value="disappear">Disappear</option>
+                      <option value="loitering">Loitering</option>
+                      <option value="object_counting">Object counting</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Duration</label>
+                      <input type="number" value={alertDuration} onChange={(e) => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Count</label>
+                      <input type="number" value={alertCount} onChange={(e) => setAlertCount(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Cooldown</label>
+                      <input type="number" value={cooldown} onChange={(e) => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Confidence</label>
+                      <input type="number" step="0.01" min="0" max="1" value={confidence} onChange={(e) => setConfidence(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">IOU</label>
+                      <input type="number" step="0.01" min="0" max="1" value={iou} onChange={(e) => setIou(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Tracker</label>
+                      <select value={tracker} onChange={(e) => setTracker(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs">
+                        <option value="bytetrack">ByteTrack</option>
+                        <option value="deepsort">DeepSORT</option>
+                        <option value="none">None</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Frame skip</label>
+                      <input type="number" min="0" value={frameSkip} onChange={(e) => setFrameSkip(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Inference FPS</label>
+                      <input type="number" min="1" value={inferenceFps} onChange={(e) => setInferenceFps(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                  <FileText className="text-emerald-600" size={18} />
+                  Natural language description
+                </label>
+                <textarea
+                  value={userDescription}
+                  onChange={(e) => handleDescriptionChange(e.target.value)}
+                  placeholder='Ví dụ: "Cảnh báo khi có người lấy hàng khỏi kệ A" hoặc "Tìm người bỏ lại balo trong khu vực chờ"'
+                  className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-sm text-slate-800 focus:bg-white focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 resize-none transition-all"
+                />
+
+                <details className="group">
+                  <summary className="text-[11px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-600 transition-colors list-none flex items-center gap-1">
+                    <ChevronRight size={12} className="group-open:rotate-90 transition-transform" />
+                    Gợi ý nhanh
+                  </summary>
+                  <div className="mt-3 grid grid-cols-2 lg:grid-cols-3 gap-2">
+                    {PIPELINE_TEMPLATES.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => { applyTemplate(t); setScheduleStart('00:00'); setScheduleEnd('23:59'); }}
+                        className="text-left bg-white border border-slate-200 hover:border-emerald-300 p-2.5 rounded-lg transition-all group"
+                      >
+                        <h5 className="font-bold text-[11px] text-slate-700 group-hover:text-emerald-700 transition-colors">{t.name}</h5>
+                        <p className="text-[9px] text-slate-400 mt-0.5 line-clamp-2">{t.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Search scope</label>
+                    <select value={searchScope} onChange={(e) => setSearchScope(e.target.value as 'whole_scene' | 'roi')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+                      <option value="whole_scene">Whole scene</option>
+                      <option value="roi">ROI</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Similarity threshold</label>
+                    <input type="number" step="0.01" min="0" max="1" value={similarityThreshold} onChange={(e) => setSimilarityThreshold(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Retrieval top-k</label>
+                    <input type="number" min="1" value={retrievalTopK} onChange={(e) => setRetrievalTopK(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Cooldown</label>
+                    <input type="number" min="0" value={cooldown} onChange={(e) => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4 pt-2">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Clock size={14} />
+                <span>Lên lịch chạy:</span>
+              </div>
+              <input
+                type="time"
+                value={scheduleStart}
+                onChange={(e) => setScheduleStart(e.target.value)}
+                className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-emerald-500"
+              />
+              <span className="text-slate-400 text-xs">→</span>
+              <input
+                type="time"
+                value={scheduleEnd}
+                onChange={(e) => setScheduleEnd(e.target.value)}
+                className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-hidden focus:border-emerald-500"
+              />
+              <span className="text-[10px] text-slate-400">(00:00 - 23:59 = chạy 24/7)</span>
+            </div>
           </div>
         )}
 
@@ -581,8 +1036,8 @@ export default function PipelineBuilder({
                     <MessageSquare size={20} />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-xs text-slate-800">Gửi Zalo OA</h4>
-                    <p className="text-[10px] text-slate-400">Tin nhắn trực tiếp về Zalo NV</p>
+                    <h4 className="font-semibold text-xs text-slate-800">Popup</h4>
+                    <p className="text-[10px] text-slate-400">Hiển thị cảnh báo trực tiếp trên giao diện</p>
                   </div>
                 </div>
                 <input type="checkbox" checked={channels.zalo} onChange={() => setChannels(prev => ({ ...prev, zalo: !prev.zalo }))} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
@@ -596,11 +1051,26 @@ export default function PipelineBuilder({
                     <Mail size={20} />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-xs text-slate-800">Gửi Email Báo cáo</h4>
-                    <p className="text-[10px] text-slate-400">Gửi ảnh kèm thời điểm vi phạm</p>
+                    <h4 className="font-semibold text-xs text-slate-800">Email</h4>
+                    <p className="text-[10px] text-slate-400">Gửi ảnh và thông tin sự kiện qua email</p>
                   </div>
                 </div>
                 <input type="checkbox" checked={channels.email} onChange={() => setChannels(prev => ({ ...prev, email: !prev.email }))} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+              </label>
+
+              <label className={`border rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors ${
+                channels.webhook ? 'border-emerald-500 bg-emerald-50/10' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl">
+                    <Webhook size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-xs text-slate-800">Webhook</h4>
+                    <p className="text-[10px] text-slate-400">Gửi sự kiện sang hệ thống bên ngoài</p>
+                  </div>
+                </div>
+                <input type="checkbox" checked={channels.webhook} onChange={() => setChannels(prev => ({ ...prev, webhook: !prev.webhook }))} className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
               </label>
 
               <div className="border border-slate-200 rounded-2xl p-4 flex items-center justify-between bg-slate-50/50 opacity-60 cursor-not-allowed">
@@ -609,24 +1079,44 @@ export default function PipelineBuilder({
                     <Send size={20} />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-xs text-slate-800">Gửi Telegram Bot</h4>
+                    <h4 className="font-semibold text-xs text-slate-800">Telegram Bot</h4>
                     <p className="text-[10px] text-slate-400">Chưa được cấu hình</p>
                   </div>
                 </div>
                 <span className="text-[10px] text-slate-400 bg-slate-200/50 px-2 py-1 rounded">Chưa cấu hình</span>
               </div>
+            </div>
+          </div>
+        )}
 
-              <div className="border border-slate-200 rounded-2xl p-4 flex items-center justify-between bg-slate-50/50 opacity-60 cursor-not-allowed">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-200 text-slate-500 rounded-xl">
-                    <Webhook size={20} />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-xs text-slate-800">Webhook API</h4>
-                    <p className="text-[10px] text-slate-400">Chưa được cấu hình</p>
-                  </div>
+        {currentStep === 'preview' && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">Preview Configuration</h3>
+              <p className="text-xs text-slate-500 mt-1">Kiểm tra cấu hình trước khi lưu và triển khai luồng giám sát.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Thông tin chung</div>
+                <div className="text-sm font-bold text-slate-800">{flowName.trim() || 'Luồng giám sát mới'}</div>
+                <div className="text-xs text-slate-600">Camera: {selectedCameraIds.length} camera đã chọn</div>
+                <div className="text-xs text-slate-600">
+                  ROI: {currentDrawPoints.length > 0 ? 'Vùng/vạch đã vẽ' : 'Toàn khung hình'}
                 </div>
-                <span className="text-[10px] text-slate-400 bg-slate-200/50 px-2 py-1 rounded">Chưa cấu hình</span>
+                <div className="text-xs text-slate-600">Lịch chạy: {scheduleStart === '00:00' && scheduleEnd === '23:59' ? '24/7' : `${scheduleStart} - ${scheduleEnd}`}</div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Nhu cầu giám sát</div>
+                <div className="text-xs text-slate-600">{userDescription || 'Chưa nhập mô tả'}</div>
+                <div className="text-xs text-slate-600">
+                  Cảnh báo: {[
+                    channels.zalo ? 'Popup' : '',
+                    channels.email ? 'Email' : '',
+                    channels.webhook ? 'Webhook' : '',
+                  ].filter(Boolean).join(', ') || 'Không gửi'}
+                </div>
               </div>
             </div>
           </div>
@@ -650,12 +1140,12 @@ export default function PipelineBuilder({
               <ArrowLeft size={14} /> Quay lại
             </button>
 
-            {currentStep === 'alert' ? (
+            {currentStep === 'preview' ? (
               <button
                 onClick={handleSave}
                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-6 py-3 rounded-xl shadow-md shadow-emerald-600/10 hover:shadow-lg hover:shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer"
               >
-                <Check size={14} /> Hoàn tất & Kích hoạt AI
+                <Check size={14} /> Lưu & Triển khai AI
               </button>
             ) : (
               <button
