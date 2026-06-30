@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, AlertEvent } from '../types';
-import { Search, Sparkles, Play, Pause, FastForward, Rewind, Camera as CameraIcon, Download, BookmarkPlus, Clock, ChevronRight, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react';
+import { Search, Sparkles, Play, Pause, FastForward, Rewind, Camera as CameraIcon, Download, BookmarkPlus, Clock, ChevronRight, ChevronDown, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react';
 import { SMART_SEARCH_PRESETS } from '../mockData';
 
 interface SearchResult {
@@ -155,26 +155,42 @@ export default function Playback({ cameras, alerts }: PlaybackProps) {
     <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-140px)]" id="playback-section">
       <div className="w-full lg:w-64 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex-shrink-0 flex flex-col h-full overflow-hidden hidden lg:flex">
         <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-4 px-2">Camera</h3>
-        <div className="flex-1 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
-          {cameras.map(camera => (
-            <div
-              key={camera.id}
-              draggable
-              onDragStart={(e) => handleDragStart(e, camera.id)}
-              onClick={() => setSelectedCameraId(camera.id)}
-              className={`p-2.5 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
-                selectedCameraId === camera.id
-                  ? 'border-emerald-500 bg-emerald-50/50'
-                  : 'border-transparent hover:border-emerald-300 hover:shadow-sm bg-white hover:bg-slate-50'
-              }`}
-            >
-                <div className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-800 truncate">{camera.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{camera.location}</p>
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+          {Object.entries(
+            cameras.reduce((acc, cam) => {
+              if (!acc[cam.site]) acc[cam.site] = [];
+              acc[cam.site].push(cam);
+              return acc;
+            }, {} as Record<string, Camera[]>)
+          ).map(([site, cams]: [string, Camera[]]) => (
+            <details key={site} className="group" open>
+              <summary className="cursor-pointer list-none flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{site}</span>
+                <ChevronDown size={14} className="text-slate-400 group-open:rotate-180 transition-transform" />
+              </summary>
+              <div className="pl-2 space-y-1 mt-1">
+                {cams.map(camera => (
+                  <div
+                    key={camera.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, camera.id)}
+                    onClick={() => setSelectedCameraId(camera.id)}
+                    className={`p-2.5 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                      selectedCameraId === camera.id
+                        ? 'border-emerald-500 bg-emerald-50/50'
+                        : 'border-transparent hover:border-emerald-300 hover:shadow-sm bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-slate-800 truncate">{camera.name}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{camera.location}</p>
+                        </div>
+                      </div>
                   </div>
-                </div>
-            </div>
+                ))}
+              </div>
+            </details>
           ))}
         </div>
       </div>

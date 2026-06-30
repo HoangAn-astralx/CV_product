@@ -74,6 +74,7 @@ export interface AlertEvent {
   score: number;
   note?: string;
   assignee?: string;
+  handledAt?: string;
 }
 
 export interface AlertRule {

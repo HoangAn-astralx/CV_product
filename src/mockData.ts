@@ -302,6 +302,9 @@ export const INITIAL_ALERTS: AlertEvent[] = [
     message: 'Cảnh báo: Nhân viên không đội mũ bảo hộ tại Zone B.',
     status: 'read',
     score: 94,
+    assignee: 'Bảo vệ Cổng 1',
+    note: 'Đã nhắc nhở nhân viên vi phạm.',
+    handledAt: '2026-06-30T10:05:00-07:00'
   },
   {
     id: 'alert-3',
@@ -312,6 +315,9 @@ export const INITIAL_ALERTS: AlertEvent[] = [
     message: 'Phát hiện khách hàng đứng quá lâu ở quầy kệ mỹ phẩm (>5 phút). Cần hỗ trợ tư vấn.',
     status: 'closed',
     score: 87,
+    assignee: 'NV. Nguyễn Thị A',
+    note: 'Khách đã mua hàng thành công.',
+    handledAt: '2026-06-23T15:35:10-07:00'
   }
 ];
 

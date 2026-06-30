@@ -145,7 +145,7 @@ export default function AnalyticsPanel() {
 
         {/* AI Prompt Bar */}
         <div className="px-6 py-4 border-b border-slate-100 bg-white">
-          <div className="flex flex-col gap-3 max-w-4xl">
+          <div className="flex flex-col gap-3 w-full">
             <h4 className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
               <Sparkles size={16} className="text-emerald-600" />
               Tạo biểu đồ bằng AI

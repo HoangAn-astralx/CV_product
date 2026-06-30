@@ -64,8 +64,7 @@ export default function App() {
   const [logs, setLogs] = useState<LogEntry[]>(INITIAL_LOGS);
   const [rules, setRules] = useState<AlertRule[]>(INITIAL_RULES);
   const [selectedSite, setSelectedSite] = useState<'Tất cả' | 'Hà Nội' | 'TP.HCM' | 'Bình Dương'>('Tất cả');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [camListOpen, setCamListOpen] = useState(false);
+
 
   const [cameras, setCameras] = useState<Camera[]>(() => {
     const saved = localStorage.getItem('visionos_cameras_v2');
@@ -273,11 +272,11 @@ export default function App() {
   ];
 
   const navItems: { id: Page; label: string; icon: any }[] = [
-    { id: 'monitor', label: 'Giám sát', icon: <Eye size={18} /> },
-    { id: 'builder', label: 'Cấu hình', icon: <CameraIcon size={18} /> },
-    { id: 'playback', label: 'Xem lại', icon: <Search size={18} /> },
-    { id: 'analytics', label: 'Báo cáo', icon: <BarChart3 size={18} /> },
-    { id: 'admin', label: 'Quản trị', icon: <Settings size={18} /> },
+    { id: 'monitor', label: 'Giám sát', icon: <Eye size={20} /> },
+    { id: 'builder', label: 'Cấu hình', icon: <CameraIcon size={20} /> },
+    { id: 'playback', label: 'Xem lại', icon: <Search size={20} /> },
+    { id: 'analytics', label: 'Báo cáo', icon: <BarChart3 size={20} /> },
+    { id: 'admin', label: 'Quản trị', icon: <Settings size={20} /> },
   ];
 
   if (!isLoggedIn) {
@@ -328,105 +327,32 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-800 font-sans antialiased flex">
-      {/* Sidebar */}
-      <aside className={`bg-neutral-950 text-white flex flex-col border-r border-neutral-900 transition-all duration-300 ${sidebarOpen ? 'w-56' : 'w-0 overflow-hidden'}`}>
-        <div className="p-4 border-b border-neutral-900 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white flex-shrink-0">
-            <Eye size={16} />
-          </div>
-          <h1 className="font-bold text-sm flex-1">VisionOS</h1>
-          <button
-            onClick={handleLogout}
-            className="text-neutral-600 hover:text-white p-1.5 rounded-lg hover:bg-neutral-900 transition-colors cursor-pointer"
-            title="Đăng xuất"
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-
-        {(activeSection === 'monitor' || activeSection === 'playback') && (
-        /* Camera Tree */
-        <div className="flex-1 overflow-y-auto border-t border-neutral-900 mt-2">
-          <div className="p-3">
-            <div className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider mb-2 px-2 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setCamListOpen(!camListOpen)}
-                  className="p-0.5 rounded-sm text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
-                >
-                  <ChevronDown size={11} className={camListOpen ? '' : '-rotate-90'} />
-                </button>
-                <span>Camera ({filteredCameras.length})</span>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveSection('monitor');
-                  const count = filteredCameras.length;
-                  let layout: GridLayout = '4x4';
-                  if (count <= 1) layout = '1x1';
-                  else if (count <= 4) layout = '2x2';
-                  else if (count <= 9) layout = '3x3';
-                  setGridLayout(layout);
-                  setGridCameras(filteredCameras.slice(0, layoutConfigs[layout].cells));
-                }}
-                className="p-0.5 rounded-sm text-neutral-500 hover:text-emerald-400 hover:bg-neutral-800 transition-colors cursor-pointer"
-                title="Xem tất cả trên lưới"
-              >
-                <Eye size={11} />
-              </button>
-            </div>
-            {camListOpen && (
-            <div className="space-y-0.5">
-              {filteredCameras.map(cam => (
-                <button
-                  key={cam.id}
-                  draggable
-                  onDragStart={(e) => { e.dataTransfer.setData('text/plain', cam.id); handleDragStart(cam.id); }}
-                  onClick={() => openCameraDetail(cam.id)}
-                  className={`w-full text-left px-2 py-1 rounded text-xs transition-colors cursor-pointer flex items-center gap-2 ${
-                    selectedCameraId === cam.id && activeSection === 'monitor' && gridLayout === '1x1'
-                      ? 'text-emerald-400'
-                      : 'text-neutral-400 hover:text-white'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cam.status === 'online' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                  <span className="truncate">{cam.name}</span>
-                </button>
-              ))}
-            </div>
-            )}
-          </div>
-        </div>
-        )}
-      </aside>
-
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
         {/* Top Bar */}
-        <header className="bg-white border-b border-neutral-100 px-4 lg:px-6 py-3 grid grid-cols-[auto_1fr_auto] items-center gap-3">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer justify-self-start"
-          >
-            {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-          </button>
+        <header className="bg-white border-b border-neutral-100 px-4 lg:px-6 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white flex-shrink-0 shadow-sm shadow-emerald-600/20">
+              <Eye size={20} />
+            </div>
+            <h1 className="font-extrabold text-lg text-neutral-800 hidden sm:block tracking-tight">VisionOS</h1>
+          </div>
 
-          <nav className="flex items-center justify-center gap-1 min-w-0 overflow-x-auto">
+          <nav className="flex items-center justify-center gap-2 min-w-0 overflow-x-auto">
             {navItems.map(item => (
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   activeSection === item.id
-                    ? 'bg-emerald-600 text-white'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
                     : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'
                 }`}
               >
                 {item.icon}
                 <span>{item.label}</span>
                 {item.id === 'monitor' && unreadAlertsCount > 0 && (
-                  <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded-full font-bold ml-0.5">
+                  <span className="text-xs bg-rose-600 text-white px-2 py-0.5 rounded-full font-bold ml-1">
                     {unreadAlertsCount}
                   </span>
                 )}
@@ -434,7 +360,7 @@ export default function App() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3 justify-self-end">
+          <div className="flex items-center gap-3 shrink-0">
             <select
               value={selectedSite}
               onChange={(e) => {
@@ -445,13 +371,20 @@ export default function App() {
                   setSelectedCameraId(filtered[0].id);
                 }
               }}
-              className="bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-700 focus:outline-hidden cursor-pointer"
+              className="bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-700 focus:outline-hidden cursor-pointer hidden sm:block"
             >
               <option value="Tất cả">Tất cả địa điểm</option>
               <option value="Hà Nội">Hà Nội</option>
               <option value="TP.HCM">TP.HCM</option>
               <option value="Bình Dương">Bình Dương</option>
             </select>
+            <button
+              onClick={handleLogout}
+              className="text-neutral-500 hover:text-rose-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
+              title="Đăng xuất"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </header>
 
@@ -460,10 +393,55 @@ export default function App() {
         {/* Main Content Area */}
         <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
           {activeSection === 'monitor' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
+            <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-140px)]">
+              {/* White sidebar */}
+              <div className="w-full lg:w-64 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex-shrink-0 flex flex-col h-full overflow-hidden hidden lg:flex">
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-4 px-2">Camera</h3>
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                  {Object.entries(
+                    filteredCameras.reduce((acc, cam) => {
+                      if (!acc[cam.site]) acc[cam.site] = [];
+                      acc[cam.site].push(cam);
+                      return acc;
+                    }, {} as Record<string, Camera[]>)
+                  ).map(([site, cams]: [string, Camera[]]) => (
+                    <details key={site} className="group" open>
+                      <summary className="cursor-pointer list-none flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg">
+                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{site}</span>
+                        <ChevronDown size={14} className="text-slate-400 group-open:rotate-180 transition-transform" />
+                      </summary>
+                      <div className="pl-2 space-y-1 mt-1">
+                        {cams.map(camera => (
+                          <div
+                            key={camera.id}
+                            draggable
+                            onDragStart={(e) => { e.dataTransfer.setData('text/plain', camera.id); handleDragStart(camera.id); }}
+                            onClick={() => openCameraDetail(camera.id)}
+                            className={`p-2.5 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                              (selectedCameraId === camera.id && gridLayout === '1x1') || gridCameras.some(c => c?.id === camera.id)
+                                ? 'border-emerald-500 bg-emerald-50'
+                                : 'border-transparent hover:border-emerald-300 hover:shadow-sm bg-white hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-slate-800 truncate">{camera.name}</p>
+                                <p className="text-[10px] text-slate-400 truncate">{camera.location}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </div>
+
+              {/* Monitor Main Section */}
+              <div className="flex-1 flex flex-col space-y-4 overflow-y-auto pr-2 custom-scrollbar pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
                     <button
                       onClick={() => setShowGridMenu(!showGridMenu)}
                       className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-300 transition-colors cursor-pointer flex items-center gap-1.5"
@@ -615,6 +593,7 @@ export default function App() {
                   })}
                 </div>
               )}
+              </div>
             </div>
           )}
 

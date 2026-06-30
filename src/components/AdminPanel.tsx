@@ -60,7 +60,7 @@ export default function AdminPanel({ cameras, onEditCamera, onDeleteCamera }: Ad
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <h3 className="text-xl font-black text-slate-800">Danh sách Camera</h3>
+                <h3 className="text-3xl font-black text-slate-800 tracking-widest">Danh sách Camera</h3>
               </div>
             </div>
 

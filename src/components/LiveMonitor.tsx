@@ -1,6 +1,6 @@
 import React, { useState, Dispatch, SetStateAction } from 'react';
 import { Camera, Pipeline, AlertEvent, LogEntry } from '../types';
-import { Play, Pause, MoreVertical, Edit2, Trash2, AlertTriangle, Sparkles, Activity, CheckCircle, Wifi, Monitor, Usb, Camera as CameraIcon, ZoomIn, ZoomOut, Move, RotateCcw } from 'lucide-react';
+import { Play, Pause, MoreVertical, Edit2, Trash2, AlertTriangle, Sparkles, Activity, CheckCircle, Wifi, Monitor, Usb, Camera as CameraIcon, ZoomIn, ZoomOut, Move, RotateCcw, Maximize, Minimize } from 'lucide-react';
 
 interface LiveMonitorProps {
   key?: string | number;
@@ -37,6 +37,26 @@ export default function LiveMonitor({
   const [isStreamOnline, setIsStreamOnline] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+  const videoWrapperRef = React.useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      videoWrapperRef.current?.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -259,7 +279,7 @@ export default function LiveMonitor({
 
   return (
     <div className={`grid grid-cols-1 ${isCompact ? '' : 'lg:grid-cols-12'} gap-6`}>
-      <div className={`${isCompact ? 'col-span-1' : 'lg:col-span-8'} flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden`}>
+      <div ref={videoWrapperRef} className={`${isCompact ? 'col-span-1' : 'lg:col-span-8'} flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden`}>
         {/* Camera Header */}
         <div className="bg-slate-900 px-4 py-3 flex items-center justify-between text-white">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -325,6 +345,14 @@ export default function LiveMonitor({
               title={isPlaying ? "Tạm dừng" : "Tiếp tục"}
             >
               {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+            </button>
+
+            <button
+              onClick={toggleFullscreen}
+              className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors cursor-pointer hidden sm:flex"
+              title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
+            >
+              {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
             </button>
 
             {(onEditCamera || onDeleteCamera || !isCompact) && (
@@ -691,17 +719,17 @@ export default function LiveMonitor({
               <AlertTriangle size={14} className="text-amber-400" />
               <span className="text-sm font-medium">Cảnh báo</span>
             </div>
-            <span className="text-[10px] text-slate-400">{cameraAlerts.filter(a => a.status !== 'closed').length} sự kiện</span>
+            <span className="text-[10px] text-slate-400">{cameraAlerts.length} sự kiện</span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {cameraAlerts.filter(a => a.status !== 'closed').length === 0 ? (
+            {cameraAlerts.length === 0 ? (
               <div className="text-center py-8 text-slate-400 text-xs">
                 <CheckCircle size={24} className="mx-auto mb-2 text-emerald-400" />
                 Không có cảnh báo
               </div>
             ) : (
-              cameraAlerts.filter(a => a.status !== 'closed').slice(0, 20).map(alert => (
+              cameraAlerts.slice(0, 20).map(alert => (
                 <div
                   key={alert.id}
                   className={`p-3 rounded-lg border text-xs transition-colors ${
@@ -715,26 +743,45 @@ export default function LiveMonitor({
                       alert.type === 'intrusion' || alert.type === 'safety_hazard' ? 'text-rose-500' : 'text-amber-500'
                     }`} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-slate-700 leading-relaxed">{alert.message}</p>
+                      <p className={`text-slate-700 leading-relaxed ${alert.status === 'closed' ? 'line-through text-slate-400' : ''}`}>{alert.message}</p>
                       <p className="text-[10px] text-slate-400 mt-1">
                         {new Date(alert.timestamp).toLocaleTimeString('vi-VN')} • Độ tin cậy: {alert.score}%
                       </p>
-                      <div className="flex gap-1.5 mt-2">
-                        {alert.status === 'new' && (
+                      
+                      {alert.assignee && (
+                        <div className="mt-2 bg-slate-50/80 rounded p-2 border border-slate-100">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[10px] font-medium text-slate-600">Người xử lý: {alert.assignee}</span>
+                            {alert.handledAt && <span className="text-[9px] text-slate-400">{new Date(alert.handledAt).toLocaleTimeString('vi-VN')}</span>}
+                          </div>
+                          {alert.note && <p className="text-[10px] text-slate-500 italic">"{alert.note}"</p>}
+                        </div>
+                      )}
+
+                      {alert.status !== 'closed' && (
+                        <div className="flex gap-1.5 mt-2">
+                          {alert.status === 'new' && (
+                            <button
+                              onClick={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, status: 'read' } : a))}
+                              className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                            >
+                              Đã đọc
+                            </button>
+                          )}
                           <button
-                            onClick={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, status: 'read' } : a))}
-                            className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                            onClick={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { 
+                              ...a, 
+                              status: 'closed',
+                              assignee: 'Quản trị viên (Admin)',
+                              note: 'Đã tiếp nhận và xử lý sự cố.',
+                              handledAt: new Date().toISOString()
+                            } : a))}
+                            className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors cursor-pointer"
                           >
-                            Đã đọc
+                            Tiếp nhận
                           </button>
-                        )}
-                        <button
-                          onClick={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, status: 'closed' } : a))}
-                          className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors cursor-pointer"
-                        >
-                          Tiếp nhận
-                        </button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
