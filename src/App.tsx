@@ -12,12 +12,12 @@ type Page = 'monitor' | 'builder' | 'playback' | 'analytics' | 'admin';
 type GridLayout = '1x1' | '2x2' | '3x3' | '4x4' | '1+2' | '2+1';
 
 const layoutConfigs: Record<GridLayout, { label: string; cols: number; rows: number; cells: number; templateColumns: string; templateRows: string }> = {
-  '1x1': { label: '1x1', cols: 1, rows: 1, cells: 1, templateColumns: '1fr', templateRows: '1fr' },
-  '2x2': { label: '2x2', cols: 2, rows: 2, cells: 4, templateColumns: '1fr 1fr', templateRows: '1fr 1fr' },
-  '3x3': { label: '3x3', cols: 3, rows: 3, cells: 9, templateColumns: 'repeat(3, 1fr)', templateRows: 'repeat(3, 1fr)' },
-  '4x4': { label: '4x4', cols: 4, rows: 4, cells: 16, templateColumns: 'repeat(4, 1fr)', templateRows: 'repeat(4, 1fr)' },
-  '1+2': { label: '1+2', cols: 2, rows: 2, cells: 3, templateColumns: '2fr 1fr', templateRows: '1fr 1fr' },
-  '2+1': { label: '2+1', cols: 2, rows: 2, cells: 3, templateColumns: '1fr 2fr', templateRows: '1fr 1fr' },
+  '1x1': { label: '1x1', cols: 1, rows: 1, cells: 1, templateColumns: 'minmax(0, 1fr)', templateRows: 'minmax(0, 1fr)' },
+  '2x2': { label: '2x2', cols: 2, rows: 2, cells: 4, templateColumns: 'repeat(2, minmax(0, 1fr))', templateRows: 'repeat(2, minmax(0, 1fr))' },
+  '3x3': { label: '3x3', cols: 3, rows: 3, cells: 9, templateColumns: 'repeat(3, minmax(0, 1fr))', templateRows: 'repeat(3, minmax(0, 1fr))' },
+  '4x4': { label: '4x4', cols: 4, rows: 4, cells: 16, templateColumns: 'repeat(4, minmax(0, 1fr))', templateRows: 'repeat(4, minmax(0, 1fr))' },
+  '1+2': { label: '1+2', cols: 2, rows: 2, cells: 3, templateColumns: '2fr 1fr', templateRows: 'repeat(2, minmax(0, 1fr))' },
+  '2+1': { label: '2+1', cols: 2, rows: 2, cells: 3, templateColumns: '1fr 2fr', templateRows: 'repeat(2, minmax(0, 1fr))' },
 };
 
 const layoutCells: Record<GridLayout, { gridColumn: string; gridRow: string }[]> = {
@@ -108,10 +108,10 @@ export default function App() {
 
   useEffect(() => {
     const cells = layoutConfigs[gridLayout].cells;
-    if (gridLayout !== '1x1' && gridCameras.length === 0 && filteredCameras.length > 0) {
+    if (gridLayout !== '1x1') {
       setGridCameras(filteredCameras.slice(0, cells));
     }
-  }, [gridLayout, filteredCameras]);
+  }, [gridLayout, selectedSite]);
 
   // Auto-switch grid on mobile
   useEffect(() => {
@@ -360,33 +360,36 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen bg-slate-900 text-neutral-100 font-sans antialiased flex overflow-hidden">
+    <div className="h-screen w-screen bg-slate-900 text-neutral-100 font-sans antialiased flex flex-col overflow-hidden">
       
-      {/* Left Sidebar (Desktop App Style) */}
-      <aside className="w-16 md:w-56 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0 z-20">
-        <div className="h-16 flex items-center justify-center md:justify-start md:px-4 border-b border-slate-800 shrink-0">
-          <div className="h-10 w-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-emerald-600/20">
-            <Eye size={22} />
+      {/* Top Header (Desktop App Style) */}
+      <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-20 shrink-0 shadow-sm">
+        
+        {/* Left: Logo */}
+        <div className="flex-1 flex items-center justify-start gap-3 h-full">
+          <div className="h-9 w-9 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-emerald-600/20">
+            <Eye size={20} />
           </div>
-          <h1 className="font-black text-xl text-white ml-3 hidden md:block tracking-tight">VisionOS</h1>
+          <h1 className="font-black text-xl text-white hidden sm:block tracking-tight">VisionOS</h1>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
+        {/* Center: Navigation */}
+        <nav className="hidden md:flex items-center justify-center gap-2 h-full">
           {navItems.map(item => (
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer relative ${
+              className={`flex items-center gap-2 px-4 h-full text-sm font-bold transition-all cursor-pointer relative border-b-2 ${
                 activeSection === item.id
-                  ? 'bg-emerald-600/10 text-emerald-400'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'border-emerald-500 text-emerald-400 bg-slate-800/40'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
               }`}
               title={item.label}
             >
               <div className="shrink-0">{item.icon}</div>
-              <span className="hidden md:inline">{item.label}</span>
+              <span>{item.label}</span>
               {item.id === 'monitor' && unreadAlertsCount > 0 && (
-                <span className="absolute top-2 right-2 md:static md:ml-auto text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded-full font-bold">
+                <span className="ml-1.5 text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded-full font-bold shadow-sm">
                   {unreadAlertsCount}
                 </span>
               )}
@@ -394,16 +397,16 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="p-2 border-t border-slate-800 flex flex-col gap-2">
+        {/* Right: Actions */}
+        <div className="flex-1 flex items-center justify-end gap-3 h-full">
           {/* Mobile hamburger for camera list when in monitor mode */}
           {activeSection === 'monitor' && (
             <button
               onClick={() => setShowMobileSidebar(true)}
-              className="lg:hidden w-full flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cursor-pointer"
+              className="lg:hidden flex items-center justify-center gap-2 px-2 py-1.5 rounded-md text-sm font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cursor-pointer"
               title="Danh sách Camera"
             >
               <Menu size={18} className="shrink-0" />
-              <span className="hidden md:inline">Camera List</span>
             </button>
           )}
           
@@ -417,10 +420,10 @@ export default function App() {
                 setSelectedCameraId(filtered[0].id);
               }
             }}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-xs font-medium text-slate-300 focus:outline-hidden cursor-pointer"
+            className="hidden sm:block bg-slate-800 border border-slate-700 rounded-md px-2 py-1.5 text-xs font-medium text-slate-300 focus:outline-hidden cursor-pointer"
             title="Khu vực"
           >
-            <option value="Tất cả">Tất cả (Khu vực)</option>
+            <option value="Tất cả">Tất cả khu vực</option>
             <option value="Hà Nội">Hà Nội</option>
             <option value="TP.HCM">TP.HCM</option>
             <option value="Bình Dương">Bình Dương</option>
@@ -428,38 +431,34 @@ export default function App() {
 
           <button 
             onClick={() => setShowProfile(true)}
-            className="w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/50 mb-1 hover:bg-slate-700/50 hover:border-slate-600 transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-slate-800/40 border border-slate-700/50 hover:bg-slate-700/50 hover:border-slate-600 transition-colors cursor-pointer"
             title="Thông tin cá nhân"
           >
-            <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 shrink-0">
-              <User size={16} />
+            <div className="h-7 w-7 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 shrink-0">
+              <User size={15} />
             </div>
-            <div className="hidden md:flex flex-col min-w-0 items-start text-left">
-              <span className="text-xs font-bold text-slate-200 truncate w-full">{loginUsername || 'admin'}</span>
-              <span className="text-[10px] text-slate-400 truncate w-full">Quản trị viên</span>
-            </div>
+            <span className="hidden sm:inline text-xs font-bold text-slate-200">{loginUsername || 'admin'}</span>
           </button>
 
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+            className="flex items-center justify-center p-2 rounded-md text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
             title="Đăng xuất"
           >
-            <LogOut size={18} className="shrink-0" />
-            <span className="hidden md:inline">Đăng xuất</span>
+            <LogOut size={18} />
           </button>
         </div>
-      </aside>
+      </header>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 h-full bg-neutral-50 text-neutral-800">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full bg-neutral-50 text-neutral-800">
         <main className={`flex-1 flex flex-col min-h-0 ${
           (activeSection === 'monitor' || activeSection === 'playback' || activeSection === 'builder') 
             ? 'p-0 overflow-hidden' // Zero padding and hide overflow for full edge-to-edge desktop feel
             : 'p-3 sm:p-4 lg:p-6 overflow-y-auto'
         }`}>
           {activeSection === 'monitor' && (
-            <div className="flex flex-col lg:flex-row h-full">
+            <div className="flex flex-col lg:flex-row h-full min-h-0">
 
               {/* Mobile Sidebar Drawer */}
               {showMobileSidebar && (
@@ -576,7 +575,7 @@ export default function App() {
               </div>
 
               {/* Monitor Main Section */}
-              <div className="flex-1 flex flex-col h-full overflow-hidden bg-black" id="monitor-grid-container">
+              <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden bg-slate-100" id="monitor-grid-container">
               {/* Toolbar */}
               <div className="flex items-center justify-between p-2 bg-slate-900 border-b border-slate-800 flex-shrink-0">
                   <div className="flex items-center gap-3">
@@ -644,8 +643,8 @@ export default function App() {
               </div>
 
               {gridLayout === '1x1' ? (
-                <div className="flex-1 flex flex-col min-h-0 bg-black">
-                  <div className="p-2 border-b border-slate-800 flex-shrink-0">
+                <div className="flex-1 flex flex-col min-h-0 bg-slate-100">
+                  <div className="p-2 border-b border-slate-200 flex-shrink-0 bg-white">
                     <button
                       onClick={backToCameraGrid}
                       className="px-3 py-1.5 text-xs font-medium rounded bg-slate-800 border border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
@@ -678,13 +677,13 @@ export default function App() {
                 </div>
               ) : (
                 <div
-                  className="flex-1 grid gap-3 p-3 bg-slate-900 min-h-0 overflow-hidden"
+                  className="flex-1 grid gap-3 p-3 bg-slate-100 min-h-0 overflow-hidden"
                   style={{
                     gridTemplateColumns: window.innerWidth < 640 && (gridLayout === '3x3' || gridLayout === '4x4')
-                      ? 'repeat(2, 1fr)'
+                      ? 'repeat(2, minmax(0, 1fr))'
                       : layoutConfigs[gridLayout].templateColumns,
                     gridTemplateRows: window.innerWidth < 640 && (gridLayout === '3x3' || gridLayout === '4x4')
-                      ? `repeat(${Math.ceil(layoutConfigs[gridLayout].cells / 2)}, 1fr)`
+                      ? `repeat(${Math.ceil(layoutConfigs[gridLayout].cells / 2)}, minmax(0, 1fr))`
                       : layoutConfigs[gridLayout].templateRows,
                   }}
                 >
@@ -697,12 +696,12 @@ export default function App() {
                         onDragLeave={() => setDragOverIdx(null)}
                         onDrop={() => handleDrop(idx)}
                         style={{ gridColumn: cell.gridColumn, gridRow: cell.gridRow }}
-                        className={`overflow-hidden rounded-lg transition-all relative ${
-                          dragOverIdx === idx ? 'ring-2 ring-emerald-500 z-10 shadow-lg shadow-emerald-500/20' : 'ring-1 ring-slate-800/80 shadow-sm'
-                        } ${cam ? 'bg-black' : 'bg-slate-900/40 flex items-center justify-center min-h-[120px]'}`}
+                        className={`overflow-hidden rounded-lg transition-all relative min-h-0 flex flex-col ${
+                          dragOverIdx === idx ? 'ring-2 ring-emerald-500 z-10 shadow-lg shadow-emerald-500/20' : 'ring-1 ring-slate-200 shadow-sm'
+                        } ${cam ? 'bg-white' : 'bg-slate-200/50 flex items-center justify-center min-h-[120px]'}`}
                       >
                         {cam ? (
-                          <div className="relative h-full">
+                          <div className="relative flex-1 min-h-0 flex flex-col w-full">
                             <LiveMonitor
                               camera={cam}
                               pipelines={pipelines}
