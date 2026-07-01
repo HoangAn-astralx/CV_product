@@ -42,11 +42,12 @@ export interface Pipeline {
   name: string;
   cameraId: string;
   detectorName: string;
-  monitoringMode?: 'standard' | 'smart';
+  monitoringMode?: 'standard' | 'smart' | 'defect_detection';
   detectionTarget?: string;
   detectionRule?: string;
   searchScope?: 'whole_scene' | 'roi';
-  config?: Record<string, string | number | boolean | undefined>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  config?: Record<string, any>;
   searchQuery?: string;
   description?: string;
   countingZones: CountingZone[];
