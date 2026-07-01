@@ -1,6 +1,6 @@
 import React, { useState, Dispatch, SetStateAction } from 'react';
 import { Camera, Pipeline, AlertEvent, LogEntry } from '../types';
-import { Play, Pause, MoreVertical, Edit2, Trash2, AlertTriangle, Sparkles, Activity, CheckCircle, Wifi, Monitor, Usb, Camera as CameraIcon, ZoomIn, ZoomOut, Move, RotateCcw, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, MoreVertical, Edit2, Trash2, AlertTriangle, Sparkles, Activity, CheckCircle, Wifi, Monitor, Usb, Camera as CameraIcon, ZoomIn, ZoomOut, Move, RotateCcw, Maximize, Maximize2, Minimize } from 'lucide-react';
 
 interface LiveMonitorProps {
   key?: string | number;
@@ -139,20 +139,18 @@ export default function LiveMonitor({
       case 'retail':
         return (
           <div
-            className="absolute inset-0 overflow-hidden flex flex-col justify-between p-4 select-none bg-cover bg-center"
+            className="absolute inset-0 overflow-hidden select-none bg-cover bg-center"
             style={{ backgroundImage: "linear-gradient(rgba(248, 250, 252, 0.85), rgba(248, 250, 252, 0.85)), url('https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?q=80&w=1200&auto=format&fit=crop')" }}
           >
-            <div className="flex justify-between w-full h-[30%]">
-              <div className="w-[30%] bg-slate-200/80 border border-slate-300 rounded-md flex flex-col justify-center items-center text-xs text-slate-500 font-medium z-20">
-                <span>Kệ Hàng A</span>
-                <span className="text-[10px] text-slate-400 font-normal">Thời trang nam</span>
-              </div>
-              <div className="w-[30%] bg-slate-200/80 border border-slate-300 rounded-md flex flex-col justify-center items-center text-xs text-slate-500 font-medium z-20">
-                <span>Kệ Hàng B</span>
-                <span className="text-[10px] text-slate-400 font-normal">Đồ mỹ phẩm</span>
-              </div>
+            <div className="absolute top-[5%] left-[5%] w-[25%] h-[25%] bg-slate-200/80 border border-slate-300 rounded-md flex flex-col justify-center items-center text-xs text-slate-500 font-medium z-20">
+              <span>Kệ Hàng A</span>
+              <span className="text-[10px] text-slate-400 font-normal">Thời trang nam</span>
             </div>
-            <div className="h-[20%] w-[40%] mx-auto bg-slate-100 border border-slate-200 rounded-t-lg flex items-center justify-center text-xs text-slate-500 font-medium z-20">
+            <div className="absolute top-[5%] right-[5%] w-[25%] h-[25%] bg-slate-200/80 border border-slate-300 rounded-md flex flex-col justify-center items-center text-xs text-slate-500 font-medium z-20">
+              <span>Kệ Hàng B</span>
+              <span className="text-[10px] text-slate-400 font-normal">Đồ mỹ phẩm</span>
+            </div>
+            <div className="absolute bottom-[5%] left-[30%] right-[30%] w-[40%] h-[20%] bg-slate-100 border border-slate-200 rounded-t-lg flex items-center justify-center text-xs text-slate-500 font-medium z-20">
               Quầy thu ngân
             </div>
           </div>
@@ -160,24 +158,22 @@ export default function LiveMonitor({
       case 'warehouse':
         return (
           <div
-            className="absolute inset-0 overflow-hidden flex flex-col justify-between p-4 select-none bg-cover bg-center"
+            className="absolute inset-0 overflow-hidden select-none bg-cover bg-center"
             style={{ backgroundImage: "linear-gradient(rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.85)), url('https://images.unsplash.com/photo-1586528116311-ad8ed745140c?q=80&w=1200&auto=format&fit=crop')" }}
           >
-            <div className="flex justify-around w-full h-[25%] z-20 relative">
-              <div className="w-[22%] bg-amber-50 border border-amber-200 rounded-md p-1 text-[11px] text-amber-700 font-medium flex flex-col justify-center items-center">
-                <span>Kệ hàng #01</span>
-                <span className="text-[10px] text-emerald-600 font-bold">Hàng lưu kho</span>
-              </div>
-              <div className="w-[22%] bg-amber-50/50 border border-amber-200/50 rounded-md p-1 text-[11px] text-amber-700/50 font-medium flex flex-col justify-center items-center">
-                <span>Kệ hàng #02</span>
-                <span className="text-[10px] font-normal">Trống</span>
-              </div>
-              <div className="w-[22%] bg-amber-50 border border-amber-200 rounded-md p-1 text-[11px] text-amber-700 font-medium flex flex-col justify-center items-center">
-                <span>Kệ hàng #03</span>
-                <span className="text-[10px] text-emerald-600 font-bold">Hàng lưu kho</span>
-              </div>
+            <div className="absolute top-[8%] left-[5%] w-[25%] h-[20%] bg-amber-50 border border-amber-200 rounded-md p-1 text-[11px] text-amber-700 font-medium flex flex-col justify-center items-center">
+              <span>Kệ hàng #01</span>
+              <span className="text-[10px] text-emerald-600 font-bold">Hàng lưu kho</span>
             </div>
-            <div className="h-[15%] w-full bg-slate-200/90 border border-slate-300 rounded-t-lg flex items-center justify-center text-xs text-slate-600 font-bold z-20 relative">
+            <div className="absolute top-[8%] left-[37.5%] w-[25%] h-[20%] bg-amber-50/50 border border-amber-200/50 rounded-md p-1 text-[11px] text-amber-700/50 font-medium flex flex-col justify-center items-center">
+              <span>Kệ hàng #02</span>
+              <span className="text-[10px] font-normal">Trống</span>
+            </div>
+            <div className="absolute top-[8%] right-[5%] w-[25%] h-[20%] bg-amber-50 border border-amber-200 rounded-md p-1 text-[11px] text-amber-700 font-medium flex flex-col justify-center items-center">
+              <span>Kệ hàng #03</span>
+              <span className="text-[10px] text-emerald-600 font-bold">Hàng lưu kho</span>
+            </div>
+            <div className="absolute bottom-[5%] left-[20%] w-[60%] h-[15%] bg-slate-200/90 border border-slate-300 rounded-t-lg flex items-center justify-center text-xs text-slate-600 font-bold z-20">
               Cổng xuất nhập hàng chính
             </div>
           </div>
@@ -185,14 +181,12 @@ export default function LiveMonitor({
       case 'parking':
         return (
           <div
-            className="absolute inset-0 overflow-hidden flex p-4 select-none bg-cover bg-center"
+            className="absolute inset-0 overflow-hidden select-none bg-cover bg-center"
             style={{ backgroundImage: "linear-gradient(rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.85)), url('https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?q=80&w=1200&auto=format&fit=crop')" }}
           >
-            <div className="w-[20%] h-full flex flex-col justify-between z-20">
-              <div className="h-[25%] w-[80%] border-y border-l border-slate-300 bg-slate-100 flex items-center justify-center text-[10px] text-slate-400">P1</div>
-              <div className="h-[25%] w-[80%] border-y border-l border-slate-300 bg-emerald-50 text-emerald-600 flex items-center justify-center text-[10px] font-bold">Đã đỗ</div>
-              <div className="h-[25%] w-[80%] border-y border-l border-slate-300 bg-slate-100 flex items-center justify-center text-[10px] text-slate-400">P3</div>
-            </div>
+            <div className="absolute top-[5%] left-[5%] h-[20%] w-[15%] border border-slate-300 bg-slate-100 flex items-center justify-center text-[10px] text-slate-400 z-20 rounded-md">P1</div>
+            <div className="absolute top-[40%] left-[5%] h-[20%] w-[15%] border border-emerald-300 bg-emerald-50 text-emerald-600 flex items-center justify-center text-[10px] font-bold z-20 rounded-md">Đã đỗ</div>
+            <div className="absolute top-[75%] left-[5%] h-[20%] w-[15%] border border-slate-300 bg-slate-100 flex items-center justify-center text-[10px] text-slate-400 z-20 rounded-md">P3</div>
           </div>
         );
       case 'conveyor':
@@ -278,14 +272,14 @@ export default function LiveMonitor({
   }
 
   return (
-    <div className={`grid grid-cols-1 ${isCompact ? '' : 'lg:grid-cols-12'} gap-6`}>
-      <div ref={videoWrapperRef} className={`${isCompact ? 'col-span-1' : 'lg:col-span-8'} flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden`}>
+    <div className={isCompact ? 'flex flex-col flex-1 w-full min-h-0' : 'grid grid-cols-1 lg:grid-cols-12 gap-6'}>
+      <div ref={videoWrapperRef} className={`${isCompact ? 'flex-1 min-h-0' : 'lg:col-span-8'} flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden`}>
         {/* Camera Header */}
-        <div className="bg-slate-900 px-4 py-3 flex items-center justify-between text-white">
+        <div className={`bg-slate-900 flex items-center justify-between text-white shrink-0 ${isCompact ? 'px-3 py-2' : 'px-4 py-3'}`}>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-sm leading-none whitespace-nowrap">
+                <h3 className={`font-semibold leading-none whitespace-nowrap ${isCompact ? 'text-xs' : 'text-sm'}`}>
                   {camera.name}
                 </h3>
                 <span className={`text-[10px] font-medium px-2 py-0.5 rounded flex items-center gap-1.5 flex-shrink-0 ${
@@ -304,59 +298,66 @@ export default function LiveMonitor({
           </div>
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Power Button */}
             <button
               onClick={() => {
                 const nextState = !isStreamOnline;
                 setIsStreamOnline(nextState);
                 addLog(`Camera ${nextState ? 'ONLINE' : 'OFFLINE'}`, nextState ? 'success' : 'error');
               }}
-              className={`text-[10px] px-2 py-1.5 rounded font-medium flex items-center gap-1 cursor-pointer transition-colors ${
+              className={`text-[10px] px-2 py-1 rounded font-medium flex items-center gap-1 cursor-pointer transition-colors ${
                 isStreamOnline
                   ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-600/25'
                   : 'bg-rose-600/15 text-rose-400 border border-rose-500/20 hover:bg-rose-600/25'
               }`}
+              title={isStreamOnline ? 'Tắt Camera' : 'Bật Camera'}
             >
               {isStreamOnline ? 'Bật' : 'Tắt'}
             </button>
 
-            <button
-              disabled={!isStreamOnline}
-              onClick={() => setIsAIMode(!isAIMode)}
-              className={`text-[10px] px-2 py-1.5 rounded font-medium transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed ${isAIMode ? 'bg-emerald-600 text-white' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}`}
-            >
-              <Sparkles size={11} className={isAIMode ? "text-emerald-200" : "text-neutral-400"} />
-              AI
-            </button>
+            {/* AI & Thermal Segmented Control */}
+            <div className="flex items-center bg-slate-800/80 rounded border border-slate-700/50 p-0.5">
+              <button
+                disabled={!isStreamOnline}
+                onClick={() => setIsAIMode(!isAIMode)}
+                className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed ${isAIMode ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+                title="Bật/tắt AI"
+              >
+                <Sparkles size={10} className={isAIMode ? "text-emerald-200" : "text-slate-400"} />
+                AI
+              </button>
+              <button
+                disabled={!isStreamOnline}
+                onClick={() => setIsHeatmap(!isHeatmap)}
+                className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isHeatmap ? 'bg-orange-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+                title="Bản đồ nhiệt"
+              >
+                Nhiệt
+              </button>
+            </div>
 
-            <button
-              disabled={!isStreamOnline}
-              onClick={() => setIsHeatmap(!isHeatmap)}
-              className={`text-[10px] px-2 py-1.5 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isHeatmap ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-            >
-              Nhiệt
-            </button>
+            {/* Media Controls */}
+            <div className="flex items-center gap-0.5">
+              <button
+                disabled={!isStreamOnline}
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="w-6 h-6 flex items-center justify-center hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={isPlaying ? "Tạm dừng" : "Tiếp tục"}
+              >
+                {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+              </button>
+              <button
+                onClick={isCompact && onExpand ? onExpand : toggleFullscreen}
+                className="w-6 h-6 flex items-center justify-center hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+                title={isCompact ? "Phóng to camera" : (isFullscreen ? "Thu nhỏ" : "Toàn màn hình")}
+              >
+                {isCompact ? <Maximize2 size={14} /> : (isFullscreen ? <Minimize size={14} /> : <Maximize size={14} />)}
+              </button>
+            </div>
 
-            <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
-
-            <button
-              disabled={!isStreamOnline}
-              onClick={() => setIsPlaying(!isPlaying)}
-              className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title={isPlaying ? "Tạm dừng" : "Tiếp tục"}
-            >
-              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-            </button>
-
-            <button
-              onClick={toggleFullscreen}
-              className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors cursor-pointer hidden sm:flex"
-              title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
-            >
-              {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-            </button>
-
+            {/* More Menu */}
             {(onEditCamera || onDeleteCamera || !isCompact) && (
-              <div className="relative">
+              <div className="relative ml-0.5">
                 {showMenu && (
                   <div
                     className="fixed inset-0 z-40"
@@ -365,9 +366,9 @@ export default function LiveMonitor({
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-                  className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 text-slate-300 hover:text-white rounded transition-colors cursor-pointer"
+                  className="w-6 h-6 flex items-center justify-center hover:bg-slate-800 text-slate-400 hover:text-white rounded transition-colors cursor-pointer"
                 >
-                  <MoreVertical size={16} />
+                  <MoreVertical size={14} />
                 </button>
                 {showMenu && (
                   <div className="absolute top-full right-0 mt-1 w-44 bg-slate-800 rounded-lg shadow-lg border border-slate-700 py-1 z-50">
@@ -404,7 +405,7 @@ export default function LiveMonitor({
 
         {/* Camera Feed */}
         <div
-          className={`relative aspect-video flex-1 overflow-hidden select-none ${isCompact ? 'cursor-pointer' : isDragging ? 'cursor-grabbing' : 'cursor-grab'} bg-slate-950${isCompact ? '' : ' border-b border-slate-100'}`}
+          className={`relative w-full ${isCompact ? 'flex-1 min-h-0' : 'aspect-video'} overflow-hidden select-none flex items-center justify-center ${isCompact ? 'cursor-pointer' : isDragging ? 'cursor-grabbing' : 'cursor-grab'} bg-white${isCompact ? '' : ' border-b border-slate-100'}`}
           onClick={isCompact && onExpand ? onExpand : undefined}
           onWheel={isCompact ? undefined : handleWheel}
           onMouseDown={isCompact ? undefined : handleMouseDown}
@@ -416,14 +417,20 @@ export default function LiveMonitor({
             <div className="absolute inset-0 bg-white/0 group-hover:bg-white/20 group-hover:backdrop-brightness-110 transition-all duration-300 z-50 pointer-events-none" />
           )}
 
-          <div
-            className="w-full h-full transition-transform duration-200 ease-out"
-            style={{
-              transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
-              transformOrigin: 'center center',
-            }}
-          >
-            {renderBackground()}
+          {/* 16:9 Aspect Ratio Wrapper */}
+          <div className="relative flex items-center justify-center w-full h-full min-h-0 overflow-hidden">
+            <div
+              className="relative w-full h-full transition-transform duration-200 ease-out"
+              style={{
+                aspectRatio: '16/9',
+                maxHeight: '100%',
+                maxWidth: '100%',
+                margin: 'auto',
+                transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
+                transformOrigin: 'center center',
+              }}
+            >
+              {renderBackground()}
 
             {/* AI Overlay */}
             {isAIMode && (
@@ -506,6 +513,7 @@ export default function LiveMonitor({
                 })()}
               </div>
             )}
+            </div>
           </div>
 
           {!isStreamOnline && (
@@ -621,20 +629,20 @@ export default function LiveMonitor({
         </div>
 
         {isCompact && (
-          <div className="bg-slate-50 border-t border-slate-100 px-4 py-3 flex items-center justify-between text-[11px]">
+          <div className="bg-white px-3 py-1.5 flex items-center justify-between text-[10px] shrink-0">
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1 text-slate-600">
-                <Activity size={13} className={activePipelines.length > 0 ? "text-emerald-500" : "text-slate-400"} />
+                <Activity size={12} className={activePipelines.length > 0 ? "text-emerald-500" : "text-slate-400"} />
                 {activePipelines.length} Luồng AI
               </span>
               {unreadAlertsCount > 0 ? (
-                <span className="flex items-center gap-1.5 text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md">
-                  <AlertTriangle size={13} />
+                <span className="flex items-center gap-1.5 text-rose-600 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">
+                  <AlertTriangle size={12} />
                   {unreadAlertsCount} Cảnh báo
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-emerald-600">
-                  <CheckCircle size={13} />
+                  <CheckCircle size={12} />
                   Bình thường
                 </span>
               )}

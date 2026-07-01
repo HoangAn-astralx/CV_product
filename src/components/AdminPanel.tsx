@@ -93,7 +93,12 @@ export default function AdminPanel({ cameras, onEditCamera, onDeleteCamera }: Ad
                       </td>
                       <td className="p-4">
                         <p className="text-xs text-slate-700 font-medium">{cam.resolution} • {cam.fps} FPS</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">Ping: {cam.latency}ms</p>
+                        <p className={`text-[11px] mt-0.5 font-medium ${
+                          cam.latency <= 100 ? 'text-emerald-600' : cam.latency <= 200 ? 'text-amber-600' : 'text-rose-600'
+                        }`}>
+                          Ping: {cam.latency}ms
+                          {cam.latency <= 100 ? ' ✓' : cam.latency <= 200 ? ' ⚠' : ' ✗'}
+                        </p>
                       </td>
                       <td className="p-4">
                         {cam.status === 'online' ? (
