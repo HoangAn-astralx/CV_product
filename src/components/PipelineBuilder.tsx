@@ -182,6 +182,28 @@ function CameraPreviewBg({ camType }: { camType?: string }) {
   }
 }
 
+// ─── Convex Hull (reorders points so polygon is always non-self-intersecting) ─
+function convexHull(pts: { x: number; y: number }[]): { x: number; y: number }[] {
+  if (pts.length < 3) return pts;
+  const sorted = [...pts].sort((a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y);
+  const cross = (O: { x: number; y: number }, A: { x: number; y: number }, B: { x: number; y: number }) =>
+    (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
+  const lower: { x: number; y: number }[] = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: { x: number; y: number }[] = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
+}
+
 // ─── Zone SVG Overlay ────────────────────────────────────────────────────────
 
 function ZoneOverlay({ zones, drawingPoints, newZoneType }: {
@@ -189,29 +211,54 @@ function ZoneOverlay({ zones, drawingPoints, newZoneType }: {
   drawingPoints: { x: number; y: number }[];
   newZoneType: 'line' | 'zone';
 }) {
+  // Live preview uses convex hull so shape is always clean while clicking
+  const liveHull = newZoneType === 'zone' && drawingPoints.length >= 3
+    ? convexHull(drawingPoints) : [];
+
   return (
     <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 1000 562.5" preserveAspectRatio="xMidYMid meet">
+
+      {/* ── Saved zones ── */}
       {zones.map((z, zIdx) => {
         const color = ZONE_COLORS[zIdx % ZONE_COLORS.length];
+
         if (z.type === 'line' && z.points.length >= 2) {
-          const mx = (z.points[0].x + z.points[z.points.length - 1].x) / 2;
-          const my = (z.points[0].y + z.points[z.points.length - 1].y) / 2;
+          const p0 = z.points[0], p1 = z.points[z.points.length - 1];
+          const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2;
           return (
             <g key={z.id}>
-              <line x1={`${z.points[0].x}%`} y1={`${z.points[0].y}%`} x2={`${z.points[z.points.length - 1].x}%`} y2={`${z.points[z.points.length - 1].y}%`} stroke={color} strokeWidth="3" strokeDasharray="8 4" />
-              <rect x={`${mx - 6}%`} y={`${my - 3}%`} width={`${z.name.length * 1.2 + 4}%`} height="4%" rx="4" fill={color} />
+              <line x1={`${p0.x}%`} y1={`${p0.y}%`} x2={`${p1.x}%`} y2={`${p1.y}%`}
+                stroke={color} strokeWidth="3" strokeLinecap="round" />
+              {/* Endpoint dots */}
+              <circle cx={`${p0.x}%`} cy={`${p0.y}%`} r="4" fill={color} stroke="white" strokeWidth="1.5" />
+              <circle cx={`${p1.x}%`} cy={`${p1.y}%`} r="4" fill={color} stroke="white" strokeWidth="1.5" />
+              {/* Label */}
+              <rect x={`${mx - 5}%`} y={`${my - 3}%`} width={`${z.name.length * 1.2 + 4}%`} height="6%" rx="4" fill={color} />
               <text x={`${mx}%`} y={`${my}%`} fill="white" fontSize="11" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">{z.name}</text>
             </g>
           );
         }
+
         if (z.type === 'zone' && z.points.length >= 3) {
-          const cx = z.points.reduce((s, p) => s + p.x, 0) / z.points.length;
-          const cy = z.points.reduce((s, p) => s + p.y, 0) / z.points.length;
+          // Points already stored as hull (saved via handleSaveZone)
+          const pts = z.points;
+          const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+          const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
           return (
             <g key={z.id}>
-              {/* polygon points must be in viewBox units, not %. ViewBox is 1000×562.5 */}
-              <polygon points={z.points.map(p => `${p.x * 10} ${p.y * 5.625}`).join(' ')} fill={`${color}22`} stroke={color} strokeWidth="2.5" strokeDasharray="8 4" strokeLinejoin="round" />
-              <rect x={`${cx - 5}%`} y={`${cy - 2.5}%`} width={`${z.name.length * 1.2 + 3}%`} height="5%" rx="4" fill={color} />
+              <polygon
+                points={pts.map(p => `${p.x * 10} ${p.y * 5.625}`).join(' ')}
+                fill={`${color}25`}
+                stroke={color}
+                strokeWidth="2.5"
+                strokeLinejoin="round"
+              />
+              {/* Corner dots */}
+              {pts.map((p, i) => (
+                <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="3.5" fill={color} stroke="white" strokeWidth="1.5" />
+              ))}
+              {/* Label badge */}
+              <rect x={`${cx - 5}%`} y={`${cy - 3}%`} width={`${z.name.length * 1.2 + 3}%`} height="6%" rx="5" fill={color} />
               <text x={`${cx}%`} y={`${cy}%`} fill="white" fontSize="11" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">{z.name}</text>
             </g>
           );
@@ -219,22 +266,44 @@ function ZoneOverlay({ zones, drawingPoints, newZoneType }: {
         return null;
       })}
 
-      {/* Current drawing in-progress */}
-      {drawingPoints.length > 1 && drawingPoints.map((p, i) => {
-        if (i === 0) return null;
-        const prev = drawingPoints[i - 1];
-        return <line key={i} x1={`${prev.x}%`} y1={`${prev.y}%`} x2={`${p.x}%`} y2={`${p.y}%`} stroke="#10b981" strokeWidth="3" strokeLinecap="round" />;
-      })}
+      {/* ── In-progress zone drawing ── */}
       {newZoneType === 'zone' && drawingPoints.length >= 3 && (
-        <polygon points={drawingPoints.map(p => `${p.x * 10} ${p.y * 5.625}`).join(' ')} fill="rgba(16,185,129,0.15)" stroke="#10b981" strokeWidth="2.5" strokeLinejoin="round" />
+        <>
+          {/* Convex hull fill — clean shape even when clicks are scattered */}
+          <polygon
+            points={liveHull.map(p => `${p.x * 10} ${p.y * 5.625}`).join(' ')}
+            fill="rgba(16,185,129,0.18)"
+            stroke="#10b981"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          {/* Dashed closing edge so user can see the shape will close */}
+          <line
+            x1={`${liveHull[liveHull.length - 1].x}%`} y1={`${liveHull[liveHull.length - 1].y}%`}
+            x2={`${liveHull[0].x}%`}                   y2={`${liveHull[0].y}%`}
+            stroke="#10b981" strokeWidth="1.5" strokeDasharray="5 3" opacity="0.55"
+          />
+        </>
       )}
+      {/* In-progress line */}
+      {newZoneType === 'line' && drawingPoints.length >= 2 && (
+        <line
+          x1={`${drawingPoints[0].x}%`} y1={`${drawingPoints[0].y}%`}
+          x2={`${drawingPoints[drawingPoints.length - 1].x}%`} y2={`${drawingPoints[drawingPoints.length - 1].y}%`}
+          stroke="#10b981" strokeWidth="3" strokeLinecap="round"
+        />
+      )}
+
+      {/* Click dots with order numbers */}
       {drawingPoints.map((p, i) => (
         <g key={i}>
-          <circle cx={`${p.x}%`} cy={`${p.y}%`} r="5" fill="#10b981" stroke="white" strokeWidth="2" />
+          <circle cx={`${p.x}%`} cy={`${p.y}%`} r="7" fill="#10b981" stroke="white" strokeWidth="2" />
+          <text x={`${p.x}%`} y={`${p.y}%`} fill="white" fontSize="8" fontWeight="bold"
+            textAnchor="middle" dominantBaseline="middle">{i + 1}</text>
           {i === drawingPoints.length - 1 && (
-            <circle cx={`${p.x}%`} cy={`${p.y}%`} r="8" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.6">
-              <animate attributeName="r" values="8;12;8" dur="1s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.6;0.2;0.6" dur="1s" repeatCount="indefinite" />
+            <circle cx={`${p.x}%`} cy={`${p.y}%`} r="11" fill="none" stroke="#10b981" strokeWidth="2" opacity="0.45">
+              <animate attributeName="r" values="11;16;11" dur="1s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.45;0.1;0.45" dur="1s" repeatCount="indefinite" />
             </circle>
           )}
         </g>
@@ -340,11 +409,15 @@ export default function PipelineBuilder({
 
   const handleSaveZone = () => {
     if (!canSaveZone) return;
+    // Apply convex hull for zones so stored points are always in correct winding order
+    const finalPoints = newZoneType === 'zone' && drawingPoints.length >= 3
+      ? convexHull(drawingPoints)
+      : [...drawingPoints];
     const newZone: DrawnZone = {
       id: `zone-${Date.now()}`,
       name: newZoneName.trim() || `Vùng ${ZONE_LETTERS[(currentCamZones.length) % 26]}`,
       type: newZoneType,
-      points: [...drawingPoints],
+      points: finalPoints,
     };
     setMultiZones(prev => ({ ...prev, [activeCamId]: [...(prev[activeCamId] || []), newZone] }));
     setDrawingPoints([]);
@@ -728,8 +801,8 @@ export default function PipelineBuilder({
                   <table className="w-full min-w-[780px] text-left">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
-                        {['Trạng thái', 'Luồng giám sát', 'Camera', 'Cấu hình AI', 'FPS', 'Lịch chạy', 'Thao tác'].map(h => (
-                          <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">{h}</th>
+                        {['Trạng thái', 'Luồng giám sát', 'Camera', 'Cấu hình AI', 'FPS', 'Lịch chạy', 'Thao tác'].map((h, i, arr) => (
+                          <th key={h} className={`px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap ${i === arr.length - 1 ? 'text-center w-px' : ''}`}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -1157,18 +1230,9 @@ export default function PipelineBuilder({
                             </details>
                           );
                         })()}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Phạm vi</label>
-                            <select value={searchScope} onChange={e => setSearchScope(e.target.value as any)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs">
-                              <option value="whole_scene">Toàn khung hình</option>
-                              <option value="roi">Chỉ trong vùng ROI</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tạm ngưng (giây)</label>
-                            <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                          </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tạm ngưng (giây)</label>
+                          <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
                         </div>
                       </>
                     ) : (
