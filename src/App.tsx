@@ -6,7 +6,7 @@ import PipelineBuilder from './components/PipelineBuilder';
 import Playback from './components/Playback';
 import AnalyticsPanel from './components/AnalyticsPanel';
 import AdminPanel from './components/AdminPanel';
-import { Plus, BarChart3, Settings, Camera as CameraIcon, AlertTriangle, Search, Eye, ChevronDown, ChevronLeft, ChevronRight, LogOut, LayoutGrid } from 'lucide-react';
+import { Plus, BarChart3, Settings, Camera as CameraIcon, AlertTriangle, Search, Eye, ChevronDown, ChevronLeft, ChevronRight, LogOut, LayoutGrid, Menu, X, Maximize, Minimize, User } from 'lucide-react';
 
 type Page = 'monitor' | 'builder' | 'playback' | 'analytics' | 'admin';
 type GridLayout = '1x1' | '2x2' | '3x3' | '4x4' | '1+2' | '2+1';
@@ -59,6 +59,9 @@ export default function App() {
   const [gridLayout, setGridLayout] = useState<GridLayout>('4x4');
   const [previousGridLayout, setPreviousGridLayout] = useState<GridLayout>('4x4');
   const [showGridMenu, setShowGridMenu] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [pipelines, setPipelines] = useState<Pipeline[]>(INITIAL_PIPELINES);
   const [alerts, setAlerts] = useState<AlertEvent[]>(INITIAL_ALERTS);
   const [logs, setLogs] = useState<LogEntry[]>(INITIAL_LOGS);
@@ -109,6 +112,37 @@ export default function App() {
       setGridCameras(filteredCameras.slice(0, cells));
     }
   }, [gridLayout, filteredCameras]);
+
+  // Auto-switch grid on mobile
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768 && (gridLayout === '3x3' || gridLayout === '4x4')) {
+        setGridLayout('2x2');
+        setGridCameras(filteredCameras.slice(0, 4));
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const onFSChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFSChange);
+    return () => document.removeEventListener('fullscreenchange', onFSChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    const el = document.getElementById('monitor-grid-container');
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   const handleLogin = () => {
     if (!loginUsername.trim() || !loginPassword.trim()) {
@@ -326,78 +360,182 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-800 font-sans antialiased flex">
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
-        {/* Top Bar */}
-        <header className="bg-white border-b border-neutral-100 px-4 lg:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="h-10 w-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white flex-shrink-0 shadow-sm shadow-emerald-600/20">
-              <Eye size={20} />
-            </div>
-            <h1 className="font-extrabold text-lg text-neutral-800 hidden sm:block tracking-tight">VisionOS</h1>
+    <div className="h-screen w-screen bg-slate-900 text-neutral-100 font-sans antialiased flex overflow-hidden">
+      
+      {/* Left Sidebar (Desktop App Style) */}
+      <aside className="w-16 md:w-56 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0 z-20">
+        <div className="h-16 flex items-center justify-center md:justify-start md:px-4 border-b border-slate-800 shrink-0">
+          <div className="h-10 w-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-md shadow-emerald-600/20">
+            <Eye size={22} />
           </div>
+          <h1 className="font-black text-xl text-white ml-3 hidden md:block tracking-tight">VisionOS</h1>
+        </div>
 
-          <nav className="flex items-center justify-center gap-2 min-w-0 overflow-x-auto">
-            {navItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                  activeSection === item.id
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                    : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'
-                }`}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-                {item.id === 'monitor' && unreadAlertsCount > 0 && (
-                  <span className="text-xs bg-rose-600 text-white px-2 py-0.5 rounded-full font-bold ml-1">
-                    {unreadAlertsCount}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3 shrink-0">
-            <select
-              value={selectedSite}
-              onChange={(e) => {
-                const siteVal = e.target.value as any;
-                setSelectedSite(siteVal);
-                const filtered = siteVal === 'Tất cả' ? cameras : cameras.filter(c => c.site === siteVal);
-                if (filtered.length > 0 && !filtered.some(c => c.id === selectedCameraId)) {
-                  setSelectedCameraId(filtered[0].id);
-                }
-              }}
-              className="bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-700 focus:outline-hidden cursor-pointer hidden sm:block"
-            >
-              <option value="Tất cả">Tất cả địa điểm</option>
-              <option value="Hà Nội">Hà Nội</option>
-              <option value="TP.HCM">TP.HCM</option>
-              <option value="Bình Dương">Bình Dương</option>
-            </select>
+        <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
+          {navItems.map(item => (
             <button
-              onClick={handleLogout}
-              className="text-neutral-500 hover:text-rose-600 p-1.5 rounded-lg hover:bg-neutral-100 transition-colors cursor-pointer"
-              title="Đăng xuất"
+              key={item.id}
+              onClick={() => setActiveSection(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer relative ${
+                activeSection === item.id
+                  ? 'bg-emerald-600/10 text-emerald-400'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+              title={item.label}
             >
-              <LogOut size={16} />
+              <div className="shrink-0">{item.icon}</div>
+              <span className="hidden md:inline">{item.label}</span>
+              {item.id === 'monitor' && unreadAlertsCount > 0 && (
+                <span className="absolute top-2 right-2 md:static md:ml-auto text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded-full font-bold">
+                  {unreadAlertsCount}
+                </span>
+              )}
             </button>
-          </div>
-        </header>
+          ))}
+        </nav>
 
-
-
-        {/* Main Content Area */}
-        <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
+        <div className="p-2 border-t border-slate-800 flex flex-col gap-2">
+          {/* Mobile hamburger for camera list when in monitor mode */}
           {activeSection === 'monitor' && (
-            <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-140px)]">
-              {/* White sidebar */}
-              <div className="w-full lg:w-64 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex-shrink-0 flex flex-col h-full overflow-hidden hidden lg:flex">
-                <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-4 px-2">Camera</h3>
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+            <button
+              onClick={() => setShowMobileSidebar(true)}
+              className="lg:hidden w-full flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 cursor-pointer"
+              title="Danh sách Camera"
+            >
+              <Menu size={18} className="shrink-0" />
+              <span className="hidden md:inline">Camera List</span>
+            </button>
+          )}
+          
+          <select
+            value={selectedSite}
+            onChange={(e) => {
+              const siteVal = e.target.value as any;
+              setSelectedSite(siteVal);
+              const filtered = siteVal === 'Tất cả' ? cameras : cameras.filter(c => c.site === siteVal);
+              if (filtered.length > 0 && !filtered.some(c => c.id === selectedCameraId)) {
+                setSelectedCameraId(filtered[0].id);
+              }
+            }}
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-xs font-medium text-slate-300 focus:outline-hidden cursor-pointer"
+            title="Khu vực"
+          >
+            <option value="Tất cả">Tất cả (Khu vực)</option>
+            <option value="Hà Nội">Hà Nội</option>
+            <option value="TP.HCM">TP.HCM</option>
+            <option value="Bình Dương">Bình Dương</option>
+          </select>
+
+          <button 
+            onClick={() => setShowProfile(true)}
+            className="w-full flex items-center justify-center md:justify-start gap-3 px-2 md:px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/50 mb-1 hover:bg-slate-700/50 hover:border-slate-600 transition-colors cursor-pointer"
+            title="Thông tin cá nhân"
+          >
+            <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 shrink-0">
+              <User size={16} />
+            </div>
+            <div className="hidden md:flex flex-col min-w-0 items-start text-left">
+              <span className="text-xs font-bold text-slate-200 truncate w-full">{loginUsername || 'admin'}</span>
+              <span className="text-[10px] text-slate-400 truncate w-full">Quản trị viên</span>
+            </div>
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+            title="Đăng xuất"
+          >
+            <LogOut size={18} className="shrink-0" />
+            <span className="hidden md:inline">Đăng xuất</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 h-full bg-neutral-50 text-neutral-800">
+        <main className={`flex-1 flex flex-col min-h-0 ${
+          (activeSection === 'monitor' || activeSection === 'playback' || activeSection === 'builder') 
+            ? 'p-0 overflow-hidden' // Zero padding and hide overflow for full edge-to-edge desktop feel
+            : 'p-3 sm:p-4 lg:p-6 overflow-y-auto'
+        }`}>
+          {activeSection === 'monitor' && (
+            <div className="flex flex-col lg:flex-row h-full">
+
+              {/* Mobile Sidebar Drawer */}
+              {showMobileSidebar && (
+                <div className="fixed inset-0 z-50 lg:hidden">
+                  <div className="absolute inset-0 bg-black/40 mobile-sidebar-overlay" onClick={() => setShowMobileSidebar(false)} />
+                  <div className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-xl mobile-sidebar-panel flex flex-col">
+                    <div className="flex items-center justify-between p-4 border-b border-slate-100">
+                      <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">Camera</h3>
+                      <button onClick={() => setShowMobileSidebar(false)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer">
+                        <X size={18} />
+                      </button>
+                    </div>
+                    {/* Mobile site filter */}
+                    <div className="px-4 py-2 border-b border-slate-100 sm:hidden">
+                      <select
+                        value={selectedSite}
+                        onChange={(e) => {
+                          const siteVal = e.target.value as any;
+                          setSelectedSite(siteVal);
+                          const filtered = siteVal === 'Tất cả' ? cameras : cameras.filter(c => c.site === siteVal);
+                          if (filtered.length > 0 && !filtered.some(c => c.id === selectedCameraId)) {
+                            setSelectedCameraId(filtered[0].id);
+                          }
+                        }}
+                        className="w-full bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 text-xs font-medium text-neutral-700 focus:outline-hidden cursor-pointer"
+                      >
+                        <option value="Tất cả">Tất cả địa điểm</option>
+                        <option value="Hà Nội">Hà Nội</option>
+                        <option value="TP.HCM">TP.HCM</option>
+                        <option value="Bình Dương">Bình Dương</option>
+                      </select>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                      {Object.entries(
+                        filteredCameras.reduce((acc, cam) => {
+                          if (!acc[cam.site]) acc[cam.site] = [];
+                          acc[cam.site].push(cam);
+                          return acc;
+                        }, {} as Record<string, Camera[]>)
+                      ).map(([site, cams]: [string, Camera[]]) => (
+                        <details key={site} className="group" open>
+                          <summary className="cursor-pointer list-none flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg">
+                            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{site}</span>
+                            <ChevronDown size={14} className="text-slate-400 group-open:rotate-180 transition-transform" />
+                          </summary>
+                          <div className="pl-2 space-y-1 mt-1">
+                            {cams.map(camera => (
+                              <div
+                                key={camera.id}
+                                onClick={() => { openCameraDetail(camera.id); setShowMobileSidebar(false); }}
+                                className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
+                                  selectedCameraId === camera.id
+                                    ? 'border-emerald-500 bg-emerald-50'
+                                    : 'border-transparent hover:border-emerald-300 hover:shadow-sm bg-white hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-bold text-slate-800 truncate">{camera.name}</p>
+                                    <p className="text-[10px] text-slate-400 truncate">{camera.location}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Desktop sidebar */}
+              <div className="w-full lg:w-56 bg-slate-50 border-r border-slate-200 flex-shrink-0 flex flex-col h-full overflow-hidden hidden lg:flex">
+                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2 px-3 pt-3">Danh sách Camera</h3>
+                <div className="flex-1 overflow-y-auto space-y-1.5 px-2 pb-2 custom-scrollbar">
                   {Object.entries(
                     filteredCameras.reduce((acc, cam) => {
                       if (!acc[cam.site]) acc[cam.site] = [];
@@ -406,27 +544,27 @@ export default function App() {
                     }, {} as Record<string, Camera[]>)
                   ).map(([site, cams]: [string, Camera[]]) => (
                     <details key={site} className="group" open>
-                      <summary className="cursor-pointer list-none flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg">
-                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{site}</span>
+                      <summary className="cursor-pointer list-none flex items-center justify-between p-1.5 hover:bg-slate-200/50 rounded-md">
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{site}</span>
                         <ChevronDown size={14} className="text-slate-400 group-open:rotate-180 transition-transform" />
                       </summary>
-                      <div className="pl-2 space-y-1 mt-1">
+                      <div className="pl-1.5 space-y-0.5 mt-0.5">
                         {cams.map(camera => (
                           <div
                             key={camera.id}
                             draggable
                             onDragStart={(e) => { e.dataTransfer.setData('text/plain', camera.id); handleDragStart(camera.id); }}
                             onClick={() => openCameraDetail(camera.id)}
-                            className={`p-2.5 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                            className={`p-2 rounded-md border transition-all cursor-grab active:cursor-grabbing ${
                               (selectedCameraId === camera.id && gridLayout === '1x1') || gridCameras.some(c => c?.id === camera.id)
-                                ? 'border-emerald-500 bg-emerald-50'
-                                : 'border-transparent hover:border-emerald-300 hover:shadow-sm bg-white hover:bg-slate-50'
+                                ? 'border-emerald-500 bg-emerald-50/80 shadow-sm'
+                                : 'border-transparent hover:bg-white'
                             }`}
                           >
                             <div className="flex items-center gap-2">
                               <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-slate-800 truncate">{camera.name}</p>
-                                <p className="text-[10px] text-slate-400 truncate">{camera.location}</p>
+                                <p className="text-[11px] font-bold text-slate-800 truncate">{camera.name}</p>
+                                <p className="text-[9px] text-slate-400 truncate">{camera.location}</p>
                               </div>
                             </div>
                           </div>
@@ -438,13 +576,14 @@ export default function App() {
               </div>
 
               {/* Monitor Main Section */}
-              <div className="flex-1 flex flex-col space-y-4 overflow-y-auto pr-2 custom-scrollbar pb-4">
-                <div className="flex items-center justify-between">
+              <div className="flex-1 flex flex-col h-full overflow-hidden bg-black" id="monitor-grid-container">
+              {/* Toolbar */}
+              <div className="flex items-center justify-between p-2 bg-slate-900 border-b border-slate-800 flex-shrink-0">
                   <div className="flex items-center gap-3">
                     <div className="relative">
                     <button
                       onClick={() => setShowGridMenu(!showGridMenu)}
-                      className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-300 transition-colors cursor-pointer flex items-center gap-1.5"
+                      className="px-2 py-1.5 text-[11px] font-medium rounded md:rounded-md bg-slate-800 border border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
                     >
                       <LayoutGrid size={12} />
                       {layoutConfigs[gridLayout].label}
@@ -452,8 +591,8 @@ export default function App() {
                     {showGridMenu && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setShowGridMenu(false)} />
-                        <div className="absolute top-full left-0 mt-1 bg-white border border-neutral-200 rounded-xl shadow-lg p-3 z-50 min-w-[220px]">
-                          <div className="text-xs font-medium text-neutral-500 mb-2 px-1">Chọn bố cục lưới</div>
+                        <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-2 z-50 min-w-[180px]">
+                          <div className="text-[10px] font-medium text-slate-400 mb-2 px-1">Chọn bố cục lưới</div>
                           <div className="grid grid-cols-3 gap-2">
                             {allLayouts.map(layout => (
                               <button
@@ -466,14 +605,14 @@ export default function App() {
                                     setGridCameras(filteredCameras.slice(0, cells));
                                   }
                                 }}
-                                className={`p-2 rounded-lg text-[10px] font-medium transition-colors cursor-pointer flex flex-col items-center gap-1.5 ${
+                                className={`p-1.5 rounded text-[10px] font-medium transition-colors cursor-pointer flex flex-col items-center gap-1 ${
                                   gridLayout === layout.id
-                                    ? 'bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700'
-                                    : 'bg-neutral-50 border border-neutral-100 text-neutral-600 hover:border-neutral-200'
+                                    ? 'bg-emerald-900/30 ring-1 ring-emerald-500 text-emerald-400'
+                                    : 'bg-slate-900 border border-slate-800 text-slate-400 hover:border-slate-600'
                                 }`}
                               >
                                 <div
-                                  className="w-10 h-8 grid gap-px"
+                                  className="w-8 h-6 grid gap-px"
                                   style={{
                                     gridTemplateColumns: layoutConfigs[layout.id].templateColumns,
                                     gridTemplateRows: layoutConfigs[layout.id].templateRows,
@@ -483,7 +622,7 @@ export default function App() {
                                     <div
                                       key={i}
                                       style={{ gridColumn: cell.gridColumn, gridRow: cell.gridRow }}
-                                      className={`rounded-sm ${gridLayout === layout.id ? 'bg-emerald-300' : 'bg-neutral-300'}`}
+                                      className={`rounded-xs ${gridLayout === layout.id ? 'bg-emerald-500' : 'bg-slate-600'}`}
                                     />
                                   ))}
                                 </div>
@@ -497,22 +636,24 @@ export default function App() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setShowAddCamera(true)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-1"
+                  onClick={toggleFullscreen}
+                  className="px-2 py-1.5 text-[11px] font-medium rounded md:rounded-md bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-colors cursor-pointer flex items-center gap-1"
                 >
-                  <Plus size={14} /> Thêm Camera
+                  {isFullscreen ? <><Minimize size={14} /> <span className="hidden sm:inline">Thu nhỏ</span></> : <><Maximize size={14} /> <span className="hidden sm:inline">Toàn màn hình</span></>}
                 </button>
               </div>
 
               {gridLayout === '1x1' ? (
-                <div className="space-y-3">
-                  <button
-                    onClick={backToCameraGrid}
-                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-300 hover:bg-neutral-50 transition-colors cursor-pointer flex items-center gap-1.5"
-                  >
-                    <ChevronLeft size={14} />
-                    Quay lại
-                  </button>
+                <div className="flex-1 flex flex-col min-h-0 bg-black">
+                  <div className="p-2 border-b border-slate-800 flex-shrink-0">
+                    <button
+                      onClick={backToCameraGrid}
+                      className="px-3 py-1.5 text-xs font-medium rounded bg-slate-800 border border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <ChevronLeft size={14} />
+                      Quay lại lưới
+                    </button>
+                  </div>
                   <LiveMonitor
                     camera={activeCamera}
                     pipelines={pipelines}
@@ -537,10 +678,14 @@ export default function App() {
                 </div>
               ) : (
                 <div
-                  className="grid gap-4"
+                  className="flex-1 grid gap-3 p-3 bg-slate-900 min-h-0 overflow-hidden"
                   style={{
-                    gridTemplateColumns: layoutConfigs[gridLayout].templateColumns,
-                    gridTemplateRows: layoutConfigs[gridLayout].templateRows,
+                    gridTemplateColumns: window.innerWidth < 640 && (gridLayout === '3x3' || gridLayout === '4x4')
+                      ? 'repeat(2, 1fr)'
+                      : layoutConfigs[gridLayout].templateColumns,
+                    gridTemplateRows: window.innerWidth < 640 && (gridLayout === '3x3' || gridLayout === '4x4')
+                      ? `repeat(${Math.ceil(layoutConfigs[gridLayout].cells / 2)}, 1fr)`
+                      : layoutConfigs[gridLayout].templateRows,
                   }}
                 >
                   {layoutCells[gridLayout].map((cell, idx) => {
@@ -552,9 +697,9 @@ export default function App() {
                         onDragLeave={() => setDragOverIdx(null)}
                         onDrop={() => handleDrop(idx)}
                         style={{ gridColumn: cell.gridColumn, gridRow: cell.gridRow }}
-                        className={`border rounded-xl overflow-hidden transition-all ${
-                          dragOverIdx === idx ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-neutral-100'
-                        } ${cam ? 'bg-white' : 'bg-neutral-50 border-dashed flex items-center justify-center min-h-[200px]'}`}
+                        className={`overflow-hidden rounded-lg transition-all relative ${
+                          dragOverIdx === idx ? 'ring-2 ring-emerald-500 z-10 shadow-lg shadow-emerald-500/20' : 'ring-1 ring-slate-800/80 shadow-sm'
+                        } ${cam ? 'bg-black' : 'bg-slate-900/40 flex items-center justify-center min-h-[120px]'}`}
                       >
                         {cam ? (
                           <div className="relative h-full">
@@ -583,9 +728,9 @@ export default function App() {
                             />
                           </div>
                         ) : (
-                          <div className="text-neutral-400 text-xs text-center p-4">
-                            <Plus size={24} className="mx-auto mb-1 opacity-50" />
-                            Kéo thả camera từ thanh bên trái vào đây
+                          <div className="text-slate-700 flex flex-col items-center gap-2">
+                            <CameraIcon size={24} className="opacity-20" />
+                            <span className="text-[10px] opacity-40 font-medium">Trống</span>
                           </div>
                         )}
                       </div>
@@ -752,6 +897,63 @@ export default function App() {
                 className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
               >
                 + {editingCameraId ? 'Lưu thay đổi' : 'Tạo mới'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showProfile && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setShowProfile(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <User size={18} className="text-emerald-600" />
+                Thông tin cá nhân
+              </h3>
+              <button
+                onClick={() => setShowProfile(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col items-center">
+              <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
+                <User size={40} />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">{loginUsername || 'admin'}</h2>
+              <p className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full mt-2 border border-emerald-100">Quản trị viên hệ thống</p>
+              
+              <div className="w-full mt-6 space-y-3">
+                <div className="flex justify-between items-center text-sm border-b border-slate-100 pb-3">
+                  <span className="text-slate-500">Email</span>
+                  <span className="font-medium text-slate-700">{loginUsername || 'admin'}@visionos.vn</span>
+                </div>
+                <div className="flex justify-between items-center text-sm border-b border-slate-100 pb-3">
+                  <span className="text-slate-500">Vai trò</span>
+                  <span className="font-medium text-slate-700">System Admin</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Trạng thái</span>
+                  <span className="font-medium text-emerald-600 flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Hoạt động
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
+              <button
+                onClick={() => setShowProfile(false)}
+                className="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                <LogOut size={16} />
+                Đăng xuất
               </button>
             </div>
           </div>

@@ -152,9 +152,9 @@ export default function Playback({ cameras, alerts }: PlaybackProps) {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-140px)]" id="playback-section">
-      <div className="w-full lg:w-64 bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex-shrink-0 flex flex-col h-full overflow-hidden hidden lg:flex">
-        <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-4 px-2">Camera</h3>
+    <div className="flex flex-col lg:flex-row h-full" id="playback-section">
+      <div className="w-full lg:w-56 bg-slate-50 border-r border-slate-200 flex-shrink-0 flex flex-col h-full overflow-hidden hidden lg:flex">
+        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-2 px-3 pt-3">Danh sách Camera</h3>
         <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
           {Object.entries(
             cameras.reduce((acc, cam) => {
@@ -164,27 +164,27 @@ export default function Playback({ cameras, alerts }: PlaybackProps) {
             }, {} as Record<string, Camera[]>)
           ).map(([site, cams]: [string, Camera[]]) => (
             <details key={site} className="group" open>
-              <summary className="cursor-pointer list-none flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">{site}</span>
+              <summary className="cursor-pointer list-none flex items-center justify-between p-1.5 hover:bg-slate-200/50 rounded-md">
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{site}</span>
                 <ChevronDown size={14} className="text-slate-400 group-open:rotate-180 transition-transform" />
               </summary>
-              <div className="pl-2 space-y-1 mt-1">
+              <div className="pl-1.5 space-y-0.5 mt-0.5">
                 {cams.map(camera => (
                   <div
                     key={camera.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, camera.id)}
                     onClick={() => setSelectedCameraId(camera.id)}
-                    className={`p-2.5 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                    className={`p-2 rounded-md border transition-all cursor-grab active:cursor-grabbing ${
                       selectedCameraId === camera.id
-                        ? 'border-emerald-500 bg-emerald-50/50'
-                        : 'border-transparent hover:border-emerald-300 hover:shadow-sm bg-white hover:bg-slate-50'
+                        ? 'border-emerald-500 bg-emerald-50/80 shadow-sm'
+                        : 'border-transparent hover:bg-white'
                     }`}
                   >
                       <div className="flex items-center gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-slate-800 truncate">{camera.name}</p>
-                          <p className="text-[10px] text-slate-400 truncate">{camera.location}</p>
+                          <p className="text-[11px] font-bold text-slate-800 truncate">{camera.name}</p>
+                          <p className="text-[9px] text-slate-400 truncate">{camera.location}</p>
                         </div>
                       </div>
                   </div>
@@ -196,13 +196,23 @@ export default function Playback({ cameras, alerts }: PlaybackProps) {
       </div>
 
       <div
-        className="flex-1 flex flex-col bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden h-full"
+        className="flex-1 flex flex-col bg-black overflow-hidden h-full"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
-        <div className="bg-slate-900 px-5 py-3 flex items-center justify-between text-white">
-          <div className="flex items-center gap-3">
-            <span className="font-bold text-sm">{activeCamera?.name || 'Kéo thả camera vào đây'}</span>
+        <div className="bg-slate-900 px-4 sm:px-5 py-3 flex items-center justify-between text-white gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="font-bold text-sm truncate">{activeCamera?.name || 'Kéo thả camera vào đây'}</span>
+            {/* Mobile camera selector */}
+            <select
+              value={selectedCameraId}
+              onChange={(e) => setSelectedCameraId(e.target.value)}
+              className="lg:hidden bg-slate-800 text-[10px] text-white rounded-lg px-2 py-1.5 outline-none border border-slate-700 max-w-[140px]"
+            >
+              {cameras.map(cam => (
+                <option key={cam.id} value={cam.id}>{cam.name}</option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -220,9 +230,12 @@ export default function Playback({ cameras, alerts }: PlaybackProps) {
             <select
               value={streamMode}
               onChange={(e) => setStreamMode(e.target.value)}
-              className="bg-slate-800 text-[10px] text-white rounded-lg px-2 py-1 outline-none border border-slate-700"
+              className="bg-slate-800 text-[10px] text-white rounded-lg px-2 py-1 outline-none border border-slate-700 cursor-pointer"
             >
-              <option value="default">Chế độ: Mặc định</option>
+              <option value="default">Chế độ: Mặc định (HD)</option>
+              <option value="sub">Chế độ: Luồng phụ (SD)</option>
+              <option value="night">Chế độ: Ban đêm (Hồng ngoại)</option>
+              <option value="ai">Chế độ: AI (Kèm viền đối tượng)</option>
             </select>
             <button
               onClick={() => alert('Đã chụp ảnh màn hình lưu vào Download')}

@@ -500,7 +500,7 @@ export default function PipelineBuilder({
   };
 
   return (
-    <div className="bg-white border border-slate-100 rounded-3xl shadow-xs overflow-hidden w-full h-full min-h-[calc(100vh-130px)] flex flex-col" id="pipeline-builder-container">
+    <div className="bg-white border border-slate-100 rounded-3xl shadow-xs overflow-hidden w-full h-full flex flex-col" id="pipeline-builder-container">
       {savedToast && (
         <div className="fixed bottom-5 right-5 bg-emerald-600 text-white text-xs font-medium px-4 py-2.5 rounded-lg shadow-lg z-50 flex items-center gap-2">
           ✓ Kích hoạt luồng AI mới thành công!
@@ -564,7 +564,7 @@ export default function PipelineBuilder({
         </div>
       )}
 
-      <div className="flex-1 p-6 md:p-8">
+      <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
         {currentStep === 'list' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-4">
@@ -1675,14 +1675,14 @@ export default function PipelineBuilder({
         )}
       </div>
 
-      <div className="border-t border-slate-100 px-8 py-5 bg-slate-50 flex items-center justify-between mt-auto">
+      <div className="border-t border-slate-100 px-8 py-5 bg-slate-50 flex items-center justify-between flex-shrink-0">
         {currentStep === 'list' ? (
           <div className="w-full flex justify-end">
             <button
               onClick={onComplete}
-              className="bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-300 font-bold text-sm px-6 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
+              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:border-slate-300 font-bold text-sm px-6 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
             >
-              Đóng
+              ← Quay lại Giám sát
             </button>
           </div>
         ) : (

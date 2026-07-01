@@ -278,8 +278,8 @@ export default function LiveMonitor({
   }
 
   return (
-    <div className={`grid grid-cols-1 ${isCompact ? '' : 'lg:grid-cols-12'} gap-6`}>
-      <div ref={videoWrapperRef} className={`${isCompact ? 'col-span-1' : 'lg:col-span-8'} flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden`}>
+    <div className={`grid grid-cols-1 ${isCompact ? 'h-full' : 'lg:grid-cols-12'} gap-6`}>
+      <div ref={videoWrapperRef} className={`${isCompact ? 'col-span-1 h-full' : 'lg:col-span-8 h-[600px] xl:h-[700px]'} flex flex-col bg-white border border-slate-100 rounded-2xl overflow-hidden`}>
         {/* Camera Header */}
         <div className="bg-slate-900 px-4 py-3 flex items-center justify-between text-white">
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -303,21 +303,23 @@ export default function LiveMonitor({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <button
-              onClick={() => {
-                const nextState = !isStreamOnline;
-                setIsStreamOnline(nextState);
-                addLog(`Camera ${nextState ? 'ONLINE' : 'OFFLINE'}`, nextState ? 'success' : 'error');
-              }}
-              className={`text-[10px] px-2 py-1.5 rounded font-medium flex items-center gap-1 cursor-pointer transition-colors ${
-                isStreamOnline
-                  ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-600/25'
-                  : 'bg-rose-600/15 text-rose-400 border border-rose-500/20 hover:bg-rose-600/25'
-              }`}
-            >
-              {isStreamOnline ? 'Bật' : 'Tắt'}
-            </button>
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+            {!isCompact && (
+              <button
+                onClick={() => {
+                  const nextState = !isStreamOnline;
+                  setIsStreamOnline(nextState);
+                  addLog(`Camera ${nextState ? 'ONLINE' : 'OFFLINE'}`, nextState ? 'success' : 'error');
+                }}
+                className={`text-[10px] px-2 py-1.5 rounded font-medium flex items-center gap-1 cursor-pointer transition-colors ${
+                  isStreamOnline
+                    ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-600/25'
+                    : 'bg-rose-600/15 text-rose-400 border border-rose-500/20 hover:bg-rose-600/25'
+                }`}
+              >
+                {isStreamOnline ? 'Bật' : 'Tắt'}
+              </button>
+            )}
 
             <button
               disabled={!isStreamOnline}
@@ -328,24 +330,30 @@ export default function LiveMonitor({
               AI
             </button>
 
-            <button
-              disabled={!isStreamOnline}
-              onClick={() => setIsHeatmap(!isHeatmap)}
-              className={`text-[10px] px-2 py-1.5 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isHeatmap ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-            >
-              Nhiệt
-            </button>
+            {!isCompact && (
+              <button
+                disabled={!isStreamOnline}
+                onClick={() => setIsHeatmap(!isHeatmap)}
+                className={`text-[10px] px-2 py-1.5 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isHeatmap ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                Nhiệt
+              </button>
+            )}
 
-            <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
+            {!isCompact && (
+              <>
+                <div className="w-px h-5 bg-slate-700 mx-0.5"></div>
 
-            <button
-              disabled={!isStreamOnline}
-              onClick={() => setIsPlaying(!isPlaying)}
-              className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title={isPlaying ? "Tạm dừng" : "Tiếp tục"}
-            >
-              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-            </button>
+                <button
+                  disabled={!isStreamOnline}
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className="w-8 h-8 flex items-center justify-center hover:bg-slate-800 rounded text-slate-300 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={isPlaying ? "Tạm dừng" : "Tiếp tục"}
+                >
+                  {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                </button>
+              </>
+            )}
 
             <button
               onClick={toggleFullscreen}
@@ -404,7 +412,7 @@ export default function LiveMonitor({
 
         {/* Camera Feed */}
         <div
-          className={`relative aspect-video flex-1 overflow-hidden select-none ${isCompact ? 'cursor-pointer' : isDragging ? 'cursor-grabbing' : 'cursor-grab'} bg-slate-950${isCompact ? '' : ' border-b border-slate-100'}`}
+          className={`relative w-full h-full flex-1 overflow-hidden select-none ${isCompact ? 'cursor-pointer' : isDragging ? 'cursor-grabbing' : 'cursor-grab'} bg-slate-950${isCompact ? '' : ' border-b border-slate-100'}`}
           onClick={isCompact && onExpand ? onExpand : undefined}
           onWheel={isCompact ? undefined : handleWheel}
           onMouseDown={isCompact ? undefined : handleMouseDown}
@@ -417,7 +425,7 @@ export default function LiveMonitor({
           )}
 
           <div
-            className="w-full h-full transition-transform duration-200 ease-out"
+            className="relative w-full h-full transition-transform duration-200 ease-out"
             style={{
               transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
               transformOrigin: 'center center',
