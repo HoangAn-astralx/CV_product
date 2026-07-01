@@ -1648,6 +1648,14 @@ export default function PipelineBuilder({
           const isMultiCam = selectedCameraIds.length > 1;
           const hasZones = pvZones.length > 0;
 
+          // Label helpers
+          const targetLabel = detectionTarget === 'custom'
+            ? (customTarget || 'Tuỳ chỉnh')
+            : ({ person: 'Người', vehicle: 'Phương tiện', motorcycle: 'Xe máy', truck: 'Xe tải', bicycle: 'Xe đạp' } as Record<string, string>)[detectionTarget] || detectionTarget;
+          const ruleLabel = ({ enter_area: 'Xâm nhập vùng', exit_area: 'Ra khỏi vùng', cross_line: 'Vượt vạch', loitering: 'Dừng đỗ lâu', appear: 'Xuất hiện đối tượng', object_counting: 'Đếm đối tượng' } as Record<string, string>)[detectionRule] || detectionRule;
+          const presetLabel = perfPreset === 'economy' ? '🌿 Tiết kiệm' : perfPreset === 'precise' ? '🎯 Chính xác' : '⚡ Cân bằng';
+          const modeLabel = monitoringMode === 'smart' ? '✦ Luồng thông minh' : monitoringMode === 'defect_detection' ? '🔬 Kiểm tra lỗi' : '⚙ Tiêu chuẩn';
+
           // Always resolve a meaningful model name for display
           const displayModelName =
             monitoringMode === 'defect_detection'
@@ -1867,6 +1875,95 @@ export default function PipelineBuilder({
                           <p className="text-xs text-slate-700 italic line-clamp-3">"{userDescription}"</p>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* ── AI Config Detail Card ── */}
+                  <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                      <Cpu size={12} className="text-slate-400" />
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Cấu hình AI</span>
+                    </div>
+                    <div className="p-4 space-y-2.5">
+                      {/* Mode */}
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Chế độ</span>
+                        <span className="text-[11px] font-semibold text-slate-800">
+                          {monitoringMode === 'smart' ? 'Luồng thông minh' : monitoringMode === 'defect_detection' ? 'Kiểm tra lỗi' : 'Tiêu chuẩn'}
+                        </span>
+                      </div>
+
+                      {/* Performance preset */}
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Hiệu năng</span>
+                        <span className="text-[11px] font-semibold text-slate-800">
+                          {perfPreset === 'economy' ? 'Tiết kiệm' : perfPreset === 'precise' ? 'Chính xác' : 'Cân bằng'}
+                          <span className="text-slate-400 font-normal"> · {inferenceFps} FPS</span>
+                        </span>
+                      </div>
+
+                      {/* Standard: target + rule */}
+                      {monitoringMode === 'standard' && (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Đối tượng</span>
+                            <span className="text-[11px] font-semibold text-slate-800">{targetLabel}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Quy tắc</span>
+                            <span className="text-[11px] font-semibold text-slate-800">{ruleLabel}</span>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Smart: search query */}
+                      {monitoringMode === 'smart' && searchQuery && (
+                        <div className="flex items-start gap-3">
+                          <span className="text-[11px] text-slate-400 w-24 flex-shrink-0 pt-px">Từ khoá AI</span>
+                          <span className="text-[11px] font-semibold text-slate-800 line-clamp-2">{searchQuery}</span>
+                        </div>
+                      )}
+
+                      {/* Defect: samples + features */}
+                      {monitoringMode === 'defect_detection' && (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Ảnh mẫu</span>
+                            <span className="text-[11px] font-semibold text-slate-800">
+                              {goldenSamples.length > 0 ? `${goldenSamples.length} ảnh` : <span className="text-rose-400">Chưa upload</span>}
+                            </span>
+                          </div>
+                          {(enableOCR || enableCNN) && (
+                            <div className="flex items-center gap-3">
+                              <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Tính năng</span>
+                              <span className="text-[11px] font-semibold text-slate-800">
+                                {[enableOCR && 'OCR', enableCNN && 'CNN'].filter(Boolean).join(', ')}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Alert thresholds */}
+                      <div className="pt-2.5 border-t border-slate-100">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-2">Ngưỡng cảnh báo</p>
+                        <div className="flex gap-5 flex-wrap">
+                          <div>
+                            <p className="text-[9px] text-slate-400">Tiếp diễn tối thiểu</p>
+                            <p className="text-xs font-bold text-slate-700">{alertDuration}s</p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] text-slate-400">Tạm ngưng sau báo</p>
+                            <p className="text-xs font-bold text-slate-700">{cooldown}s</p>
+                          </div>
+                          {monitoringMode !== 'defect_detection' && maxLimit > 0 && (
+                            <div>
+                              <p className="text-[9px] text-slate-400">Giới hạn số lượng</p>
+                              <p className="text-xs font-bold text-slate-700">&gt; {maxLimit}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
