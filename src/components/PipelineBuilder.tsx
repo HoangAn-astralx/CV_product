@@ -1,5 +1,5 @@
 import React, { useState, Dispatch, SetStateAction } from 'react';
-import { Camera, Pipeline, CountingZone, AlertRule } from '../types';
+import { Camera, Pipeline, CountingZone, AlertRule, ScheduleSlot } from '../types';
 import { PIPELINE_TEMPLATES } from '../mockData';
 import {
   Check, Camera as CamIcon, Cpu, Sliders, Bell, AlertCircle, ArrowRight, ArrowLeft,
@@ -43,6 +43,19 @@ const WIZARD_STEPS: Step[] = ['camera', 'task', 'config', 'alert', 'preview'];
 
 const ZONE_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 const ZONE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+const ALL_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+function formatScheduleSlots(slots: ScheduleSlot[]): string {
+  if (!slots || slots.length === 0) return '24/7 liên tục';
+  if (slots.length === 1) {
+    const s = slots[0];
+    const isAllDays = ALL_DAYS.every(d => s.days.includes(d));
+    const dayStr = isAllDays ? 'Hàng ngày' : s.days.join(', ');
+    return `${dayStr} · ${s.start}–${s.end}`;
+  }
+  return slots.map(s => `${s.days.join(',')} ${s.start}–${s.end}`).join(' | ');
+}
 
 // Per-task quick suggestions for Smart AI mode
 const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; description: string }>> = {
@@ -328,8 +341,7 @@ export default function PipelineBuilder({
   // Task
   const [taskType, setTaskType] = useState<string>('security');
   const [flowName, setFlowName] = useState('');
-  const [scheduleStart, setScheduleStart] = useState('00:00');
-  const [scheduleEnd, setScheduleEnd] = useState('23:59');
+  const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([]); // [] = 24/7
 
   // AI mode
   const [monitoringMode, setMonitoringMode] = useState<'standard' | 'smart' | 'defect_detection'>('smart');
@@ -439,8 +451,7 @@ export default function PipelineBuilder({
     setRoutedModelReason('Mặc định');
     setSearchQuery('');
     setCameraSearch('');
-    setScheduleStart('00:00');
-    setScheduleEnd('23:59');
+    setScheduleSlots([]);
     setNewZoneName('Vùng A');
     setNewZoneType('zone');
     setDetectionTarget('person');
@@ -549,8 +560,7 @@ export default function PipelineBuilder({
     setRoutedModelReason('Đã nạp từ luồng hiện có.');
     setSearchQuery(pipe.searchQuery || '');
     setSearchScope(pipe.searchScope || 'whole_scene');
-    setScheduleStart(pipe.scheduleStart || '00:00');
-    setScheduleEnd(pipe.scheduleEnd || '23:59');
+    setScheduleSlots(pipe.scheduleSlots || []);
     setChannels(pipe.alertChannels);
 
     // Restore zones
@@ -658,7 +668,7 @@ export default function PipelineBuilder({
         finalConfig = { alertDuration, alertCount, cooldown, confidence, iou, tracker, frameSkip, inferenceFps };
       } else if (monitoringMode === 'smart') {
         finalRule = ruleCondition;
-        finalConfig = { similarityThreshold, retrievalTopK, cooldown, inferenceFps };
+        finalConfig = { similarityThreshold, retrievalTopK, cooldown, alertDuration, inferenceFps };
       } else {
         finalRule = 'defect_detected';
         finalConfig = { goldenSamples, inspectionROIs, enableSSIM, enableCNN, enableOCR, expectedOCRText, alertDuration, alertCount, cooldown, inferenceFps };
@@ -682,8 +692,7 @@ export default function PipelineBuilder({
         description: monitoringMode === 'smart' ? userDescription : undefined,
         countingZones,
         alertChannels: channels,
-        scheduleStart: scheduleStart !== '00:00' || scheduleEnd !== '23:59' ? scheduleStart : undefined,
-        scheduleEnd: scheduleStart !== '00:00' || scheduleEnd !== '23:59' ? scheduleEnd : undefined,
+        scheduleSlots: scheduleSlots.length > 0 ? scheduleSlots : undefined,
         isActive: existing?.isActive ?? true,
         createdAt: existing?.createdAt || new Date().toISOString(),
       } as Pipeline;
@@ -809,7 +818,7 @@ export default function PipelineBuilder({
                     <tbody className="divide-y divide-slate-100">
                       {pipelines.map(pipe => {
                         const cam = cameras.find(c => c.id === pipe.cameraId);
-                        const schedule = pipe.scheduleStart && pipe.scheduleEnd ? `${pipe.scheduleStart} – ${pipe.scheduleEnd}` : '24/7';
+                        const schedule = formatScheduleSlots(pipe.scheduleSlots || []);
                         const fps = pipe.config?.inferenceFps ? `${pipe.config.inferenceFps} FPS` : '15 FPS';
                         const usesFullFrame = pipe.countingZones.length === 0 || pipe.countingZones.some(z => z.name === 'Toàn khung hình');
                         return (
@@ -1062,24 +1071,13 @@ export default function PipelineBuilder({
                 </div>
               </div>
               <div className="h-px bg-slate-100" />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Tên tác vụ</label>
-                  <input
-                    type="text" value={flowName} onChange={e => setFlowName(e.target.value)}
-                    placeholder="VD: Chấm công cổng chính, Giám sát kệ hàng A..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Clock size={12} /> Lịch chạy</label>
-                  <div className="flex items-center gap-2">
-                    <input type="time" value={scheduleStart} onChange={e => setScheduleStart(e.target.value)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500" />
-                    <span className="text-slate-400 text-sm">→</span>
-                    <input type="time" value={scheduleEnd} onChange={e => setScheduleEnd(e.target.value)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-emerald-500" />
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-1">00:00 → 23:59 = chạy 24/7</p>
-                </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Tên tác vụ</label>
+                <input
+                  type="text" value={flowName} onChange={e => setFlowName(e.target.value)}
+                  placeholder="VD: Chấm công cổng chính, Giám sát kệ hàng A..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                />
               </div>
             </div>
           </div>
@@ -1196,15 +1194,6 @@ export default function PipelineBuilder({
                           placeholder='Mô tả bằng tiếng Việt: "Cảnh báo khi có người xâm nhập khu vực cấm sau 22h"'
                           className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 resize-none"
                         />
-                        {userDescription.trim() && (
-                          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs flex items-start gap-2">
-                            <Sparkles size={14} className="text-emerald-600 mt-0.5 flex-shrink-0" />
-                            <div>
-                              <p className="font-bold text-emerald-800">{routedModelName}</p>
-                              <p className="text-emerald-700 mt-0.5">{routedModelReason}</p>
-                            </div>
-                          </div>
-                        )}
                         {/* Task-specific quick suggestions */}
                         {(() => {
                           const suggestions = TASK_SMART_SUGGESTIONS[taskType];
@@ -1230,10 +1219,51 @@ export default function PipelineBuilder({
                             </details>
                           );
                         })()}
+
+                        {/* Sensitivity selector */}
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tạm ngưng (giây)</label>
-                          <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Độ nhạy phát hiện</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {([
+                              { value: 0.65, label: 'Rộng', desc: 'Bắt nhiều hơn, có thể có báo nhầm' },
+                              { value: 0.78, label: 'Cân bằng', desc: 'Đề xuất cho hầu hết nghiệp vụ', recommended: true },
+                              { value: 0.88, label: 'Chính xác', desc: 'Ít báo nhầm, có thể bỏ sót nhẹ' },
+                            ] as const).map(opt => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setSimilarityThreshold(opt.value)}
+                                className={`relative p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer ${similarityThreshold === opt.value ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
+                              >
+                                {(opt as any).recommended && similarityThreshold !== opt.value && (
+                                  <span className="absolute -top-2 left-2 text-[8px] bg-slate-700 text-white px-1.5 py-0.5 rounded font-bold">Đề xuất</span>
+                                )}
+                                <p className={`text-xs font-bold ${similarityThreshold === opt.value ? 'text-emerald-700' : 'text-slate-700'}`}>{opt.label}</p>
+                                <p className="text-[9px] text-slate-400 mt-0.5 leading-snug">{opt.desc}</p>
+                              </button>
+                            ))}
+                          </div>
                         </div>
+
+                        {/* Timing params */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sự kiện sau</label>
+                            <div className="flex items-center gap-2">
+                              <input type="number" min={1} value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                              <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-1">Phải diễn ra liên tục bao lâu trước khi báo</p>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
+                            <div className="flex items-center gap-2">
+                              <input type="number" min={0} value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                              <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-1">Chờ bao lâu trước khi cho phép báo tiếp</p>
+                          </div>
+                        </div>
+
                       </>
                     ) : (
                       <>
@@ -1275,9 +1305,21 @@ export default function PipelineBuilder({
                               </div>
                             )}
                             <div className="grid grid-cols-3 gap-3">
-                              <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Duy trì (giây)</label><input type="number" value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" /></div>
-                              <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Số lượng tối thiểu</label><input type="number" value={alertCount} onChange={e => setAlertCount(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" /></div>
-                              <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tạm ngưng (giây)</label><input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" /></div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau (giây)</label>
+                                <input type="number" value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                                <p className="text-[9px] text-slate-400 mt-1">Phải diễn ra liên tục bao lâu</p>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ngưỡng số lượng</label>
+                                <input type="number" value={alertCount} onChange={e => setAlertCount(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                                <p className="text-[9px] text-slate-400 mt-1">Phát hiện ≥ N đối tượng thì báo</p>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
+                                <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                                <p className="text-[9px] text-slate-400 mt-1">Chờ trước khi báo tiếp (giây)</p>
+                              </div>
                             </div>
                           </>
                         )}
@@ -1295,7 +1337,11 @@ export default function PipelineBuilder({
                                 ))}
                               </div>
                             </div>
-                            <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tạm ngưng (giây)</label><input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" /></div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
+                              <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                              <p className="text-[9px] text-slate-400 mt-1">Chờ trước khi báo tiếp (giây)</p>
+                            </div>
                           </>
                         )}
 
@@ -1351,8 +1397,16 @@ export default function PipelineBuilder({
                               </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
-                              <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Duy trì hành vi (giây)</label><input type="number" value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" /></div>
-                              <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tạm ngưng (giây)</label><input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" /></div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau (giây)</label>
+                                <input type="number" value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                                <p className="text-[9px] text-slate-400 mt-1">Hành vi phải diễn ra liên tục bao lâu</p>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
+                                <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                                <p className="text-[9px] text-slate-400 mt-1">Chờ trước khi báo tiếp (giây)</p>
+                              </div>
                             </div>
                           </>
                         )}
@@ -1367,7 +1421,11 @@ export default function PipelineBuilder({
                                 <option value="flow">Luồng di chuyển khách hàng</option>
                               </select>
                             </div>
-                            <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tạm ngưng (giây)</label><input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" /></div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
+                              <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" />
+                              <p className="text-[9px] text-slate-400 mt-1">Chờ trước khi báo tiếp (giây)</p>
+                            </div>
                           </>
                         )}
                       </>
@@ -1635,6 +1693,84 @@ export default function PipelineBuilder({
                 <span className="text-[10px] text-slate-400 bg-slate-200/50 px-2 py-1 rounded">Chưa cấu hình</span>
               </div>
             </div>
+
+            {/* ── Schedule ── */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <Clock size={12} /> Lịch chạy
+                </label>
+                <button
+                  onClick={() => {
+                    if (scheduleSlots.length === 0) {
+                      setScheduleSlots([{ id: Date.now().toString(), days: ['T2','T3','T4','T5','T6'], start: '08:00', end: '18:00' }]);
+                    } else {
+                      setScheduleSlots([]);
+                    }
+                  }}
+                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scheduleSlots.length === 0 ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${scheduleSlots.length === 0 ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {scheduleSlots.length === 0 ? (
+                <p className="text-xs text-slate-400">AI chạy liên tục 24/7 — không giới hạn ngày hay giờ.</p>
+              ) : (
+                <div className="space-y-3">
+                  {scheduleSlots.map((slot, idx) => (
+                    <div key={slot.id} className="bg-slate-50 rounded-xl p-3 space-y-2.5 border border-slate-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Khung {idx + 1}</span>
+                        {scheduleSlots.length > 1 && (
+                          <button onClick={() => setScheduleSlots(prev => prev.filter(s => s.id !== slot.id))} className="text-slate-300 hover:text-rose-400 transition-colors">
+                            <X size={13} />
+                          </button>
+                        )}
+                      </div>
+                      {/* Day pills */}
+                      <div className="flex gap-1.5 flex-wrap">
+                        {ALL_DAYS.map(day => {
+                          const selected = slot.days.includes(day);
+                          return (
+                            <button
+                              key={day}
+                              onClick={() => setScheduleSlots(prev => prev.map(s => s.id !== slot.id ? s : {
+                                ...s,
+                                days: selected ? s.days.filter(d => d !== day) : [...s.days, day]
+                              }))}
+                              className={`w-8 h-8 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${selected ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-500 hover:border-emerald-300 hover:text-emerald-600'}`}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {/* Time range */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="time" value={slot.start}
+                          onChange={e => setScheduleSlots(prev => prev.map(s => s.id !== slot.id ? s : { ...s, start: e.target.value }))}
+                          className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                        <span className="text-slate-400 text-xs">→</span>
+                        <input
+                          type="time" value={slot.end}
+                          onChange={e => setScheduleSlots(prev => prev.map(s => s.id !== slot.id ? s : { ...s, end: e.target.value }))}
+                          className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setScheduleSlots(prev => [...prev, { id: Date.now().toString(), days: ['T2','T3','T4','T5','T6'], start: '08:00', end: '18:00' }])}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 border-2 border-dashed border-slate-200 rounded-xl text-xs text-slate-500 hover:border-emerald-300 hover:text-emerald-600 transition-all cursor-pointer"
+                  >
+                    <Plus size={12} /> Thêm khung giờ khác
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1860,7 +1996,7 @@ export default function PipelineBuilder({
 
                         { icon: <LayoutGrid size={13} />, label: 'Vùng giám sát', value: hasZones ? `${pvZones.length} vùng` : 'Toàn khung hình' },
                         { icon: <Zap size={13} />, label: 'Tốc độ xử lý', value: `${inferenceFps} FPS · Độ nhạy ${Math.round(confidence * 100)}%` },
-                        { icon: <Clock size={13} />, label: 'Lịch chạy', value: scheduleStart === '00:00' && scheduleEnd === '23:59' ? '24/7 liên tục' : `${scheduleStart} – ${scheduleEnd}` },
+                        { icon: <Clock size={13} />, label: 'Lịch chạy', value: formatScheduleSlots(scheduleSlots) },
                         { icon: <Bell size={13} />, label: 'Thông báo', value: [channels.zalo && 'Popup', channels.email && 'Email', channels.webhook && 'Webhook'].filter(Boolean).join(', ') || 'Không gửi' },
                       ].map(row => (
                         <div key={row.label} className="flex items-start gap-3">

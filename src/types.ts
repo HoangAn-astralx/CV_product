@@ -37,6 +37,13 @@ export interface CountingZone {
   maxLimit?: number;
 }
 
+export interface ScheduleSlot {
+  id: string;
+  days: string[]; // 'T2'|'T3'|'T4'|'T5'|'T6'|'T7'|'CN'
+  start: string;  // 'HH:mm'
+  end: string;    // 'HH:mm'
+}
+
 export interface Pipeline {
   id: string;
   name: string;
@@ -59,6 +66,7 @@ export interface Pipeline {
   };
   scheduleStart?: string;
   scheduleEnd?: string;
+  scheduleSlots?: ScheduleSlot[];
   isActive: boolean;
   createdAt: string;
 }
