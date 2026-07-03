@@ -28,6 +28,8 @@ export interface CountingZone {
   id: string;
   name: string;
   type: 'zone' | 'line';
+  /** 'monitor' = AI giám sát trong vùng này; 'exclude' = vùng ngoại lệ / được phép (AI bỏ qua) */
+  role?: 'monitor' | 'exclude';
   points: { x: number; y: number }[];
   lineStart?: { x: number; y: number };
   lineEnd?: { x: number; y: number };

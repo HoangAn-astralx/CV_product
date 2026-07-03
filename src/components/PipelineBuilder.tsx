@@ -15,6 +15,7 @@ interface DrawnZone {
   id: string;
   name: string;
   type: 'line' | 'zone';
+  role?: 'monitor' | 'exclude'; // 'monitor' = AI watches here; 'exclude' = allowed/exception zone
   points: { x: number; y: number }[];
 }
 
@@ -129,10 +130,339 @@ const TASK_LABELS: Record<string, string> = {
   security: 'Giám sát An ninh', counting: 'Đếm lưu lượng',
   defect_surface: 'Lỗi bề mặt', defect_assembly: 'Lỗi lắp ráp & Đóng gói',
   defect_label: 'Kiểm tra tem nhãn', defect_foreign: 'Phát hiện dị vật',
+  label_inspection: 'Kiểm tra tem nhãn / Hạn dùng', assembly_inspection: 'Lỗi lắp ráp',
   ppe: 'An toàn lao động', fire: 'Phòng cháy chữa cháy',
   traffic: 'Giao thông thông minh', behavior: 'Phân tích hành vi',
   retail_analytics: 'Phân tích Bán lẻ',
 };
+
+// ─── Use-Case Domain Definitions ─────────────────────────────────────────────
+
+type UCParamType = 'text' | 'textarea' | 'number' | 'select' | 'select_text' | 'toggle' | 'multicheck' | 'multicheck_dynamic' | 'time_range' | 'date_range' | 'slider_pct' | 'image' | 'zone_hint' | 'line_hint' | 'bbox_per_field' | 'bbox_per_part' | 'card2' | 'card3';
+
+interface UCParam {
+  key: string;
+  label: string;
+  type: UCParamType;
+  options?: string[];
+  unit?: string;
+  placeholder?: string;
+  optional?: boolean;
+  /** for multicheck_dynamic: key of another param whose value provides the options list */
+  sourceKey?: string;
+}
+
+interface UCDef {
+  id: string;
+  name: string;
+  taskMapType: string;
+  needsImage?: boolean;
+  imageLabel?: string;
+  multipleImages?: boolean;
+  params: UCParam[];
+}
+
+interface DomainDef {
+  key: string;
+  name: string;
+  color: string;
+  useCases: UCDef[];
+}
+
+const DOMAINS: DomainDef[] = [
+  {
+    key: 'security', name: 'An ninh', color: 'blue',
+    useCases: [
+      { id: 'sec_intrusion', name: 'Xâm nhập vùng cấm', taskMapType: 'security', params: [
+        { key: 'zone', label: 'Vẽ vùng cấm cần giám sát', type: 'zone_hint' },
+        { key: 'target', label: 'Đối tượng nào BỊ CẤM vào vùng này', type: 'select', options: ['Người', 'Xe máy', 'Xe ô tô', 'Xe tải', 'Bất kỳ đối tượng nào'] },
+        { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
+        { key: 'confirmSeconds', label: 'Phải ở trong vùng liên tục bao lâu mới báo động', type: 'number', unit: 'giây', placeholder: '3' },
+        { key: 'restrictHours', label: 'Khung giờ áp dụng', type: 'select', options: ['Cả ngày 24/7', 'Ngoài giờ hành chính (18:00 – 07:00)', 'Ngoài giờ sản xuất', 'Tuỳ chỉnh theo lịch'] },
+        { key: 'reason', label: 'Lý do cấm / bối cảnh khu vực', type: 'select', optional: true, options: ['Nguy hiểm / an toàn lao động', 'Có tài sản / thiết bị giá trị cao', 'Khu vực bí mật / kiểm soát', 'Máy móc đang vận hành', 'Khác'] },
+        { key: 'allowedPersonnel', label: 'Ai ĐƯỢC PHÉP vào (ngoại lệ — mô tả ngoại hình)', type: 'text', optional: true, placeholder: 'VD: nhân viên bảo trì đồng phục xanh + đeo thẻ đỏ; bảo vệ đồng phục đen' },
+        { key: 'excludeZone', label: 'Vùng ngoại lệ (AI bỏ qua)', type: 'zone_hint', optional: true },
+        { key: 'normalActivity', label: 'Hoạt động bình thường gần khu vực (giúp AI tránh báo nhầm)', type: 'text', optional: true, placeholder: 'VD: xe tải qua lại hành lang phải; công nhân tập trung trước cửa vào ca' },
+      ]},
+      { id: 'sec_loitering', name: 'Lảng vảng quá lâu', taskMapType: 'security', params: [
+        { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
+        { key: 'target', label: 'Đối tượng cần phát hiện', type: 'select', options: ['Người', 'Xe', 'Bất kỳ'] },
+        { key: 'maxStayMinutes', label: 'Thời gian tối đa ở lại', type: 'number', unit: 'phút', placeholder: '5' },
+        { key: 'allowedPersonnel', label: 'Người được phép ở lại lâu hơn', type: 'text', optional: true },
+      ]},
+      { id: 'sec_afterhours', name: 'Đột nhập ngoài giờ', taskMapType: 'security', params: [
+        { key: 'workHours', label: 'Giờ làm việc bình thường', type: 'time_range' },
+        { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
+        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây', placeholder: '3' },
+        { key: 'guardSchedule', label: 'Lịch bảo vệ tuần tra', type: 'text', optional: true, placeholder: 'VD: 22:30 và 02:30' },
+        { key: 'cleaningStaff', label: 'Nhân viên vệ sinh (giờ + ngoại hình)', type: 'text', optional: true, placeholder: 'VD: 23:00–01:00, đồng phục xám' },
+        { key: 'overtime', label: 'Ai được ở lại tăng ca', type: 'text', optional: true },
+      ]},
+      { id: 'sec_assetloss', name: 'Mất tài sản', taskMapType: 'security', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tài sản cần bảo vệ (giúp AI nhận dạng chính xác hơn)', params: [
+        { key: 'assetDesc', label: 'Mô tả tài sản cần bảo vệ', type: 'text', placeholder: 'VD: laptop bạc Dell XPS, máy chiếu đen Epson' },
+        { key: 'assetZone', label: 'Vùng đặt tài sản', type: 'zone_hint' },
+        { key: 'missingSeconds', label: 'Tài sản mất bao lâu mới báo', type: 'number', unit: 'giây', placeholder: '30' },
+        { key: 'allowedPersonnel', label: 'Ai được phép di chuyển tài sản', type: 'text', optional: true },
+        { key: 'tempMoveMinutes', label: 'Cho phép di chuyển tạm trong', type: 'number', unit: 'phút', optional: true, placeholder: '5' },
+      ]},
+
+      { id: 'sec_crowd', name: 'Tụ tập đông người', taskMapType: 'security', params: [
+        { key: 'zone', label: 'Vùng cần kiểm soát', type: 'zone_hint' },
+        { key: 'minPeople', label: 'Số người tối thiểu để báo', type: 'number', placeholder: '5' },
+        { key: 'minSeconds', label: 'Thời gian tụ tập tối thiểu', type: 'number', unit: 'giây', placeholder: '30' },
+        { key: 'allowedZone', label: 'Khu vực được phép tụ tập', type: 'zone_hint', optional: true },
+        { key: 'breakHours', label: 'Giờ nghỉ ca / giờ ăn (bình thường)', type: 'time_range', optional: true },
+      ]},
+      { id: 'sec_vehicle_reid', name: 'Nhận diện phương tiện tương tự', taskMapType: 'security', needsImage: true, imageLabel: 'Ảnh xe mẫu cần tìm — upload rồi khoanh vùng thân xe nếu ảnh có nhiều nền', params: [
+        { key: 'similarityThreshold', label: 'Ngưỡng tương đồng tối thiểu', type: 'slider_pct' },
+        { key: 'vehicleTypes', label: 'Loại xe ưu tiên', type: 'multicheck', optional: true, options: ['Ô tô', 'Xe máy', 'Xe tải', 'Xe buýt'] },
+        { key: 'colors', label: 'Màu sắc xe', type: 'multicheck', optional: true, options: ['Trắng', 'Đen', 'Bạc / Xám', 'Đỏ', 'Xanh lam', 'Xanh lá', 'Vàng', 'Nâu'] },
+        { key: 'maxResults', label: 'Số kết quả tối đa trả về', type: 'number', optional: true, placeholder: '20' },
+        { key: 'noPlate', label: 'Chỉ tìm xe không rõ / bị che biển số', type: 'toggle', optional: true },
+      ]},
+
+    ]
+  },
+  {
+    key: 'traffic', name: 'Giao thông', color: 'amber',
+    useCases: [
+      { id: 'tra_alpr', name: 'Đọc biển số xe', taskMapType: 'traffic', params: [
+        { key: 'vehicleTypes', label: 'Loại xe cần nhận diện', type: 'multicheck', options: ['Ô tô', 'Xe máy', 'Xe tải', 'Xe buýt'] },
+{ key: 'action', label: 'Hành động khi phát hiện', type: 'select', options: ['Chỉ ghi log', 'Cảnh báo', 'Gọi webhook mở barrier'] },
+        { key: 'whitelist', label: 'Danh sách xe được phép vào', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
+        { key: 'blacklist', label: 'Danh sách xe bị cấm', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
+        { key: 'unknownAction', label: 'Xe không có trong danh sách', type: 'select', options: ['Cho qua + ghi log', 'Cảnh báo', 'Chặn'] },
+        { key: 'historyDays', label: 'Lưu lịch sử bao nhiêu ngày', type: 'number', placeholder: '30' },
+      ]},
+      { id: 'tra_count', name: 'Đếm phương tiện theo luồng', taskMapType: 'counting', params: [
+        { key: 'vehicleTypes', label: 'Loại xe cần đếm', type: 'multicheck', options: ['Xe máy', 'Ô tô', 'Xe tải', 'Xe đạp', 'Tất cả'] },
+        { key: 'direction', label: 'Hướng đếm', type: 'card3', options: ['Chỉ vào', 'Chỉ ra', 'Cả 2 chiều'] },
+        { key: 'line', label: 'Vị trí vạch đếm', type: 'line_hint' },
+        { key: 'alertThreshold', label: 'Cảnh báo khi số xe vượt ngưỡng', type: 'number', unit: 'xe/giờ', optional: true },
+        { key: 'ignoreParked', label: 'Bỏ qua xe đang đỗ (chỉ đếm xe di chuyển)', type: 'toggle', optional: true },
+        { key: 'reportPeriod', label: 'Báo cáo tổng kết theo', type: 'select', options: ['Theo giờ', 'Theo ca', 'Theo ngày'] },
+      ]},
+      { id: 'tra_parking', name: 'Dừng đỗ sai quy định', taskMapType: 'traffic', params: [
+        { key: 'zone', label: 'Vùng cấm dừng đỗ', type: 'zone_hint' },
+        { key: 'maxMinutes', label: 'Thời gian tối đa được dừng', type: 'number', unit: 'phút', placeholder: '5' },
+        { key: 'hazardGrace', label: 'Xe bật đèn cảnh báo (hazard) được gia hạn thêm', type: 'toggle', optional: true },
+        { key: 'exemptVehicles', label: 'Xe nào được miễn', type: 'multicheck', optional: true, options: ['Xe cứu thương', 'Xe cứu hỏa', 'Xe bảo trì'] },
+        { key: 'loadingZone', label: 'Khu vực bốc dỡ hàng (cho phép đỗ)', type: 'zone_hint', optional: true },
+      ]},
+      { id: 'tra_speed', name: 'Đo / ước lượng tốc độ', taskMapType: 'traffic', params: [
+        { key: 'refDistance', label: 'Khoảng cách tham chiếu', type: 'number', unit: 'mét', placeholder: '10' },
+        { key: 'vehicleTypes', label: 'Loại phương tiện', type: 'multicheck', options: ['Xe máy', 'Ô tô', 'Xe tải', 'Tất cả'] },
+        { key: 'maxSpeed', label: 'Ngưỡng tốc độ tối đa', type: 'number', unit: 'km/h', placeholder: '40' },
+        { key: 'minSpeed', label: 'Ngưỡng tốc độ tối thiểu', type: 'number', unit: 'km/h', optional: true, placeholder: '5' },
+        { key: 'direction', label: 'Hướng di chuyển giám sát', type: 'card3', options: ['Trái → Phải', 'Phải → Trái', 'Cả hai'] },
+      ]},
+      { id: 'tra_redlight', name: 'Vượt đèn đỏ', taskMapType: 'traffic', params: [
+        { key: 'stopLine', label: 'Vị trí vạch dừng', type: 'line_hint' },
+        { key: 'trafficLight', label: 'Vị trí đèn giao thông', type: 'zone_hint' },
+        { key: 'direction', label: 'Hướng giám sát', type: 'card3', options: ['Thẳng', 'Rẽ trái', 'Rẽ phải'] },
+        { key: 'greenDelay', label: 'Thời gian chờ sau đèn xanh', type: 'number', unit: 'giây', placeholder: '3' },
+      ]},
+      { id: 'tra_smartpark', name: 'Bãi đỗ xe thông minh', taskMapType: 'counting', params: [
+        { key: 'capacity', label: 'Sức chứa bãi đỗ (tổng số chỗ)', type: 'number', placeholder: '50' },
+        { key: 'fullThreshold', label: 'Cảnh báo khi đầy bao nhiêu %', type: 'slider_pct' },
+        { key: 'zones', label: 'Khu vực A, B, C... (vẽ từng khu)', type: 'zone_hint' },
+        { key: 'ledRule', label: 'Biển LED chỉ đường (quy tắc)', type: 'textarea', optional: true, placeholder: 'VD: Nếu Khu A đầy → biển LED cổng A hiển thị "Rẽ vào Khu B"' },
+      ]},
+    ]
+  },
+  {
+    key: 'production', name: 'Sản xuất', color: 'violet',
+    useCases: [
+      { id: 'prd_label', name: 'Kiểm tra tem nhãn / Hạn dùng', taskMapType: 'label_inspection', needsImage: true, imageLabel: 'Ảnh mẫu sản phẩm (vị trí nhãn rõ)', params: [
+        { key: 'fields', label: 'Trường thông tin cần đọc', type: 'multicheck', options: ['Ngày sản xuất (NSX)', 'Hạn sử dụng (HSD)', 'Số lô (LOT)', 'Mã vạch', 'Mã QR'] },
+        { key: 'fieldZones', label: 'Vùng mỗi trường trên sản phẩm (vẽ trên ảnh mẫu)', type: 'bbox_per_field' },
+        { key: 'mfgFormat', label: 'Định dạng Ngày sản xuất', type: 'select_text', options: ['DD/MM/YYYY', 'MM/YYYY', 'YYYY-MM-DD', 'YYYYMMDD', 'DD-MM-YYYY'] },
+        { key: 'expFormat', label: 'Định dạng Hạn sử dụng', type: 'select_text', options: ['DD/MM/YYYY', 'MM/YYYY', 'YYYY-MM-DD', 'YYYYMMDD', 'DD-MM-YYYY'] },
+        { key: 'lotFormat', label: 'Định dạng Số lô (regex)', type: 'text', optional: true, placeholder: 'VD: [A-Z]{2}\\d{6} hoặc LOT\\d{4}-\\d{2}' },
+        { key: 'minShelfLife', label: 'HSD phải cách NSX tối thiểu', type: 'number', unit: 'ngày', optional: true, placeholder: '180' },
+        { key: 'minRemainingDays', label: 'HSD phải còn hạn tối thiểu', type: 'number', unit: 'ngày', optional: true, placeholder: '30' },
+        { key: 'language', label: 'Ngôn ngữ trên nhãn', type: 'select', options: ['Tiếng Việt', 'Tiếng Anh', 'Song ngữ (Việt + Anh)', 'Khác'] },
+      ]},
+      { id: 'prd_assembly', name: 'Lỗi lắp ráp', taskMapType: 'assembly_inspection', needsImage: true, multipleImages: true, imageLabel: 'Ảnh mẫu sản phẩm lắp đúng', params: [
+        { key: 'parts', label: 'Liệt kê các bộ phận cần có', type: 'textarea', placeholder: 'Mỗi bộ phận một dòng hoặc cách nhau bởi dấu phẩy\nVD: nắp, gioăng cao su, tem bảo hành, 4 ốc vít' },
+        { key: 'partZones', label: 'Vùng từng bộ phận trên ảnh sản phẩm (vẽ trên ảnh mẫu)', type: 'bbox_per_part' },
+        { key: 'multiVersion', label: 'Sản phẩm có nhiều phiên bản', type: 'toggle' },
+
+      ]},
+      { id: 'prd_counting', name: 'Đếm sản phẩm dây chuyền', taskMapType: 'counting', needsImage: true, multipleImages: true, imageLabel: 'Ảnh sản phẩm cần đếm (để trống = đếm tất cả)', params: [
+        { key: 'line', label: 'Vị trí vạch đếm trên băng chuyền', type: 'line_hint' },
+        { key: 'targetPerShift', label: 'Mục tiêu sản lượng ca', type: 'number', placeholder: '2000' },
+        { key: 'alertBelowPct', label: 'Cảnh báo khi năng suất dưới', type: 'number', unit: '%', placeholder: '80' },
+        { key: 'stopAlertSeconds', label: 'Dây chuyền dừng bao lâu thì báo', type: 'number', unit: 'giây', placeholder: '30' },
+        { key: 'countRejects', label: 'Đếm riêng sản phẩm bị từ chối', type: 'toggle', optional: true },
+      ]},
+      { id: 'prd_productivity', name: 'Giám sát năng suất', taskMapType: 'behavior', params: [
+        { key: 'zone', label: 'Khu vực giám sát', type: 'zone_hint' },
+        { key: 'targetPerShift', label: 'Mục tiêu sản lượng ca', type: 'number', placeholder: '500' },
+        { key: 'alertBelowPct', label: 'Cảnh báo khi năng suất dưới', type: 'number', unit: '%', placeholder: '80' },
+        { key: 'workerCount', label: 'Số nhân công trong khu vực', type: 'number', optional: true },
+        { key: 'workHours', label: 'Giờ làm việc', type: 'time_range' },
+      ]},
+    ]
+  },
+  {
+    key: 'safety', name: 'An toàn lao động', color: 'orange',
+    useCases: [
+      { id: 'hse_ppe', name: 'Thiếu trang thiết bị bảo hộ', taskMapType: 'ppe', params: [
+        { key: 'zone', label: 'Khu vực yêu cầu PPE', type: 'zone_hint' },
+        { key: 'requiredPPE', label: 'PPE bắt buộc tại khu vực này', type: 'multicheck', options: ['Mũ bảo hộ', 'Áo phản quang', 'Găng tay', 'Khẩu trang', 'Kính bảo hộ'] },
+        { key: 'triggerMode', label: 'Điều kiện kích hoạt', type: 'card2', options: ['Thiếu BẤT KỲ 1 PPE', 'Thiếu TẤT CẢ PPE'] },
+        { key: 'ppeColors', label: 'Màu PPE ở cơ sở này', type: 'text', optional: true, placeholder: 'VD: Mũ vàng, áo cam' },
+        { key: 'exempt', label: 'Ai được miễn PPE', type: 'text', optional: true },
+        { key: 'staffAppearance', label: 'Nhân viên nhận dạng thế nào', type: 'text', optional: true, placeholder: 'VD: đồng phục xanh công ty' },
+        { key: 'graceSeconds', label: 'Cho phép tháo PPE tạm trong', type: 'number', unit: 'giây', optional: true, placeholder: '30' },
+      ]},
+      { id: 'hse_machine', name: 'Người vào khu vực nguy hiểm', taskMapType: 'security', params: [
+        { key: 'zone', label: 'Vùng nguy hiểm', type: 'zone_hint' },
+        { key: 'zoneCondition', label: 'Điều kiện vào vùng', type: 'card2', options: ['Chạm viền (phản ứng ngay)', 'Tâm đối tượng trong vùng'] },
+        { key: 'onlyWhenRunning', label: 'Chỉ báo khi máy đang chạy', type: 'toggle', optional: true },
+        { key: 'allowedPersonnel', label: 'Ai được vào vùng này', type: 'text', optional: true, placeholder: 'VD: kỹ thuật viên mặc áo cam' },
+        { key: 'maintenanceSchedule', label: 'Lịch bảo trì (được vào)', type: 'time_range', optional: true },
+        { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thông báo', 'Dừng máy tự động qua webhook', 'Cả hai'] },
+      ]},
+      { id: 'hse_behavior', name: 'Phát hiện hành vi bất thường', taskMapType: 'behavior', params: [
+        { key: 'behaviorTypes', label: 'Hành vi cần phát hiện', type: 'multicheck', options: ['Té ngã / Đột quỵ', 'Đánh nhau / Ẩu đả'] },
+        { key: 'zone', label: 'Khu vực giám sát', type: 'zone_hint' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận hành vi', type: 'number', unit: 'giây', placeholder: '5' },
+        { key: 'restZone', label: '↳ Khu vực nghỉ ngơi bình thường — AI bỏ qua (cho bài toán té ngã)', type: 'zone_hint', optional: true },
+        { key: 'frequentCrouch', label: '↳ Nhân viên hay cúi / ngồi thường xuyên (tránh báo nhầm té ngã)', type: 'toggle', optional: true },
+        { key: 'minPeople', label: '↳ Số người tối thiểu để báo đánh nhau', type: 'number', placeholder: '2', optional: true },
+        { key: 'excludeZone', label: '↳ Khu vực bỏ qua (sân thể thao, v.v.)', type: 'zone_hint', optional: true },
+      ]},
+      { id: 'hse_proximity', name: 'Khoảng cách người - máy', taskMapType: 'security', params: [
+        { key: 'zone', label: 'Vùng nguy hiểm quanh máy', type: 'zone_hint' },
+        { key: 'minDistance', label: 'Khoảng cách an toàn tối thiểu', type: 'number', unit: 'mét', placeholder: '1.5' },
+        { key: 'alertAction', label: 'Hành động khi vi phạm', type: 'select', options: ['Cảnh báo trên màn hình', 'Gửi webhook + cảnh báo', 'Cả hai'] },
+        { key: 'machineRunning', label: 'Chỉ giám sát khi máy đang hoạt động', type: 'toggle', optional: true },
+        { key: 'allowedPersonnel', label: 'Người được phép đến gần', type: 'text', optional: true },
+      ]},
+    ]
+  },
+  {
+    key: 'fire', name: 'PCCC', color: 'rose',
+    useCases: [
+      { id: 'fir_fire', name: 'Phát hiện khói / Lửa', taskMapType: 'fire', params: [
+        { key: 'hazardTypes', label: 'Loại mối nguy cần phát hiện', type: 'multicheck', options: ['Khói', 'Lửa / ngọn lửa'] },
+        { key: 'sensitivity', label: 'Mức độ nhạy', type: 'card3', options: ['Cao', 'Trung bình', 'Thấp'] },
+        { key: 'dustyEnv', label: 'Môi trường có hơi / bụi thường xuyên (tránh báo nhầm)', type: 'toggle', optional: true },
+        { key: 'allowedZone', label: 'Khu vực được phép có khói / lửa', type: 'zone_hint', optional: true },
+        { key: 'material', label: 'Vật liệu chủ yếu trong khu vực', type: 'select', optional: true, options: ['Gỗ', 'Nhựa', 'Hóa chất', 'Dầu', 'Hỗn hợp'] },
+      ]},
+      { id: 'fir_smoking', name: 'Hút thuốc nơi cấm', taskMapType: 'behavior', params: [
+        { key: 'zone', label: 'Vùng cấm hút thuốc', type: 'zone_hint' },
+        { key: 'sensitivity', label: 'Mức độ nhạy', type: 'card3', options: ['Cao', 'Trung bình', 'Thấp'] },
+        { key: 'allowedZone', label: 'Khu vực cho phép hút thuốc', type: 'zone_hint', optional: true },
+      ]},
+      { id: 'fir_exit', name: 'Chặn / khoá lối thoát hiểm', taskMapType: 'security', params: [
+        { key: 'exitZones', label: 'Vị trí các lối thoát hiểm', type: 'zone_hint' },
+        { key: 'blockedPct', label: 'Coi là bị chặn khi bị che bao nhiêu %', type: 'slider_pct' },
+        { key: 'confirmSeconds', label: 'Báo sau bao lâu', type: 'number', unit: 'giây', placeholder: '10' },
+        { key: 'loadingHours', label: 'Giờ bốc dỡ hàng qua lối thoát (cho phép)', type: 'time_range', optional: true },
+      ]},
+    ]
+  },
+  {
+    key: 'retail', name: 'Bán lẻ & khách hàng', color: 'emerald',
+    useCases: [
+      { id: 'ret_counting', name: 'Đếm khách vào ra', taskMapType: 'counting', params: [
+        { key: 'line', label: 'Vị trí cửa vào', type: 'line_hint' },
+        { key: 'direction', label: 'Hướng đếm', type: 'card3', options: ['Chỉ vào', 'Chỉ ra', 'Cả 2 chiều'] },
+        { key: 'maxSimultaneous', label: 'Cảnh báo khi có bao nhiêu khách đồng thời', type: 'number', optional: true },
+        { key: 'staffAppearance', label: 'Nhân viên nhận dạng thế nào (không đếm)', type: 'text', optional: true, placeholder: 'VD: đồng phục áo đỏ' },
+        { key: 'reportPeriod', label: 'Báo cáo tổng kết theo', type: 'select', options: ['Mỗi giờ', 'Mỗi ca', 'Cuối ngày'] },
+        { key: 'peakHours', label: 'Giờ cao điểm bình thường', type: 'time_range', optional: true },
+      ]},
+      { id: 'ret_heatmap', name: 'Heatmap khu vực', taskMapType: 'retail_analytics', params: [
+        { key: 'zone', label: 'Khu vực giám sát', type: 'zone_hint' },
+        { key: 'objectType', label: 'Loại đối tượng', type: 'select', options: ['Người', 'Xe', 'Tất cả'] },
+        { key: 'aggregatePeriod', label: 'Khoảng thời gian tổng hợp', type: 'select', options: ['1 giờ', '1 ca', '1 ngày', '1 tuần'] },
+        { key: 'gridSize', label: 'Kích thước ô lưới', type: 'number', unit: 'mét', placeholder: '1' },
+      ]},
+      { id: 'ret_shelf', name: 'Kệ hàng trống', taskMapType: 'retail_analytics', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kệ hàng khi đầy hàng', params: [
+        { key: 'emptyThreshold', label: 'Coi là trống khi diện tích kệ trống vượt', type: 'slider_pct' },
+        { key: 'notifyTo', label: 'Ai cần nhận thông báo', type: 'text', placeholder: 'VD: nhân viên kho, trưởng khu vực' },
+        { key: 'restockMinutes', label: 'Cần bổ sung hàng trong bao lâu', type: 'number', unit: 'phút', placeholder: '15' },
+        { key: 'inventoryTime', label: 'Giờ kiểm kê đầu ngày (không báo)', type: 'time_range', optional: true },
+        { key: 'allowRearrange', label: 'Hàng được sắp xếp lại thường xuyên (tránh báo nhầm)', type: 'toggle', optional: true },
+      ]},
+      { id: 'ret_demographics', name: 'Phân tích nhân khẩu học', taskMapType: 'retail_analytics', params: [
+        { key: 'zone', label: 'Khu vực phân tích', type: 'zone_hint' },
+        { key: 'attributes', label: 'Thông tin cần thu thập', type: 'multicheck', options: ['Độ tuổi', 'Giới tính'] },
+        { key: 'aggregatePeriod', label: 'Khoảng thời gian tổng hợp', type: 'select', options: ['1 giờ', '1 ca', '1 ngày'] },
+        { key: 'anonymize', label: 'Ẩn danh hóa khuôn mặt', type: 'toggle' },
+      ]},
+      { id: 'ret_queue', name: 'Giám sát hàng chờ', taskMapType: 'counting', params: [
+        { key: 'zone', label: 'Khu vực xếp hàng / quầy phục vụ', type: 'zone_hint' },
+        { key: 'alertPeople', label: 'Cảnh báo khi số người xếp hàng vượt', type: 'number', placeholder: '8' },
+        { key: 'minQueueSeconds', label: 'Phải xếp hàng bao lâu mới tính', type: 'number', unit: 'giây', placeholder: '60' },
+        { key: 'maxWaitSeconds', label: 'Thời gian chờ tối đa mỗi khách', type: 'number', unit: 'giây', placeholder: '120' },
+        { key: 'counterCount', label: 'Số quầy phục vụ', type: 'number', placeholder: '3' },
+        { key: 'serviceTime', label: 'Thời gian phục vụ trung bình mỗi khách', type: 'number', unit: 'giây', placeholder: '60' },
+        { key: 'alertOnOvertime', label: 'Cảnh báo khi khách chờ vượt thời gian tối đa', type: 'toggle', optional: true },
+        { key: 'peakHours', label: 'Giờ cao điểm thường có hàng dài', type: 'time_range', optional: true },
+      ]},
+      { id: 'ret_crowdanalysis', name: 'Phân tích đông / rảnh', taskMapType: 'retail_analytics', params: [
+        { key: 'zone', label: 'Khu vực giám sát', type: 'zone_hint' },
+        { key: 'busyThreshold', label: 'Ngưỡng đông', type: 'number', unit: 'người', placeholder: '20' },
+        { key: 'quietThreshold', label: 'Ngưỡng vắng', type: 'number', unit: 'người', placeholder: '5' },
+        { key: 'aggregatePeriod', label: 'Khoảng thời gian tổng hợp', type: 'select', options: ['30 phút', '1 giờ', '1 ca'] },
+        { key: 'autoThreshold', label: 'Tự động điều chỉnh ngưỡng', type: 'toggle', optional: true },
+      ]},
+    ]
+  },
+  {
+    key: 'warehouse', name: 'Kho bãi & logistics', color: 'cyan',
+    useCases: [
+      { id: 'wh_forklift', name: 'Người vào đường xe nâng', taskMapType: 'security', params: [
+        { key: 'zone', label: 'Tuyến đường xe nâng', type: 'zone_hint' },
+        { key: 'zoneCondition', label: 'Phản ứng ngay khi', type: 'card2', options: ['Chân chạm viền vùng (intersect)', 'Đứng hẳn trong vùng (inside)'] },
+        { key: 'alertLevel', label: 'Mức cảnh báo', type: 'select', options: ['Chỉ thông báo', 'Kích hoạt còi tự động', 'Gửi lệnh dừng xe nâng'] },
+        { key: 'allowedPersonnel', label: 'Ai được vào đường xe nâng', type: 'text', optional: true, placeholder: 'VD: lái xe nâng có thẻ vàng' },
+        { key: 'forkActiveHours', label: 'Xe nâng chỉ hoạt động vào giờ', type: 'time_range', optional: true },
+      ]},
+      { id: 'wh_wrongzone', name: 'Xe vào sai khu vực', taskMapType: 'security', params: [
+        { key: 'zone', label: 'Khu vực cấm xe', type: 'zone_hint' },
+        { key: 'bannedTypes', label: 'Loại xe bị cấm', type: 'multicheck', options: ['Xe tải', 'Xe máy', 'Xe khách', 'Xe con'] },
+        { key: 'allowedList', label: 'Danh sách xe được phép', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
+      ]},
+      { id: 'wh_inventory', name: 'Giám sát mức tồn kho kệ', taskMapType: 'retail_analytics', params: [
+        { key: 'shelfZones', label: 'Vị trí các kệ cần giám sát', type: 'zone_hint' },
+        { key: 'minStock', label: 'Số lượng tồn tối thiểu', type: 'number', placeholder: '10' },
+        { key: 'emptyThreshold', label: 'Coi là hết hàng khi', type: 'slider_pct' },
+      ]},
+      { id: 'wh_counting', name: 'Đếm hàng xuất / nhập kho', taskMapType: 'counting', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kiện hàng cần đếm (tuỳ chọn — để trống = đếm tất cả)', params: [
+        { key: 'line', label: 'Vị trí cổng xuất / nhập', type: 'line_hint' },
+        { key: 'plannedQty', label: 'Số lượng theo kế hoạch hôm nay', type: 'number', placeholder: '500' },
+        { key: 'deviationPct', label: 'Sai lệch bao nhiêu % thì báo', type: 'number', unit: '%', placeholder: '5' },
+        { key: 'truckCount', label: 'Hàng đến từ bao nhiêu chuyến xe', type: 'number', optional: true, placeholder: '3' },
+      ]},
+      { id: 'wh_truck', name: 'Xe tải ra vào cổng', taskMapType: 'traffic', params: [
+        { key: 'useALPR', label: 'Đọc biển số xe tải tự động', type: 'toggle' },
+        { key: 'expectedTrucks', label: 'Xe tải dự kiến hôm nay', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
+        { key: 'unknownAction', label: 'Hành động khi xe không trong danh sách', type: 'select', options: ['Chỉ cảnh báo', 'Không mở barrier', 'Ghi log + cảnh báo'] },
+      ]},
+    ]
+  },
+];
+
+const DOMAIN_COLOR_MAP: Record<string, { bg: string; text: string; border: string; activeBg: string; activeText: string; badge: string }> = {
+  blue:    { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',    activeBg: 'bg-blue-600',    activeText: 'text-white', badge: 'bg-blue-100 text-blue-700' },
+  amber:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   activeBg: 'bg-amber-500',   activeText: 'text-white', badge: 'bg-amber-100 text-amber-700' },
+  violet:  { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200',  activeBg: 'bg-violet-600',  activeText: 'text-white', badge: 'bg-violet-100 text-violet-700' },
+  orange:  { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200',  activeBg: 'bg-orange-500',  activeText: 'text-white', badge: 'bg-orange-100 text-orange-700' },
+  rose:    { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200',    activeBg: 'bg-rose-600',    activeText: 'text-white', badge: 'bg-rose-100 text-rose-700' },
+  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', activeBg: 'bg-emerald-600', activeText: 'text-white', badge: 'bg-emerald-100 text-emerald-700' },
+  cyan:    { bg: 'bg-cyan-50',    text: 'text-cyan-700',    border: 'border-cyan-200',    activeBg: 'bg-cyan-600',    activeText: 'text-white', badge: 'bg-cyan-100 text-cyan-700' },
+};
+
+// ─── Helper: find a UCDef by id from DOMAINS ─────────────────────────────────
+const findUCById = (id: string): UCDef | null =>
+  DOMAINS.flatMap(d => d.useCases).find(uc => uc.id === id) ?? null;
 
 // ─── Camera Preview Background (shared between steps) ───────────────────────
 
@@ -233,7 +563,9 @@ function ZoneOverlay({ zones, drawingPoints, newZoneType }: {
 
       {/* ── Saved zones ── */}
       {zones.map((z, zIdx) => {
-        const color = ZONE_COLORS[zIdx % ZONE_COLORS.length];
+        // exclude zones are always green; monitor zones use the palette
+        const color = z.role === 'exclude' ? '#22c55e' : ZONE_COLORS[zIdx % ZONE_COLORS.length];
+        const isExclude = z.role === 'exclude';
 
         if (z.type === 'line' && z.points.length >= 2) {
           const p0 = z.points[0], p1 = z.points[z.points.length - 1];
@@ -241,11 +573,9 @@ function ZoneOverlay({ zones, drawingPoints, newZoneType }: {
           return (
             <g key={z.id}>
               <line x1={`${p0.x}%`} y1={`${p0.y}%`} x2={`${p1.x}%`} y2={`${p1.y}%`}
-                stroke={color} strokeWidth="3" strokeLinecap="round" />
-              {/* Endpoint dots */}
+                stroke={color} strokeWidth="3" strokeLinecap="round" strokeDasharray={isExclude ? '8 4' : undefined} />
               <circle cx={`${p0.x}%`} cy={`${p0.y}%`} r="4" fill={color} stroke="white" strokeWidth="1.5" />
               <circle cx={`${p1.x}%`} cy={`${p1.y}%`} r="4" fill={color} stroke="white" strokeWidth="1.5" />
-              {/* Label */}
               <rect x={`${mx - 5}%`} y={`${my - 3}%`} width={`${z.name.length * 1.2 + 4}%`} height="6%" rx="4" fill={color} />
               <text x={`${mx}%`} y={`${my}%`} fill="white" fontSize="11" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">{z.name}</text>
             </g>
@@ -253,7 +583,6 @@ function ZoneOverlay({ zones, drawingPoints, newZoneType }: {
         }
 
         if (z.type === 'zone' && z.points.length >= 3) {
-          // Points already stored as hull (saved via handleSaveZone)
           const pts = z.points;
           const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
           const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
@@ -261,18 +590,18 @@ function ZoneOverlay({ zones, drawingPoints, newZoneType }: {
             <g key={z.id}>
               <polygon
                 points={pts.map(p => `${p.x * 10} ${p.y * 5.625}`).join(' ')}
-                fill={`${color}25`}
+                fill={`${color}20`}
                 stroke={color}
                 strokeWidth="2.5"
                 strokeLinejoin="round"
+                strokeDasharray={isExclude ? '8 4' : undefined}
               />
-              {/* Corner dots */}
               {pts.map((p, i) => (
                 <circle key={i} cx={`${p.x}%`} cy={`${p.y}%`} r="3.5" fill={color} stroke="white" strokeWidth="1.5" />
               ))}
-              {/* Label badge */}
-              <rect x={`${cx - 5}%`} y={`${cy - 3}%`} width={`${z.name.length * 1.2 + 3}%`} height="6%" rx="5" fill={color} />
-              <text x={`${cx}%`} y={`${cy}%`} fill="white" fontSize="11" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">{z.name}</text>
+              {/* Label badge — show role icon for exclude zones */}
+              <rect x={`${cx - 5}%`} y={`${cy - 3}%`} width={`${z.name.length * 1.2 + (isExclude ? 5 : 3)}%`} height="6%" rx="5" fill={color} />
+              <text x={`${cx}%`} y={`${cy}%`} fill="white" fontSize="11" fontWeight="bold" textAnchor="middle" dominantBaseline="middle">{isExclude ? `✓ ${z.name}` : z.name}</text>
             </g>
           );
         }
@@ -376,6 +705,15 @@ export default function PipelineBuilder({
   const [behaviorItems, setBehaviorItems] = useState({ fall: false, violence: false, crowd: false, smoking: false, phone: false, weapon: false });
   const [retailMode, setRetailMode] = useState<'heatmap' | 'demographics'>('heatmap');
 
+  // Zone spatial condition: 'inside' = center of bbox in polygon; 'intersect' = bbox edge touches polygon
+  const [zoneCondition, setZoneCondition] = useState<'inside' | 'intersect'>('inside');
+
+  // Counting: reference product image (only count this product)
+  const [countingProductImage, setCountingProductImage] = useState<string | null>(null);
+
+  // AI context hints for smart mode
+  const [aiContext, setAiContext] = useState({ environment: '', normalBehavior: '', specialNotes: '' });
+
   // Defect
   const [goldenSamples, setGoldenSamples] = useState<string[]>([]);
   const [inspectionROIs, setInspectionROIs] = useState<Record<number, BoundingBox[]>>({});
@@ -393,6 +731,14 @@ export default function PipelineBuilder({
   const [drawingPoints, setDrawingPoints] = useState<{ x: number; y: number }[]>([]);
   const [newZoneName, setNewZoneName] = useState('Vùng A');
   const [newZoneType, setNewZoneType] = useState<'line' | 'zone'>('zone');
+  const [newZoneRole, setNewZoneRole] = useState<'monitor' | 'exclude'>('monitor');
+
+  // Domain / use-case browsing
+const [selectedDomain, setSelectedDomain] = useState<string>('');
+  const [selectedUseCaseDef, setSelectedUseCaseDef] = useState<UCDef | null>(null);
+  const [useCaseParamValues, setUseCaseParamValues] = useState<Record<string, string>>({});
+  const [useCaseImages, setUseCaseImages] = useState<string[]>([]);
+  const [useCaseImageROIs, setUseCaseImageROIs] = useState<Record<number, BoundingBox[]>>({});
 
   // UI
   // Performance presets
@@ -429,6 +775,7 @@ export default function PipelineBuilder({
       id: `zone-${Date.now()}`,
       name: newZoneName.trim() || `Vùng ${ZONE_LETTERS[(currentCamZones.length) % 26]}`,
       type: newZoneType,
+      role: newZoneRole,
       points: finalPoints,
     };
     setMultiZones(prev => ({ ...prev, [activeCamId]: [...(prev[activeCamId] || []), newZone] }));
@@ -454,6 +801,7 @@ export default function PipelineBuilder({
     setScheduleSlots([]);
     setNewZoneName('Vùng A');
     setNewZoneType('zone');
+    setNewZoneRole('monitor');
     setDetectionTarget('person');
     setCustomTarget('');
     setDetectionRule('enter_area');
@@ -479,6 +827,14 @@ export default function PipelineBuilder({
     setExpectedOCRText('');
     setDefectSensitivity('medium');
     setInspectionROIs({});
+    setZoneCondition('inside');
+    setCountingProductImage(null);
+    setAiContext({ environment: '', normalBehavior: '', specialNotes: '' });
+setSelectedDomain('');
+    setSelectedUseCaseDef(null);
+    setUseCaseParamValues({});
+    setUseCaseImages([]);
+    setUseCaseImageROIs({});
   };
 
   const inferMonitoringConfig = (text: string, hasRoi: boolean): InferredMonitoringConfig => {
@@ -570,6 +926,7 @@ export default function PipelineBuilder({
         id: z.id,
         name: z.name,
         type: z.type,
+        role: z.role ?? 'monitor',
         points: z.type === 'line' ? ([z.lineStart, z.lineEnd].filter(Boolean) as { x: number; y: number }[]) : z.points,
       }));
     if (restoredZones.length > 0) setMultiZones({ [pipe.cameraId]: restoredZones });
@@ -586,10 +943,13 @@ export default function PipelineBuilder({
       setTracker(String(pipe.config?.tracker || 'bytetrack'));
       setFrameSkip(Number(pipe.config?.frameSkip || 0));
       setInferenceFps(Number(pipe.config?.inferenceFps || 15));
+      setZoneCondition((pipe.config?.zoneCondition as 'inside' | 'intersect') || 'inside');
+      setCountingProductImage((pipe.config?.countingProductImage as string) || null);
     } else if (pipe.monitoringMode === 'smart') {
       setSimilarityThreshold(Number(pipe.config?.similarityThreshold || 0.78));
       setRetrievalTopK(Number(pipe.config?.retrievalTopK || 5));
       setCooldown(Number(pipe.config?.cooldown || 60));
+      if (pipe.config?.aiContext) setAiContext(pipe.config.aiContext as { environment: string; normalBehavior: string; specialNotes: string });
     } else if (pipe.monitoringMode === 'defect_detection') {
       setGoldenSamples((pipe.config?.goldenSamples as unknown) as string[] || []);
       setEnableSSIM(Boolean(pipe.config?.enableSSIM ?? true));
@@ -649,6 +1009,7 @@ export default function PipelineBuilder({
             id: `zone-${Date.now()}-${i}-${cameraId}`,
             name: z.name,
             type: z.type,
+            role: z.role ?? 'monitor',
             points: z.type === 'zone' ? z.points : [],
             lineStart: z.type === 'line' && z.points.length >= 2 ? z.points[0] : undefined,
             lineEnd: z.type === 'line' && z.points.length >= 2 ? z.points[z.points.length - 1] : undefined,
@@ -662,16 +1023,24 @@ export default function PipelineBuilder({
       let finalTarget: string | undefined;
       let finalRule = 'semantic_match';
 
+      const ucExtra = selectedUseCaseDef ? {
+        useCaseId: selectedUseCaseDef.id,
+        useCaseName: selectedUseCaseDef.name,
+        useCaseParams: Object.keys(useCaseParamValues).length > 0 ? useCaseParamValues : undefined,
+        useCaseImages: useCaseImages.length > 0 ? useCaseImages : undefined,
+        useCaseImageROIs: Object.keys(useCaseImageROIs).length > 0 ? useCaseImageROIs : undefined,
+      } : {};
+
       if (monitoringMode === 'standard') {
         finalTarget = detectionTarget === 'custom' ? customTarget : detectionTarget;
         finalRule = detectionRule;
-        finalConfig = { alertDuration, alertCount, cooldown, confidence, iou, tracker, frameSkip, inferenceFps };
+        finalConfig = { alertDuration, alertCount, cooldown, confidence, iou, tracker, frameSkip, inferenceFps, zoneCondition, countingProductImage: countingProductImage || undefined, ...ucExtra };
       } else if (monitoringMode === 'smart') {
         finalRule = ruleCondition;
-        finalConfig = { similarityThreshold, retrievalTopK, cooldown, alertDuration, inferenceFps };
+        finalConfig = { similarityThreshold, retrievalTopK, cooldown, alertDuration, inferenceFps, aiContext: (aiContext.environment || aiContext.normalBehavior || aiContext.specialNotes) ? aiContext : undefined, ...ucExtra };
       } else {
         finalRule = 'defect_detected';
-        finalConfig = { goldenSamples, inspectionROIs, enableSSIM, enableCNN, enableOCR, expectedOCRText, alertDuration, alertCount, cooldown, inferenceFps };
+        finalConfig = { goldenSamples: useCaseImages.length > 0 ? useCaseImages : goldenSamples, inspectionROIs, enableSSIM, enableCNN, enableOCR, expectedOCRText, alertDuration, alertCount, cooldown, inferenceFps, ...ucExtra };
       }
 
       return {
@@ -1037,48 +1406,113 @@ export default function PipelineBuilder({
 
         {/* ── TASK STEP ─────────────────────────────────────────────────────── */}
         {currentStep === 'task' && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div>
-              <h3 className="text-base font-bold text-slate-800">Chọn bài toán & Đặt tên tác vụ</h3>
-              <p className="text-xs text-slate-500 mt-1">Chọn nghiệp vụ thực tế bạn muốn giải quyết.</p>
+              <h3 className="text-base font-bold text-slate-800">Chọn bài toán</h3>
+              <p className="text-xs text-slate-500 mt-1">Chọn lĩnh vực và bài toán cụ thể để cấu hình.</p>
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-3">Nghiệp vụ thực tế</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {[
-                    { id: 'security', icon: <Shield size={18} />, label: 'Giám sát An ninh', desc: 'Phát hiện xâm nhập, đột nhập, mất cắp' },
-                    { id: 'counting', icon: <BarChart3 size={18} />, label: 'Đếm lưu lượng', desc: 'Đếm người, xe qua vạch kẻ' },
-                    { id: 'defect_surface', icon: <Search size={18} />, label: 'Lỗi bề mặt', desc: 'Xước, nứt vỡ, rỗ khí' },
-                    { id: 'defect_assembly', icon: <Package size={18} />, label: 'Lỗi lắp ráp', desc: 'Thiếu linh kiện, sai vị trí' },
-                    { id: 'defect_label', icon: <Tag size={18} />, label: 'Kiểm tra nhãn', desc: 'OCR, mã vạch, hạn dùng' },
-                    { id: 'defect_foreign', icon: <Bug size={18} />, label: 'Dị vật', desc: 'Tóc, côn trùng trong thực phẩm' },
-                    { id: 'ppe', icon: <HardHat size={18} />, label: 'An toàn lao động', desc: 'Kiểm tra mũ, áo bảo hộ' },
-                    { id: 'fire', icon: <Flame size={18} />, label: 'PCCC', desc: 'Cảnh báo khói, lửa, tia lửa' },
-                    { id: 'traffic', icon: <Car size={18} />, label: 'Giao thông', desc: 'Biển số, đi ngược chiều' },
-                    { id: 'behavior', icon: <Activity size={18} />, label: 'Phân tích hành vi', desc: 'Bạo lực, té ngã, hút thuốc' },
-                    { id: 'retail_analytics', icon: <Store size={18} />, label: 'Phân tích Bán lẻ', desc: 'Heatmap, đếm khách, nhân khẩu học' },
-                  ].map(t => (
-                    <label key={t.id} className={`flex flex-col gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${taskType === t.id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-emerald-200'}`}>
-                      <input type="radio" name="taskType" checked={taskType === t.id} onChange={() => setTaskType(t.id)} className="hidden" />
-                      <div className="flex items-center gap-2">
-                        <span className={taskType === t.id ? 'text-emerald-600' : 'text-slate-400'}>{t.icon}</span>
-                        <span className={`text-xs font-bold ${taskType === t.id ? 'text-emerald-800' : 'text-slate-700'}`}>{t.label}</span>
-                      </div>
-                      <p className="text-[10px] text-slate-500 hidden md:block">{t.desc}</p>
-                    </label>
-                  ))}
+
+            {/* ── Domain browser ── */}
+            <div className="space-y-4">
+              {/* Domain strip */}
+              <div className="flex gap-2 flex-wrap">
+                {DOMAINS.map(domain => {
+                  const c = DOMAIN_COLOR_MAP[domain.color];
+                  const isActive = selectedDomain === domain.key;
+                  return (
+                    <button
+                      key={domain.key}
+                      onClick={() => { setSelectedDomain(isActive ? '' : domain.key); }}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-xs font-bold transition-all cursor-pointer ${isActive ? `${c.activeBg} ${c.activeText} border-transparent shadow-md` : `bg-white ${c.text} ${c.border} hover:${c.bg}`}`}
+                    >
+                      {domain.key === 'security' && <Shield size={14} />}
+                      {domain.key === 'traffic' && <Car size={14} />}
+                      {domain.key === 'production' && <Cpu size={14} />}
+                      {domain.key === 'safety' && <HardHat size={14} />}
+                      {domain.key === 'fire' && <Flame size={14} />}
+                      {domain.key === 'retail' && <Store size={14} />}
+                      {domain.key === 'warehouse' && <Package size={14} />}
+                      {domain.name}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isActive ? 'bg-white/25 text-white' : c.badge}`}>{domain.useCases.length}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Use case list */}
+              {selectedDomain && (() => {
+                const domain = DOMAINS.find(d => d.key === selectedDomain)!;
+                const c = DOMAIN_COLOR_MAP[domain.color];
+                return (
+                  <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                    <div className={`px-5 py-3 border-b border-slate-100 flex items-center gap-2 ${c.bg}`}>
+                      <span className={`text-xs font-bold ${c.text}`}>{domain.name}</span>
+                      <span className="text-xs text-slate-400">— chọn bài toán cụ thể</span>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                      {domain.useCases.map(uc => {
+                        const isSelected = selectedUseCaseDef?.id === uc.id;
+                        const hasImage = uc.needsImage;
+                        return (
+                          <button
+                            key={uc.id}
+                            onClick={() => {
+                              setSelectedUseCaseDef(isSelected ? null : uc);
+                              setTaskType(uc.taskMapType);
+                              if (!isSelected) {
+                                setUseCaseParamValues({});
+                                setUseCaseImages([]);
+                              }
+                            }}
+                            className={`w-full text-left flex items-center gap-4 px-5 py-4 transition-colors cursor-pointer ${isSelected ? `${c.bg}` : 'hover:bg-slate-50'}`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${isSelected ? `${c.activeBg} border-transparent` : 'border-slate-300'}`}>
+                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-sm font-bold ${isSelected ? c.text : 'text-slate-700'}`}>{uc.name}</div>
+                              {hasImage && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${c.badge}`}>📷 Cần ảnh mẫu</span>
+                                </div>
+                              )}
+                            </div>
+                            {isSelected && <Check size={16} className={c.text} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Selected use case chip */}
+              {selectedUseCaseDef && (
+                <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                  <Check size={16} className="text-emerald-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-bold text-emerald-800">{selectedUseCaseDef.name}</span>
+                    <span className="text-xs text-emerald-600 ml-2">· Tiếp tục để cấu hình tham số →</span>
+                  </div>
+                  <button onClick={() => { setSelectedUseCaseDef(null); setUseCaseParamValues({}); setUseCaseImages([]); }} className="text-emerald-400 hover:text-rose-500 cursor-pointer transition-colors"><X size={14} /></button>
                 </div>
-              </div>
-              <div className="h-px bg-slate-100" />
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Tên tác vụ</label>
-                <input
-                  type="text" value={flowName} onChange={e => setFlowName(e.target.value)}
-                  placeholder="VD: Chấm công cổng chính, Giám sát kệ hàng A..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-                />
-              </div>
+              )}
+
+              {!selectedDomain && (
+                <div className="text-center py-10 text-slate-400 text-sm border border-dashed border-slate-200 rounded-2xl">
+                  ↑ Chọn lĩnh vực để xem danh sách bài toán
+                </div>
+              )}
+            </div>
+
+            {/* Task name input — always shown */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2">Tên tác vụ</label>
+              <input
+                type="text" value={flowName} onChange={e => setFlowName(e.target.value)}
+                placeholder="VD: Chấm công cổng chính, Giám sát kệ hàng A..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+              />
             </div>
           </div>
         )}
@@ -1154,6 +1588,321 @@ export default function PipelineBuilder({
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                 {/* Left: AI mode + params + FPS */}
                 <div className="lg:col-span-7 space-y-4">
+
+                  {/* ── Use-case specific param form (only when selected from domain browser) ── */}
+                  {selectedUseCaseDef && (() => {
+                    const uc = selectedUseCaseDef;
+                    const domainDef = DOMAINS.find(d => d.useCases.some(u => u.id === uc.id));
+                    const c = domainDef ? DOMAIN_COLOR_MAP[domainDef.color] : DOMAIN_COLOR_MAP['emerald'];
+
+                    const renderParam = (param: UCParam) => {
+                      const val = useCaseParamValues[param.key] || '';
+                      const setVal = (v: string) => setUseCaseParamValues(prev => ({ ...prev, [param.key]: v }));
+
+                      if (param.type === 'zone_hint' || param.type === 'line_hint') {
+                        return (
+                          <div key={param.key} className="flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 border border-dashed border-slate-200 rounded-lg px-3 py-2">
+                            <span>{param.type === 'line_hint' ? '╱' : '⬠'}</span>
+                            <span className="font-medium text-slate-500">{param.label}</span>
+                            <span className="ml-auto text-[9px]">→ vẽ ở bước ROI bên phải</span>
+                          </div>
+                        );
+                      }
+
+                      if (param.type === 'text') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                          <input type="text" value={val} onChange={e => setVal(e.target.value)} placeholder={param.placeholder} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                        </div>
+                      );
+
+                      if (param.type === 'textarea') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                          <textarea value={val} onChange={e => setVal(e.target.value)} placeholder={param.placeholder} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500 resize-none" />
+                        </div>
+                      );
+
+                      if (param.type === 'number') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                          <div className="flex items-center gap-2">
+                            <input type="number" value={val} onChange={e => setVal(e.target.value)} placeholder={param.placeholder} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                            {param.unit && <span className="text-[10px] text-slate-400 whitespace-nowrap">{param.unit}</span>}
+                          </div>
+                        </div>
+                      );
+
+                      if (param.type === 'select') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                          <select value={val} onChange={e => setVal(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500">
+                            <option value="">— Chọn —</option>
+                            {(param.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        </div>
+                      );
+
+                      if (param.type === 'toggle') return (
+                        <div key={param.key}>
+                          <label className="flex items-center gap-3 cursor-pointer">
+                            <div className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${val === 'true' ? 'bg-emerald-500' : 'bg-slate-200'}`} onClick={() => setVal(val === 'true' ? 'false' : 'true')}>
+                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${val === 'true' ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            </div>
+                            <span className="text-xs text-slate-700">{param.label}{param.optional && <span className="text-slate-400 ml-1">(tuỳ chọn)</span>}</span>
+                          </label>
+                        </div>
+                      );
+
+                      if (param.type === 'multicheck') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                          <div className="flex flex-wrap gap-2">
+                            {(param.options || []).map(opt => {
+                              const selected = (val || '').split('|').filter(Boolean);
+                              const isOn = selected.includes(opt);
+                              return (
+                                <button key={opt} type="button" onClick={() => {
+                                  const next = isOn ? selected.filter(s => s !== opt) : [...selected, opt];
+                                  setVal(next.join('|'));
+                                }} className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-all cursor-pointer ${isOn ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'}`}>
+                                  {isOn && '✓ '}{opt}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+
+                      if (param.type === 'card2') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">{param.label}</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(param.options || []).map(opt => (
+                              <button key={opt} type="button" onClick={() => setVal(opt)} className={`text-left p-2.5 rounded-xl border-2 cursor-pointer transition-all ${val === opt ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                                <p className={`text-[11px] font-bold ${val === opt ? 'text-emerald-700' : 'text-slate-700'}`}>{opt}</p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+
+                      if (param.type === 'card3') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">{param.label}</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {(param.options || []).map(opt => (
+                              <button key={opt} type="button" onClick={() => setVal(opt)} className={`text-center p-2.5 rounded-xl border-2 cursor-pointer transition-all ${val === opt ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                                <p className={`text-[11px] font-bold ${val === opt ? 'text-emerald-700' : 'text-slate-700'}`}>{opt}</p>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+
+                      if (param.type === 'time_range') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                          <div className="flex items-center gap-2">
+                            <input type="time" value={(val || '').split('–')[0] || ''} onChange={e => setVal(`${e.target.value}–${(val || '').split('–')[1] || ''}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                            <span className="text-xs text-slate-400">đến</span>
+                            <input type="time" value={(val || '').split('–')[1] || ''} onChange={e => setVal(`${(val || '').split('–')[0] || ''}–${e.target.value}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                          </div>
+                        </div>
+                      );
+
+                      if (param.type === 'date_range') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                          <div className="flex items-center gap-2">
+                            <input type="date" value={(val || '').split('→')[0]?.trim() || ''} onChange={e => setVal(`${e.target.value}→${(val || '').split('→')[1]?.trim() || ''}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                            <span className="text-xs text-slate-400">đến</span>
+                            <input type="date" value={(val || '').split('→')[1]?.trim() || ''} onChange={e => setVal(`${(val || '').split('→')[0]?.trim() || ''}→${e.target.value}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                          </div>
+                        </div>
+                      );
+
+                      if (param.type === 'slider_pct') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}</label>
+                          <div className="flex items-center gap-3">
+                            <input type="range" min={5} max={95} step={5} value={val || '30'} onChange={e => setVal(e.target.value)} className="flex-1 accent-emerald-600" />
+                            <span className="text-xs font-bold text-slate-700 w-10 text-right">{val || 30}%</span>
+                          </div>
+                        </div>
+                      );
+
+                      if (param.type === 'select_text') {
+                        const opts = param.options || [];
+                        const isCustom = val !== '' && !opts.includes(val) && val !== '__custom__';
+                        const dropVal = isCustom ? '__custom__' : val;
+                        return (
+                          <div key={param.key} className="space-y-1.5">
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                            <select value={dropVal} onChange={e => setVal(e.target.value === '__custom__' ? '' : e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500">
+                              <option value="">— Chọn —</option>
+                              {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                              <option value="__custom__">Khác (nhập tay)</option>
+                            </select>
+                            {(dropVal === '__custom__' || isCustom) && (
+                              <input type="text" value={isCustom ? val : ''} onChange={e => setVal(e.target.value)} placeholder="Nhập định dạng tuỳ chỉnh…" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (param.type === 'bbox_per_field') {
+                        const fields = (useCaseParamValues['fields'] || '').split('|').filter(Boolean);
+                        return (
+                          <div key={param.key}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                            {fields.length === 0 ? (
+                              <p className="text-[10px] text-slate-400 italic bg-slate-50 border border-dashed border-slate-200 rounded-lg px-3 py-2">Chọn các trường thông tin ở trên để hiển thị danh sách cần đánh dấu</p>
+                            ) : (
+                              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-3 space-y-2">
+                                <p className="text-[10px] text-slate-500">Trên ảnh mẫu bên trên, vẽ bounding box cho từng trường:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {fields.map(f => <span key={f} className="text-[10px] px-2 py-0.5 bg-violet-100 text-violet-700 rounded-md font-medium">⬚ {f.trim()}</span>)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (param.type === 'bbox_per_part') {
+                        const raw = useCaseParamValues['parts'] || '';
+                        const parts = raw.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean);
+                        return (
+                          <div key={param.key}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                            {parts.length === 0 ? (
+                              <p className="text-[10px] text-slate-400 italic bg-slate-50 border border-dashed border-slate-200 rounded-lg px-3 py-2">Nhập danh sách bộ phận ở trên để hiển thị danh sách cần đánh dấu</p>
+                            ) : (
+                              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-3 space-y-2">
+                                <p className="text-[10px] text-slate-500">Trên ảnh mẫu bên trên, vẽ bounding box cho từng bộ phận:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {parts.map((p: string) => <span key={p} className="text-[10px] px-2 py-0.5 bg-violet-100 text-violet-700 rounded-md font-medium">⬚ {p}</span>)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (param.type === 'multicheck_dynamic') {
+                        const raw = useCaseParamValues[param.sourceKey || ''] || '';
+                        const options = raw.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean);
+                        const selected = (val || '').split('|').filter(Boolean);
+                        return (
+                          <div key={param.key}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                            {options.length === 0 ? (
+                              <p className="text-[10px] text-slate-400 italic">Nhập danh sách bộ phận ở trên trước</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {options.map((opt: string) => {
+                                  const isOn = selected.includes(opt);
+                                  return (
+                                    <button key={opt} type="button" onClick={() => {
+                                      const next = isOn ? selected.filter((s: string) => s !== opt) : [...selected, opt];
+                                      setVal(next.join('|'));
+                                    }} className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium transition-all cursor-pointer ${isOn ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'}`}>
+                                      {isOn && '⚠ '}{opt}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    };
+
+                    const requiredParams = uc.params.filter(p => !p.optional);
+                    const optionalParams = uc.params.filter(p => p.optional);
+
+                    return (
+                      <div className={`bg-white border-2 ${c.border} rounded-2xl p-5 shadow-sm space-y-4`}>
+                        {/* Header */}
+                        <div className={`flex items-center gap-2 pb-3 border-b border-slate-100`}>
+                          <div className={`text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded ${c.badge}`}>{domainDef?.name}</div>
+                          <h4 className="text-sm font-bold text-slate-800">{uc.name}</h4>
+                        </div>
+
+                        {/* Image upload — for tasks needing reference images (with bounding box drawing) */}
+                        {uc.needsImage && (
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{uc.imageLabel || 'Ảnh mẫu tham chiếu'}{!uc.multipleImages && <span className="font-normal normal-case text-slate-400 ml-1">(tuỳ chọn)</span>}</label>
+                            {useCaseImages.length > 0 && (
+                              <div className="flex flex-col gap-3 mb-3">
+                                {useCaseImages.map((img, idx) => (
+                                  <ImageRoiDrawer
+                                    key={idx}
+                                    imgSrc={img}
+                                    rois={useCaseImageROIs[idx] || []}
+                                    onChange={(rois) => setUseCaseImageROIs(prev => ({ ...prev, [idx]: rois }))}
+                                    onRemove={() => {
+                                      setUseCaseImages(prev => prev.filter((_, i) => i !== idx));
+                                      setUseCaseImageROIs(prev => {
+                                        const next = { ...prev };
+                                        delete next[idx];
+                                        const reindexed: Record<number, BoundingBox[]> = {};
+                                        Object.keys(next).forEach(k => { const n = Number(k); reindexed[n > idx ? n - 1 : n] = next[n]; });
+                                        return reindexed;
+                                      });
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            <label className="block border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:bg-slate-50 hover:border-emerald-300 transition-colors cursor-pointer">
+                              <input type="file" accept="image/jpeg,image/png" multiple={uc.multipleImages} className="hidden" onChange={(e) => {
+                                Array.from(e.target.files || []).forEach((file: File) => {
+                                  if (file.size > 5 * 1024 * 1024) { alert('File quá lớn (tối đa 5MB)'); return; }
+                                  const reader = new FileReader();
+                                  reader.onload = (ev) => {
+                                    if (uc.multipleImages) setUseCaseImages(prev => [...prev, ev.target!.result as string]);
+                                    else setUseCaseImages([ev.target!.result as string]);
+                                  };
+                                  reader.readAsDataURL(file);
+                                });
+                                e.target.value = '';
+                              }} />
+                              <Package size={16} className="mx-auto text-slate-300 mb-1.5" />
+                              <p className="text-xs text-slate-500">{uc.multipleImages ? 'Upload nhiều ảnh' : 'Upload ảnh mẫu'} · JPG, PNG · Tối đa 5MB</p>
+                              {useCaseImages.length > 0 && <p className="text-[10px] text-emerald-600 mt-0.5">Thêm ảnh nữa</p>}
+                            </label>
+                          </div>
+                        )}
+
+                        {/* Required params (spatial zone/line hints are handled by the ROI panel — skip them here) */}
+                        {requiredParams.filter(p => p.type !== 'zone_hint' && p.type !== 'line_hint').length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Bắt buộc</p>
+                            {requiredParams.filter(p => p.type !== 'zone_hint' && p.type !== 'line_hint').map(renderParam)}
+                          </div>
+                        )}
+
+                        {/* Optional params in collapsible */}
+                        {optionalParams.length > 0 && (
+                          <details className="group">
+                            <summary className="text-[11px] font-bold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-slate-600 list-none flex items-center gap-1.5 select-none">
+                              <ChevronRight size={12} className="group-open:rotate-90 transition-transform flex-shrink-0" />
+                              Tham số tuỳ chọn ({optionalParams.length})
+                              <span className="font-normal normal-case text-slate-300 ml-1">giúp AI chính xác hơn</span>
+                            </summary>
+                            <div className="mt-3 space-y-3">
+                              {optionalParams.map(renderParam)}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Mode selection */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-3">Công nghệ AI</label>
@@ -1264,6 +2013,47 @@ export default function PipelineBuilder({
                           </div>
                         </div>
 
+                        {/* AI Context — helps AI understand operating environment & rules */}
+                        <details className="group">
+                          <summary className="text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 list-none flex items-center gap-1.5 select-none">
+                            <ChevronRight size={12} className="group-open:rotate-90 transition-transform flex-shrink-0" />
+                            Ngữ cảnh bổ sung cho AI
+                            <span className="font-normal normal-case text-slate-300 ml-1">(giúp AI hiểu bài toán chính xác hơn)</span>
+                          </summary>
+                          <div className="mt-3 space-y-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Môi trường vận hành</label>
+                              <input
+                                type="text"
+                                value={aiContext.environment}
+                                onChange={e => setAiContext(prev => ({ ...prev, environment: e.target.value }))}
+                                placeholder="VD: Nhà máy dệt may, kho lạnh, sân bốc xếp container, văn phòng..."
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Hành vi bình thường (AI bỏ qua)</label>
+                              <input
+                                type="text"
+                                value={aiContext.normalBehavior}
+                                onChange={e => setAiContext(prev => ({ ...prev, normalBehavior: e.target.value }))}
+                                placeholder="VD: Công nhân đi lại bình thường, xe nâng hoạt động ban ngày, nhân viên vệ sinh..."
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Điều kiện hoặc lưu ý đặc biệt</label>
+                              <input
+                                type="text"
+                                value={aiContext.specialNotes}
+                                onChange={e => setAiContext(prev => ({ ...prev, specialNotes: e.target.value }))}
+                                placeholder="VD: Khu vực A có người sau 20h là bình thường, bỏ qua vật thể nhỏ dưới 20cm..."
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                          </div>
+                        </details>
+
                       </>
                     ) : (
                       <>
@@ -1271,38 +2061,120 @@ export default function PipelineBuilder({
                           <>
                             <div>
                               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Đối tượng phát hiện</label>
-                              <select value={detectionTarget} onChange={e => setDetectionTarget(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                <option value="person">Người</option>
-                                <option value="vehicle">Phương tiện (chung)</option>
-                                {taskType === 'counting' && <><option value="motorcycle">Xe máy</option><option value="truck">Xe tải</option><option value="bicycle">Xe đạp</option></>}
-                                <option value="custom">Tuỳ chỉnh...</option>
-                              </select>
+                              {(() => {
+                                const isProductCounting = selectedUseCaseDef?.id === 'prd_counting' || selectedUseCaseDef?.id === 'wh_counting';
+                                const isPeopleCounting = selectedUseCaseDef?.id === 'ret_counting' || selectedUseCaseDef?.id === 'ret_queue';
+                                return (
+                                  <select value={detectionTarget} onChange={e => setDetectionTarget(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                    {/* People (shown for general + retail counting; hidden for product/item counting) */}
+                                    {!isProductCounting && <option value="person">Người</option>}
+                                    {/* Vehicles (hidden for product counting and retail people counting) */}
+                                    {!isProductCounting && !isPeopleCounting && <option value="vehicle">Phương tiện (chung)</option>}
+                                    {!isProductCounting && !isPeopleCounting && <option value="motorcycle">Xe máy</option>}
+                                    {!isProductCounting && !isPeopleCounting && <option value="truck">Xe tải / Xe buýt</option>}
+                                    {!isProductCounting && !isPeopleCounting && <option value="bicycle">Xe đạp</option>}
+                                    {/* Forklift — industrial, shown unless retail people counting */}
+                                    {!isPeopleCounting && <option value="forklift">Xe nâng</option>}
+                                    {/* Products — only for counting tasks and not for retail people counting */}
+                                    {taskType === 'counting' && !isPeopleCounting && <option value="package">Hàng hoá / Thùng hộp</option>}
+                                    {!isProductCounting && !isPeopleCounting && <option value="pet">Thú cưng / Động vật</option>}
+                                    {!isPeopleCounting && <option value="unknown_object">Vật thể không xác định</option>}
+                                    <option value="custom">Tuỳ chỉnh...</option>
+                                  </select>
+                                );
+                              })()}
                             </div>
                             {detectionTarget === 'custom' && (
                               <input type="text" value={customTarget} onChange={e => setCustomTarget(e.target.value)} placeholder="VD: box, helmet, forklift" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" />
                             )}
                             {taskType === 'security' && (
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Luật cảnh báo</label>
-                                <select value={detectionRule} onChange={e => setDetectionRule(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                  <option value="enter_area">Xâm nhập vùng cấm</option>
-                                  <option value="exit_area">Rời khỏi khu vực</option>
-                                  <option value="cross_line">Vượt ranh giới ảo</option>
-                                  <option value="appear">Phát hiện vật thể lạ</option>
-                                  <option value="disappear">Mất tài sản / Rời đi</option>
-                                  <option value="loitering">Dừng đỗ / Lảng vảng</option>
-                                </select>
-                              </div>
+                              <>
+                                {/* When a specific use case is selected from domain browser, the rule is implicit — hide the dropdown */}
+                                {!selectedUseCaseDef && (
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Luật cảnh báo</label>
+                                  <select value={detectionRule} onChange={e => setDetectionRule(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                    <option value="enter_area">Xâm nhập vùng cấm</option>
+                                    <option value="exit_area">Rời khỏi khu vực</option>
+                                    <option value="cross_line">Vượt ranh giới / Vạch ảo</option>
+                                    <option value="appear">Xuất hiện đột ngột</option>
+                                    <option value="disappear">Mất tài sản / Vật thể bị lấy đi</option>
+                                    <option value="loitering">Dừng đỗ / Lảng vảng lâu</option>
+                                    <option value="crowd_gathering">Tụ tập đông người</option>
+                                  </select>
+                                </div>
+                                )}
+                                {/* Zone condition — only relevant for zone-based rules when no specific use case selected */}
+                                {!selectedUseCaseDef && (detectionRule === 'enter_area' || detectionRule === 'exit_area' || detectionRule === 'loitering') && (
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Điều kiện kích hoạt vùng</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {([
+                                        { value: 'inside' as const, label: 'Tâm trong vùng', desc: 'Tâm bounding box nằm bên trong polygon' },
+                                        { value: 'intersect' as const, label: 'Chạm vào vùng', desc: 'Bất kỳ phần nào của bbox chạm viền polygon' },
+                                      ]).map(opt => (
+                                        <button key={opt.value} type="button" onClick={() => setZoneCondition(opt.value)}
+                                          className={`text-left p-2.5 rounded-xl border-2 cursor-pointer transition-all ${zoneCondition === opt.value ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                                          <p className={`text-[11px] font-bold ${zoneCondition === opt.value ? 'text-emerald-700' : 'text-slate-700'}`}>{opt.label}</p>
+                                          <p className="text-[9px] text-slate-400 mt-0.5 leading-snug">{opt.desc}</p>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
                             )}
                             {taskType === 'counting' && (
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Hướng đếm</label>
-                                <select value={countingDirection} onChange={e => setCountingDirection(e.target.value as any)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                  <option value="in">Chỉ đếm chiều vào</option>
-                                  <option value="out">Chỉ đếm chiều ra</option>
-                                  <option value="both">Đếm cả 2 chiều</option>
-                                </select>
-                              </div>
+                              <>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Hướng đếm</label>
+                                  <select value={countingDirection} onChange={e => setCountingDirection(e.target.value as any)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                                    <option value="in">Chỉ đếm chiều vào</option>
+                                    <option value="out">Chỉ đếm chiều ra</option>
+                                    <option value="both">Đếm cả 2 chiều</option>
+                                  </select>
+                                </div>
+                                {/* Product image — only show when NOT using a domain use case that already uploaded images */}
+                                {!(selectedUseCaseDef?.id === 'prd_counting' || selectedUseCaseDef?.id === 'wh_counting' || selectedUseCaseDef?.id === 'ret_counting' || selectedUseCaseDef?.id === 'ret_queue') && (
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ảnh sản phẩm cần đếm <span className="font-normal normal-case text-slate-400">(Tuỳ chọn)</span></label>
+                                  <p className="text-[9px] text-slate-400 mb-2">Upload ảnh mẫu để AI chỉ đếm riêng loại sản phẩm này. Để trống = đếm tất cả đối tượng đã chọn.</p>
+                                  {countingProductImage ? (
+                                    <div className="relative flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-2">
+                                      <img src={countingProductImage} alt="Sản phẩm cần đếm" className="w-14 h-14 object-cover rounded-lg border border-slate-200 flex-shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-semibold text-slate-700">Ảnh mẫu đã chọn</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">AI sẽ chỉ đếm sản phẩm có ngoại hình tương tự ảnh này</p>
+                                      </div>
+                                      <button type="button" onClick={() => setCountingProductImage(null)} className="text-slate-300 hover:text-rose-500 transition-colors p-1 cursor-pointer flex-shrink-0">
+                                        <X size={14} />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <label className="block border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:bg-slate-50 hover:border-emerald-300 transition-colors cursor-pointer">
+                                      <input type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        const reader = new FileReader();
+                                        reader.onload = (ev) => setCountingProductImage(ev.target?.result as string);
+                                        reader.readAsDataURL(file);
+                                        e.target.value = '';
+                                      }} />
+                                      <Package size={18} className="mx-auto text-slate-300 mb-1.5" />
+                                      <p className="text-xs text-slate-500">Kéo thả hoặc click để upload ảnh sản phẩm</p>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">JPG, PNG · Tối đa 5MB</p>
+                                    </label>
+                                  )}
+                                </div>
+                                )}
+                                {/* When product counting UC was selected, remind user their images are already set above */}
+                                {(selectedUseCaseDef?.id === 'prd_counting' || selectedUseCaseDef?.id === 'wh_counting') && useCaseImages.length > 0 && (
+                                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                                    <Package size={13} className="text-emerald-600 flex-shrink-0" />
+                                    <p className="text-[10px] text-emerald-700">{useCaseImages.length} ảnh mẫu sản phẩm đã được upload ở bước trên</p>
+                                  </div>
+                                )}
+                              </>
                             )}
                             <div className="grid grid-cols-3 gap-3">
                               <div>
@@ -1385,6 +2257,8 @@ export default function PipelineBuilder({
 
                         {taskType === 'behavior' && (
                           <>
+                            {/* fir_smoking / prd_productivity are already specific — no need to pick from behavior list */}
+                            {selectedUseCaseDef?.id !== 'fir_smoking' && selectedUseCaseDef?.id !== 'prd_productivity' && (
                             <div>
                               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Hành vi cần phát hiện</label>
                               <div className="grid grid-cols-2 gap-2">
@@ -1396,6 +2270,7 @@ export default function PipelineBuilder({
                                 ))}
                               </div>
                             </div>
+                            )}
                             <div className="grid grid-cols-2 gap-3">
                               <div>
                                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau (giây)</label>
@@ -1612,16 +2487,21 @@ export default function PipelineBuilder({
                     </div>
                   </div>
 
-                  {/* Zone type + controls */}
-                  <div className="flex items-center gap-2">
+                  {/* Zone type + role + controls */}
+                  <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
                       <button onClick={() => { setNewZoneType('zone'); setDrawingPoints([]); }} className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${newZoneType === 'zone' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>⬠ Vùng</button>
                       <button onClick={() => { setNewZoneType('line'); setDrawingPoints([]); }} className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${newZoneType === 'line' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>╱ Vạch</button>
                     </div>
+                    {/* Zone role — distinguishes AI monitoring zones from allowed/exception zones */}
+                    <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
+                      <button onClick={() => setNewZoneRole('monitor')} title="AI giám sát trong vùng này" className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${newZoneRole === 'monitor' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>🔴 Giám sát</button>
+                      <button onClick={() => setNewZoneRole('exclude')} title="AI bỏ qua / cho phép trong vùng này" className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${newZoneRole === 'exclude' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>✅ Ngoại lệ</button>
+                    </div>
                     <input
                       type="text" value={newZoneName} onChange={e => setNewZoneName(e.target.value)}
                       placeholder="Tên vùng..."
-                      className="flex-1 min-w-0 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-emerald-500"
+                      className="flex-1 min-w-[100px] bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-emerald-500"
                     />
                     <button onClick={() => setDrawingPoints(prev => prev.slice(0, -1))} disabled={drawingPoints.length === 0} title="Hoàn tác" className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-sm">↩</button>
                     <button onClick={() => setDrawingPoints([])} disabled={drawingPoints.length === 0} title="Xóa bản vẽ" className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
@@ -1644,16 +2524,20 @@ export default function PipelineBuilder({
                         <br /><span className="text-[10px] text-slate-300">(Nếu không vẽ → giám sát toàn khung hình)</span>
                       </div>
                     ) : (
-                      currentCamZones.map((z, idx) => (
+                      currentCamZones.map((z, idx) => {
+                        const dotColor = z.role === 'exclude' ? '#22c55e' : ZONE_COLORS[idx % ZONE_COLORS.length];
+                        return (
                         <div key={z.id} className="flex items-center gap-2.5 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: ZONE_COLORS[idx % ZONE_COLORS.length] }} />
+                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: dotColor }} />
                           <span className="text-xs font-bold text-slate-700 flex-1">{z.name}</span>
-                          <span className="text-[10px] text-slate-400 bg-white border border-slate-100 px-2 py-0.5 rounded">{z.type === 'line' ? 'Vạch' : 'Vùng'} · {z.points.length} điểm</span>
+                          {z.role === 'exclude' && <span className="text-[9px] font-bold text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">Ngoại lệ</span>}
+                          <span className="text-[10px] text-slate-400 bg-white border border-slate-100 px-2 py-0.5 rounded">{z.type === 'line' ? 'Vạch' : 'Vùng'}</span>
                           <button onClick={() => handleDeleteZone(activeCamId, z.id)} className="text-slate-300 hover:text-rose-500 transition-colors cursor-pointer p-0.5">
                             <X size={13} />
                           </button>
                         </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -1792,6 +2676,46 @@ export default function PipelineBuilder({
           const presetLabel = perfPreset === 'economy' ? '🌿 Tiết kiệm' : perfPreset === 'precise' ? '🎯 Chính xác' : '⚡ Cân bằng';
           const modeLabel = monitoringMode === 'smart' ? '✦ Luồng thông minh' : monitoringMode === 'defect_detection' ? '🔬 Kiểm tra lỗi' : '⚙ Tiêu chuẩn';
 
+          // ── Problem statement generator ──────────────────────────────────
+          const generateProblemStatement = (): string => {
+            const scheduleDesc = scheduleSlots.length === 0 ? '24/7' : formatScheduleSlots(scheduleSlots);
+            const pvZonesHere = multiZones[pvCamId] || [];
+            const monitorZones = pvZonesHere.filter(z => (z.role ?? 'monitor') === 'monitor');
+            const excludeZones = pvZonesHere.filter(z => z.role === 'exclude');
+            const zoneDesc = pvZonesHere.length > 0
+              ? `tại ${monitorZones.length > 0 ? `${monitorZones.length} vùng giám sát (${monitorZones.map(z => z.name).join(', ')})` : 'toàn bộ khung hình'}` +
+                (excludeZones.length > 0 ? `, bỏ qua ${excludeZones.length} vùng ngoại lệ (${excludeZones.map(z => z.name).join(', ')})` : '')
+              : 'toàn bộ khung hình';
+
+            if (monitoringMode === 'smart') {
+              const contextParts: string[] = [];
+              if (aiContext.environment) contextParts.push(`môi trường: ${aiContext.environment}`);
+              if (aiContext.normalBehavior) contextParts.push(`bỏ qua: ${aiContext.normalBehavior}`);
+              if (aiContext.specialNotes) contextParts.push(`lưu ý: ${aiContext.specialNotes}`);
+              const baseDesc = userDescription.trim() || 'giám sát theo yêu cầu người dùng';
+              return `AI sẽ ${baseDesc} ${zoneDesc}` +
+                (contextParts.length > 0 ? ` (${contextParts.join('; ')})` : '') +
+                `. Hệ thống chạy ${scheduleDesc}, xác nhận sự kiện sau ${alertDuration}s và nghỉ ${cooldown}s giữa các cảnh báo liên tiếp.`;
+            }
+
+            if (monitoringMode === 'standard') {
+              const tLabel = detectionTarget === 'custom' ? (customTarget || 'đối tượng tuỳ chỉnh') :
+                ({ person: 'người', vehicle: 'phương tiện', motorcycle: 'xe máy', truck: 'xe tải', bicycle: 'xe đạp', forklift: 'xe nâng', package: 'hàng hoá/thùng hộp', pet: 'thú cưng', unknown_object: 'vật thể không xác định' } as Record<string,string>)[detectionTarget] || detectionTarget;
+              const rLabel = ({ enter_area: 'xâm nhập vùng cấm', exit_area: 'rời khỏi khu vực', cross_line: 'vượt ranh giới ảo', appear: 'xuất hiện đột ngột', disappear: 'mất/bị lấy đi', loitering: 'dừng đỗ/lảng vảng lâu', crowd_gathering: 'tụ tập đông người', object_counting: 'vượt ngưỡng số lượng' } as Record<string,string>)[detectionRule] || detectionRule;
+              const condDesc = (detectionRule === 'enter_area' || detectionRule === 'exit_area' || detectionRule === 'loitering')
+                ? (zoneCondition === 'inside' ? ' (tâm đối tượng nằm trong vùng)' : ' (bất kỳ phần nào chạm vào vùng)')
+                : '';
+              const productDesc = countingProductImage ? ' — chỉ đếm sản phẩm khớp ảnh mẫu đã upload' : '';
+              return `Hệ thống theo dõi ${tLabel} và phát cảnh báo theo luật "${rLabel}"${condDesc} ${zoneDesc}${productDesc}. ` +
+                `Sự kiện cần diễn ra liên tục ${alertDuration}s trước khi cảnh báo. Luồng chạy ${scheduleDesc}.`;
+            }
+
+            // defect_detection
+            const methods = [enableSSIM && 'kiểm tra bề mặt (MS-SSIM + FSIM)', enableCNN && 'đặc trưng ngữ nghĩa (DINOv2)', enableOCR && 'đọc nhãn mác (PaddleOCR)'].filter(Boolean).join(', ');
+            return `AI so sánh sản phẩm thực tế với ${goldenSamples.length > 0 ? `${goldenSamples.length} ảnh mẫu chuẩn` : 'ảnh mẫu (chưa upload)'} sử dụng ${methods || 'kiểm tra bề mặt mặc định'}. ` +
+              `Mỗi sản phẩm được phân tích tại ${inferenceFps} FPS và nhận phán quyết OK/NG theo ngưỡng đã cấu hình.`;
+          };
+
           // Always resolve a meaningful model name for display
           const displayModelName =
             monitoringMode === 'defect_detection'
@@ -1850,7 +2774,7 @@ export default function PipelineBuilder({
                       >
                         <defs>
                           {pvZones.map((z, idx) => {
-                            const color = ZONE_COLORS[idx % ZONE_COLORS.length];
+                            const color = z.role === 'exclude' ? '#22c55e' : ZONE_COLORS[idx % ZONE_COLORS.length];
                             return (
                               <filter key={`glow-${z.id}`} id={`glow-${z.id}`} x="-20%" y="-20%" width="140%" height="140%">
                                 <feGaussianBlur stdDeviation="3" result="blur" />
@@ -1863,7 +2787,8 @@ export default function PipelineBuilder({
                         </defs>
 
                         {pvZones.map((z, idx) => {
-                          const color = ZONE_COLORS[idx % ZONE_COLORS.length];
+                          const color = z.role === 'exclude' ? '#22c55e' : ZONE_COLORS[idx % ZONE_COLORS.length];
+                          const isExclude = z.role === 'exclude';
                           const isHovered = hoveredPreviewZoneId === z.id;
                           const isAnyHovered = hoveredPreviewZoneId !== null;
                           // Dim non-focused zones; highlight focused
@@ -1876,15 +2801,12 @@ export default function PipelineBuilder({
                             const mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2;
                             return (
                               <g key={z.id} opacity={opacity} filter={filterAttr}>
-                                {/* Arrow direction indicators */}
                                 <line x1={`${p0.x}%`} y1={`${p0.y}%`} x2={`${p1.x}%`} y2={`${p1.y}%`}
                                   stroke={color} strokeWidth={strokeWidth} strokeLinecap="round"
-                                  strokeDasharray={isHovered ? 'none' : '10 5'} />
-                                {/* Zone index badge */}
+                                  strokeDasharray={isExclude ? '8 4' : (isHovered ? 'none' : '10 5')} />
                                 <circle cx={`${mx}%`} cy={`${my}%`} r="14" fill={color} />
                                 <text x={`${mx}%`} y={`${my}%`} fill="white" fontSize="11" fontWeight="bold"
-                                  textAnchor="middle" dominantBaseline="middle">{idx + 1}</text>
-                                {/* Name label */}
+                                  textAnchor="middle" dominantBaseline="middle">{isExclude ? '✓' : idx + 1}</text>
                                 <rect x={`${mx + 2}%`} y={`${my - 4}%`}
                                   width={`${Math.max(z.name.length * 1.4, 8)}%`} height="5%"
                                   rx="4" fill={`${color}dd`} />
@@ -1902,17 +2824,15 @@ export default function PipelineBuilder({
                               <g key={z.id} opacity={opacity} filter={filterAttr}>
                                 <polygon
                                   points={z.points.map(p => `${p.x * 10} ${p.y * 5.625}`).join(' ')}
-                                  fill={`${color}${isHovered ? '33' : '22'}`}
+                                  fill={`${color}${isHovered ? '33' : '20'}`}
                                   stroke={color}
                                   strokeWidth={strokeWidth}
                                   strokeLinejoin="round"
-                                  strokeDasharray={isHovered ? 'none' : '8 4'}
+                                  strokeDasharray={isExclude ? '8 4' : (isHovered ? 'none' : undefined)}
                                 />
-                                {/* Zone index badge */}
                                 <circle cx={`${cx}%`} cy={`${cy}%`} r="14" fill={color} />
                                 <text x={`${cx}%`} y={`${cy}%`} fill="white" fontSize="11" fontWeight="bold"
-                                  textAnchor="middle" dominantBaseline="middle">{idx + 1}</text>
-                                {/* Name label below badge */}
+                                  textAnchor="middle" dominantBaseline="middle">{isExclude ? '✓' : idx + 1}</text>
                                 <rect x={`${cx - Math.max(z.name.length * 0.7, 4)}%`} y={`${cy + 4}%`}
                                   width={`${Math.max(z.name.length * 1.4, 8)}%`} height="5%"
                                   rx="4" fill={`${color}dd`} />
@@ -1938,12 +2858,13 @@ export default function PipelineBuilder({
                   {hasZones ? (
                     <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800">
                       <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Vùng giám sát</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Vùng cấu hình</span>
                         <span className="text-[10px] text-slate-500">Di chuột để xem từng vùng</span>
                       </div>
                       <div className="divide-y divide-slate-800">
                         {pvZones.map((z, idx) => {
-                          const color = ZONE_COLORS[idx % ZONE_COLORS.length];
+                          const isExclude = z.role === 'exclude';
+                          const color = isExclude ? '#22c55e' : ZONE_COLORS[idx % ZONE_COLORS.length];
                           const isHovered = hoveredPreviewZoneId === z.id;
                           return (
                             <div
@@ -1952,21 +2873,20 @@ export default function PipelineBuilder({
                               onMouseEnter={() => setHoveredPreviewZoneId(z.id)}
                               onMouseLeave={() => setHoveredPreviewZoneId(null)}
                             >
-                              {/* Color + number badge */}
+                              {/* Color + role badge */}
                               <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-black shadow-sm"
                                 style={{ background: color }}>
-                                {idx + 1}
+                                {isExclude ? '✓' : idx + 1}
                               </div>
-                              {/* Color stripe */}
-                              <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: color }} />
-                              {/* Name + type */}
+                              {/* Color stripe — dashed for exclude */}
+                              <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${isExclude ? 'opacity-60' : ''}`} style={{ background: color }} />
+                              {/* Name + role type */}
                               <div className="flex-1 min-w-0">
                                 <span className={`text-xs font-bold ${isHovered ? 'text-white' : 'text-slate-300'}`}>{z.name}</span>
-                                <span className="ml-2 text-[10px] text-slate-500">{z.type === 'line' ? 'Vạch kiểm soát' : 'Vùng giám sát'}</span>
+                                <span className={`ml-2 text-[10px] ${isExclude ? 'text-green-500' : 'text-slate-500'}`}>
+                                  {isExclude ? '✓ Ngoại lệ (AI bỏ qua)' : (z.type === 'line' ? 'Vạch kiểm soát' : 'Vùng giám sát')}
+                                </span>
                               </div>
-                              {/* Points count */}
-                              <span className="text-[10px] text-slate-600 flex-shrink-0">{z.points.length} điểm</span>
-                              {/* Hover indicator */}
                               {isHovered && (
                                 <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
                               )}
@@ -2134,6 +3054,17 @@ export default function PipelineBuilder({
                       </div>
                     </div>
                   )}
+
+                  {/* ── Problem Statement Card ── */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
+                      <FileText size={12} className="text-slate-400" />
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Phát biểu bài toán</span>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-xs text-slate-300 leading-relaxed">{generateProblemStatement()}</p>
+                    </div>
+                  </div>
 
                   <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex items-start gap-2.5">
                     <Check size={16} className="text-emerald-600 mt-0.5 flex-shrink-0" />
