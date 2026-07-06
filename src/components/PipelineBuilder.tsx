@@ -62,17 +62,17 @@ function formatScheduleSlots(slots: ScheduleSlot[]): string {
 const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; description: string }>> = {
   security: [
     { id: 's1', name: 'Xâm nhập ngoài giờ', description: 'Phát hiện người di chuyển trong văn phòng sau 22:00' },
-    { id: 's2', name: 'Tụ tập đông người', description: 'Báo khi có từ 3 người trở lên đứng yên hơn 5 phút' },
+    { id: 's2', name: 'Phát hiện đám đông / bạo loạn', description: 'Báo khi có từ 3 người trở lên đứng yên hơn 5 phút' },
     { id: 's3', name: 'Bỏ lại đồ vật', description: 'Phát hiện balo hoặc túi xách bị bỏ lại không có người' },
     { id: 's4', name: 'Xâm nhập kho hàng', description: 'Cảnh báo khi có người vào khu vực bốc xếp hàng hóa' },
     { id: 's5', name: 'Phá khóa, đập cửa', description: 'Phát hiện hành vi tác động bất thường vào cửa kho' },
     { id: 's6', name: 'Giám sát lối thoát hiểm', description: 'Cảnh báo khi cửa thoát hiểm bị chặn hoặc khóa sai quy định' },
   ],
   counting: [
-    { id: 'c1', name: 'Đếm khách vào ra', description: 'Đếm số khách hàng đi vào và ra cửa hàng theo ngày' },
+    { id: 'c1', name: 'Đếm lượt khách ra vào', description: 'Đếm số khách hàng đi vào và ra cửa hàng theo ngày' },
     { id: 'c2', name: 'Đếm xe tại bãi đỗ', description: 'Đếm ô tô và xe máy đi qua cổng bãi đỗ xe' },
     { id: 'c3', name: 'Giới hạn sức chứa', description: 'Cảnh báo khi số người trong phòng vượt quá giới hạn tối đa' },
-    { id: 'c4', name: 'Đếm sản phẩm dây chuyền', description: 'Đếm số hộp đi qua trạm kiểm tra mỗi ca làm việc' },
+    { id: 'c4', name: 'Đếm sản lượng tự động', description: 'Đếm số hộp đi qua trạm kiểm tra mỗi ca làm việc' },
     { id: 'c5', name: 'Đếm xe tải ra vào cổng', description: 'Theo dõi số chuyến xe tải xuất nhập hàng trong ngày' },
     { id: 'c6', name: 'Hàng chờ tại quầy', description: 'Đếm số người đang xếp hàng chờ để điều phối nhân viên' },
   ],
@@ -101,7 +101,7 @@ const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; d
   behavior: [
     { id: 'b1', name: 'Phát hiện té ngã', description: 'Cảnh báo khi phát hiện người ngã xuống bất thường' },
     { id: 'b2', name: 'Phát hiện đánh nhau', description: 'Phát hiện hành vi ẩu đả, xô xát giữa nhiều người' },
-    { id: 'b3', name: 'Hút thuốc nơi cấm', description: 'Phát hiện người hút thuốc trong khu vực cấm' },
+    { id: 'b3', name: 'Phát hiện hút thuốc sai quy định', description: 'Phát hiện người hút thuốc trong khu vực cấm' },
     { id: 'b4', name: 'Dùng điện thoại khi lái xe nâng', description: 'Cảnh báo tài xế xe nâng dùng điện thoại khi vận hành' },
     { id: 'b5', name: 'Ngủ gật tại vị trí làm việc', description: 'Phát hiện nhân viên mất tập trung hoặc ngủ gật' },
     { id: 'b6', name: 'Leo trèo khu vực nguy hiểm', description: 'Cảnh báo khi có người leo lên kệ hàng hoặc kết cấu không an toàn' },
@@ -148,6 +148,7 @@ interface UCParam {
   unit?: string;
   placeholder?: string;
   optional?: boolean;
+  condition?: (values: any) => boolean;
   /** for multicheck_dynamic: key of another param whose value provides the options list */
   sourceKey?: string;
 }
@@ -156,6 +157,7 @@ interface UCDef {
   id: string;
   name: string;
   taskMapType: string;
+  desc?: string;
   needsImage?: boolean;
   imageLabel?: string;
   multipleImages?: boolean;
@@ -173,7 +175,7 @@ const DOMAINS: DomainDef[] = [
   {
     key: 'security', name: 'An ninh', color: 'blue',
     useCases: [
-      { id: 'sec_intrusion', name: 'Xâm nhập vùng cấm', taskMapType: 'security', params: [
+      { id: 'sec_intrusion', name: 'Cảnh báo xâm nhập trái phép', taskMapType: 'security', desc: 'Cảnh báo tự động khi có đối tượng đi vào vùng cấm.', params: [
         { key: 'zone', label: 'Vẽ vùng cấm cần giám sát', type: 'zone_hint' },
         { key: 'target', label: 'Đối tượng nào BỊ CẤM vào vùng này', type: 'select', options: ['Người', 'Xe máy', 'Xe ô tô', 'Xe tải', 'Bất kỳ đối tượng nào'] },
         { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
@@ -184,13 +186,13 @@ const DOMAINS: DomainDef[] = [
         { key: 'excludeZone', label: 'Vùng ngoại lệ (AI bỏ qua)', type: 'zone_hint', optional: true },
         { key: 'normalActivity', label: 'Hoạt động bình thường gần khu vực (giúp AI tránh báo nhầm)', type: 'text', optional: true, placeholder: 'VD: xe tải qua lại hành lang phải; công nhân tập trung trước cửa vào ca' },
       ]},
-      { id: 'sec_loitering', name: 'Lảng vảng quá lâu', taskMapType: 'security', params: [
+      { id: 'sec_loitering', name: 'Phát hiện lảng vảng đáng ngờ', taskMapType: 'security', desc: 'Phát hiện đối tượng đứng lâu bất thường tại một khu vực.', params: [
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'target', label: 'Đối tượng cần phát hiện', type: 'select', options: ['Người', 'Xe', 'Bất kỳ'] },
         { key: 'maxStayMinutes', label: 'Thời gian tối đa ở lại', type: 'number', unit: 'phút', placeholder: '5' },
         { key: 'allowedPersonnel', label: 'Người được phép ở lại lâu hơn', type: 'text', optional: true },
       ]},
-      { id: 'sec_afterhours', name: 'Đột nhập ngoài giờ', taskMapType: 'security', params: [
+      { id: 'sec_afterhours', name: 'Giám sát an ninh ngoài giờ', taskMapType: 'security', desc: 'Giám sát và cảnh báo hoạt động trong khung giờ vắng người.', params: [
         { key: 'workHours', label: 'Giờ làm việc bình thường', type: 'time_range' },
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây', placeholder: '3' },
@@ -198,7 +200,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'cleaningStaff', label: 'Nhân viên vệ sinh (giờ + ngoại hình)', type: 'text', optional: true, placeholder: 'VD: 23:00–01:00, đồng phục xám' },
         { key: 'overtime', label: 'Ai được ở lại tăng ca', type: 'text', optional: true },
       ]},
-      { id: 'sec_assetloss', name: 'Mất tài sản', taskMapType: 'security', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tài sản cần bảo vệ (giúp AI nhận dạng chính xác hơn)', params: [
+      { id: 'sec_assetloss', name: 'Cảnh báo mất cắp tài sản', taskMapType: 'security', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tài sản cần bảo vệ (giúp AI nhận dạng chính xác hơn)', desc: 'Báo động khi đồ vật quan trọng bị di dời khỏi vị trí.', params: [
         { key: 'assetDesc', label: 'Mô tả tài sản cần bảo vệ', type: 'text', placeholder: 'VD: laptop bạc Dell XPS, máy chiếu đen Epson' },
         { key: 'assetZone', label: 'Vùng đặt tài sản', type: 'zone_hint' },
         { key: 'missingSeconds', label: 'Tài sản mất bao lâu mới báo', type: 'number', unit: 'giây', placeholder: '30' },
@@ -206,14 +208,14 @@ const DOMAINS: DomainDef[] = [
         { key: 'tempMoveMinutes', label: 'Cho phép di chuyển tạm trong', type: 'number', unit: 'phút', optional: true, placeholder: '5' },
       ]},
 
-      { id: 'sec_crowd', name: 'Tụ tập đông người', taskMapType: 'security', params: [
+      { id: 'sec_crowd', name: 'Tụ tập đông người', taskMapType: 'security', desc: 'Nhận diện tình trạng tụ tập đông người bất thường.', params: [
         { key: 'zone', label: 'Vùng cần kiểm soát', type: 'zone_hint' },
         { key: 'minPeople', label: 'Số người tối thiểu để báo', type: 'number', placeholder: '5' },
         { key: 'minSeconds', label: 'Thời gian tụ tập tối thiểu', type: 'number', unit: 'giây', placeholder: '30' },
         { key: 'allowedZone', label: 'Khu vực được phép tụ tập', type: 'zone_hint', optional: true },
         { key: 'breakHours', label: 'Giờ nghỉ ca / giờ ăn (bình thường)', type: 'time_range', optional: true },
       ]},
-      { id: 'sec_vehicle_reid', name: 'Nhận diện phương tiện tương tự', taskMapType: 'security', needsImage: true, imageLabel: 'Ảnh xe mẫu cần tìm — upload rồi khoanh vùng thân xe nếu ảnh có nhiều nền', params: [
+      { id: 'sec_vehicle_reid', name: 'Tìm kiếm phương tiện (Re-ID)', taskMapType: 'security', needsImage: true, imageLabel: 'Ảnh xe mẫu cần tìm — upload rồi khoanh vùng thân xe nếu ảnh có nhiều nền', desc: 'Tìm kiếm và nhận diện lại phương tiện giống với ảnh mẫu.', params: [
         { key: 'similarityThreshold', label: 'Ngưỡng tương đồng tối thiểu', type: 'slider_pct' },
         { key: 'vehicleTypes', label: 'Loại xe ưu tiên', type: 'multicheck', optional: true, options: ['Ô tô', 'Xe máy', 'Xe tải', 'Xe buýt'] },
         { key: 'colors', label: 'Màu sắc xe', type: 'multicheck', optional: true, options: ['Trắng', 'Đen', 'Bạc / Xám', 'Đỏ', 'Xanh lam', 'Xanh lá', 'Vàng', 'Nâu'] },
@@ -226,7 +228,7 @@ const DOMAINS: DomainDef[] = [
   {
     key: 'traffic', name: 'Giao thông', color: 'amber',
     useCases: [
-      { id: 'tra_alpr', name: 'Đọc biển số xe', taskMapType: 'traffic', params: [
+      { id: 'tra_alpr', name: 'Nhận diện & quản lý biển số', taskMapType: 'traffic', desc: 'Tự động đọc biển số xe và đối chiếu danh sách trắng/đen.', params: [
         { key: 'vehicleTypes', label: 'Loại xe cần nhận diện', type: 'multicheck', options: ['Ô tô', 'Xe máy', 'Xe tải', 'Xe buýt'] },
 { key: 'action', label: 'Hành động khi phát hiện', type: 'select', options: ['Chỉ ghi log', 'Cảnh báo', 'Gọi webhook mở barrier'] },
         { key: 'whitelist', label: 'Danh sách xe được phép vào', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
@@ -234,7 +236,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'unknownAction', label: 'Xe không có trong danh sách', type: 'select', options: ['Cho qua + ghi log', 'Cảnh báo', 'Chặn'] },
         { key: 'historyDays', label: 'Lưu lịch sử bao nhiêu ngày', type: 'number', placeholder: '30' },
       ]},
-      { id: 'tra_count', name: 'Đếm phương tiện theo luồng', taskMapType: 'counting', params: [
+      { id: 'tra_count', name: 'Phân tích lưu lượng giao thông', taskMapType: 'counting', desc: 'Đo lường số lượng phương tiện đi qua một vạch/vùng cụ thể.', params: [
         { key: 'vehicleTypes', label: 'Loại xe cần đếm', type: 'multicheck', options: ['Xe máy', 'Ô tô', 'Xe tải', 'Xe đạp', 'Tất cả'] },
         { key: 'direction', label: 'Hướng đếm', type: 'card3', options: ['Chỉ vào', 'Chỉ ra', 'Cả 2 chiều'] },
         { key: 'line', label: 'Vị trí vạch đếm', type: 'line_hint' },
@@ -242,27 +244,27 @@ const DOMAINS: DomainDef[] = [
         { key: 'ignoreParked', label: 'Bỏ qua xe đang đỗ (chỉ đếm xe di chuyển)', type: 'toggle', optional: true },
         { key: 'reportPeriod', label: 'Báo cáo tổng kết theo', type: 'select', options: ['Theo giờ', 'Theo ca', 'Theo ngày'] },
       ]},
-      { id: 'tra_parking', name: 'Dừng đỗ sai quy định', taskMapType: 'traffic', params: [
+      { id: 'tra_parking', name: 'Phát hiện dừng đỗ trái phép', taskMapType: 'traffic', desc: 'Phát hiện các phương tiện dừng đỗ tại khu vực cấm.', params: [
         { key: 'zone', label: 'Vùng cấm dừng đỗ', type: 'zone_hint' },
         { key: 'maxMinutes', label: 'Thời gian tối đa được dừng', type: 'number', unit: 'phút', placeholder: '5' },
         { key: 'hazardGrace', label: 'Xe bật đèn cảnh báo (hazard) được gia hạn thêm', type: 'toggle', optional: true },
         { key: 'exemptVehicles', label: 'Xe nào được miễn', type: 'multicheck', optional: true, options: ['Xe cứu thương', 'Xe cứu hỏa', 'Xe bảo trì'] },
         { key: 'loadingZone', label: 'Khu vực bốc dỡ hàng (cho phép đỗ)', type: 'zone_hint', optional: true },
       ]},
-      { id: 'tra_speed', name: 'Đo / ước lượng tốc độ', taskMapType: 'traffic', params: [
+      { id: 'tra_speed', name: 'Cảnh báo vi phạm tốc độ', taskMapType: 'traffic', desc: 'Ước lượng tốc độ và cảnh báo xe chạy quá giới hạn.', params: [
         { key: 'refDistance', label: 'Khoảng cách tham chiếu', type: 'number', unit: 'mét', placeholder: '10' },
         { key: 'vehicleTypes', label: 'Loại phương tiện', type: 'multicheck', options: ['Xe máy', 'Ô tô', 'Xe tải', 'Tất cả'] },
         { key: 'maxSpeed', label: 'Ngưỡng tốc độ tối đa', type: 'number', unit: 'km/h', placeholder: '40' },
         { key: 'minSpeed', label: 'Ngưỡng tốc độ tối thiểu', type: 'number', unit: 'km/h', optional: true, placeholder: '5' },
         { key: 'direction', label: 'Hướng di chuyển giám sát', type: 'card3', options: ['Trái → Phải', 'Phải → Trái', 'Cả hai'] },
       ]},
-      { id: 'tra_redlight', name: 'Vượt đèn đỏ', taskMapType: 'traffic', params: [
+      { id: 'tra_redlight', name: 'Giám sát vi phạm đèn tín hiệu', taskMapType: 'traffic', desc: 'Phát hiện xe cố tình đi qua ngã tư khi đèn đỏ.', params: [
         { key: 'stopLine', label: 'Vị trí vạch dừng', type: 'line_hint' },
         { key: 'trafficLight', label: 'Vị trí đèn giao thông', type: 'zone_hint' },
         { key: 'direction', label: 'Hướng giám sát', type: 'card3', options: ['Thẳng', 'Rẽ trái', 'Rẽ phải'] },
         { key: 'greenDelay', label: 'Thời gian chờ sau đèn xanh', type: 'number', unit: 'giây', placeholder: '3' },
       ]},
-      { id: 'tra_smartpark', name: 'Bãi đỗ xe thông minh', taskMapType: 'counting', params: [
+      { id: 'tra_smartpark', name: 'Quản lý bãi đỗ xe thông minh', taskMapType: 'counting', desc: 'Theo dõi tình trạng chỗ trống trong bãi đỗ xe nội bộ.', params: [
         { key: 'capacity', label: 'Sức chứa bãi đỗ (tổng số chỗ)', type: 'number', placeholder: '50' },
         { key: 'fullThreshold', label: 'Cảnh báo khi đầy bao nhiêu %', type: 'slider_pct' },
         { key: 'zones', label: 'Khu vực A, B, C... (vẽ từng khu)', type: 'zone_hint' },
@@ -273,7 +275,7 @@ const DOMAINS: DomainDef[] = [
   {
     key: 'production', name: 'Sản xuất', color: 'violet',
     useCases: [
-      { id: 'prd_label', name: 'Kiểm tra tem nhãn / Hạn dùng', taskMapType: 'label_inspection', needsImage: true, imageLabel: 'Ảnh mẫu sản phẩm (vị trí nhãn rõ)', params: [
+      { id: 'prd_label', name: 'Kiểm tra ngoại quan / Tem nhãn', taskMapType: 'label_inspection', needsImage: true, imageLabel: 'Ảnh mẫu sản phẩm (vị trí nhãn rõ)', desc: 'Kiểm tra lỗi in ấn, thiếu tem nhãn, bao bì rách nát.', params: [
         { key: 'fields', label: 'Trường thông tin cần đọc', type: 'multicheck', options: ['Ngày sản xuất (NSX)', 'Hạn sử dụng (HSD)', 'Số lô (LOT)', 'Mã vạch', 'Mã QR'] },
         { key: 'fieldZones', label: 'Vùng mỗi trường trên sản phẩm (vẽ trên ảnh mẫu)', type: 'bbox_per_field' },
         { key: 'mfgFormat', label: 'Định dạng Ngày sản xuất', type: 'select_text', options: ['DD/MM/YYYY', 'MM/YYYY', 'YYYY-MM-DD', 'YYYYMMDD', 'DD-MM-YYYY'] },
@@ -283,20 +285,20 @@ const DOMAINS: DomainDef[] = [
         { key: 'minRemainingDays', label: 'HSD phải còn hạn tối thiểu', type: 'number', unit: 'ngày', optional: true, placeholder: '30' },
         { key: 'language', label: 'Ngôn ngữ trên nhãn', type: 'select', options: ['Tiếng Việt', 'Tiếng Anh', 'Song ngữ (Việt + Anh)', 'Khác'] },
       ]},
-      { id: 'prd_assembly', name: 'Lỗi lắp ráp', taskMapType: 'assembly_inspection', needsImage: true, multipleImages: true, imageLabel: 'Ảnh mẫu sản phẩm lắp đúng', params: [
+      { id: 'prd_assembly', name: 'Phát hiện lỗi sai hỏng (Defect)', taskMapType: 'assembly_inspection', needsImage: true, multipleImages: true, imageLabel: 'Ảnh mẫu sản phẩm lắp đúng', desc: 'Phát hiện linh kiện bị thiếu, sai vị trí, lắp ráp ngược.', params: [
         { key: 'parts', label: 'Liệt kê các bộ phận cần có', type: 'textarea', placeholder: 'Mỗi bộ phận một dòng hoặc cách nhau bởi dấu phẩy\nVD: nắp, gioăng cao su, tem bảo hành, 4 ốc vít' },
         { key: 'partZones', label: 'Vùng từng bộ phận trên ảnh sản phẩm (vẽ trên ảnh mẫu)', type: 'bbox_per_part' },
         { key: 'multiVersion', label: 'Sản phẩm có nhiều phiên bản', type: 'toggle' },
 
       ]},
-      { id: 'prd_counting', name: 'Đếm sản phẩm dây chuyền', taskMapType: 'counting', needsImage: true, multipleImages: true, imageLabel: 'Ảnh sản phẩm cần đếm (để trống = đếm tất cả)', params: [
+      { id: 'prd_counting', name: 'Đếm sản phẩm dây chuyền', taskMapType: 'counting', needsImage: true, multipleImages: true, imageLabel: 'Ảnh sản phẩm cần đếm (để trống = đếm tất cả)', desc: 'Tự động đếm sản phẩm chạy qua băng chuyền.', params: [
         { key: 'line', label: 'Vị trí vạch đếm trên băng chuyền', type: 'line_hint' },
         { key: 'targetPerShift', label: 'Mục tiêu sản lượng ca', type: 'number', placeholder: '2000' },
         { key: 'alertBelowPct', label: 'Cảnh báo khi năng suất dưới', type: 'number', unit: '%', placeholder: '80' },
         { key: 'stopAlertSeconds', label: 'Dây chuyền dừng bao lâu thì báo', type: 'number', unit: 'giây', placeholder: '30' },
         { key: 'countRejects', label: 'Đếm riêng sản phẩm bị từ chối', type: 'toggle', optional: true },
       ]},
-      { id: 'prd_productivity', name: 'Giám sát năng suất', taskMapType: 'behavior', params: [
+      { id: 'prd_productivity', name: 'Phân tích nhịp độ làm việc', taskMapType: 'behavior', desc: 'Phân tích và đo lường thời gian chu kỳ (cycle time).', params: [
         { key: 'zone', label: 'Khu vực giám sát', type: 'zone_hint' },
         { key: 'targetPerShift', label: 'Mục tiêu sản lượng ca', type: 'number', placeholder: '500' },
         { key: 'alertBelowPct', label: 'Cảnh báo khi năng suất dưới', type: 'number', unit: '%', placeholder: '80' },
@@ -308,7 +310,7 @@ const DOMAINS: DomainDef[] = [
   {
     key: 'safety', name: 'An toàn lao động', color: 'orange',
     useCases: [
-      { id: 'hse_ppe', name: 'Thiếu trang thiết bị bảo hộ', taskMapType: 'ppe', params: [
+      { id: 'hse_ppe', name: 'Giám sát trang bị bảo hộ (PPE)', taskMapType: 'ppe', desc: 'Kiểm tra nhân viên có mặc đủ áo phản quang, mũ, kính bảo hộ.', params: [
         { key: 'zone', label: 'Khu vực yêu cầu PPE', type: 'zone_hint' },
         { key: 'requiredPPE', label: 'PPE bắt buộc tại khu vực này', type: 'multicheck', options: ['Mũ bảo hộ', 'Áo phản quang', 'Găng tay', 'Khẩu trang', 'Kính bảo hộ'] },
         { key: 'triggerMode', label: 'Điều kiện kích hoạt', type: 'card2', options: ['Thiếu BẤT KỲ 1 PPE', 'Thiếu TẤT CẢ PPE'] },
@@ -317,7 +319,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'staffAppearance', label: 'Nhân viên nhận dạng thế nào', type: 'text', optional: true, placeholder: 'VD: đồng phục xanh công ty' },
         { key: 'graceSeconds', label: 'Cho phép tháo PPE tạm trong', type: 'number', unit: 'giây', optional: true, placeholder: '30' },
       ]},
-      { id: 'hse_machine', name: 'Người vào khu vực nguy hiểm', taskMapType: 'security', params: [
+      { id: 'hse_machine', name: 'Cảnh báo tiếp cận vùng nguy hiểm', taskMapType: 'security', desc: 'Báo động khi người tiến quá gần máy móc đang hoạt động.', params: [
         { key: 'zone', label: 'Vùng nguy hiểm', type: 'zone_hint' },
         { key: 'zoneCondition', label: 'Điều kiện vào vùng', type: 'card2', options: ['Chạm viền (phản ứng ngay)', 'Tâm đối tượng trong vùng'] },
         { key: 'onlyWhenRunning', label: 'Chỉ báo khi máy đang chạy', type: 'toggle', optional: true },
@@ -325,16 +327,22 @@ const DOMAINS: DomainDef[] = [
         { key: 'maintenanceSchedule', label: 'Lịch bảo trì (được vào)', type: 'time_range', optional: true },
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thông báo', 'Dừng máy tự động qua webhook', 'Cả hai'] },
       ]},
-      { id: 'hse_behavior', name: 'Phát hiện hành vi bất thường', taskMapType: 'behavior', params: [
+            { id: 'hse_behavior', name: 'Nhận diện hành vi bất thường', taskMapType: 'behavior', desc: 'Nhận diện hành vi bất thường như xô xát, té ngã.', params: [
         { key: 'behaviorTypes', label: 'Hành vi cần phát hiện', type: 'multicheck', options: ['Té ngã / Đột quỵ', 'Đánh nhau / Ẩu đả'] },
-        { key: 'zone', label: 'Khu vực giám sát', type: 'zone_hint' },
-        { key: 'confirmSeconds', label: 'Thời gian xác nhận hành vi', type: 'number', unit: 'giây', placeholder: '5' },
-        { key: 'restZone', label: '↳ Khu vực nghỉ ngơi bình thường — AI bỏ qua (cho bài toán té ngã)', type: 'zone_hint', optional: true },
-        { key: 'frequentCrouch', label: '↳ Nhân viên hay cúi / ngồi thường xuyên (tránh báo nhầm té ngã)', type: 'toggle', optional: true },
-        { key: 'minPeople', label: '↳ Số người tối thiểu để báo đánh nhau', type: 'number', placeholder: '2', optional: true },
-        { key: 'excludeZone', label: '↳ Khu vực bỏ qua (sân thể thao, v.v.)', type: 'zone_hint', optional: true },
+        { key: 'zone', label: 'Khu vực giám sát chung', type: 'zone_hint' },
+        
+        // Té ngã params
+        { key: 'fall_confirmSeconds', label: '[Té ngã] Xác nhận ngã sau bao lâu nằm yên', type: 'number', unit: 'giây', placeholder: '5', condition: (v) => v.behaviorTypes?.includes('Té ngã / Đột quỵ') },
+        { key: 'fall_restZone', label: '[Té ngã] Khu vực nghỉ ngơi (AI bỏ qua)', type: 'zone_hint', optional: true, condition: (v) => v.behaviorTypes?.includes('Té ngã / Đột quỵ') },
+        { key: 'fall_frequentCrouch', label: '[Té ngã] Người làm việc có cúi/ngồi thường xuyên không', type: 'toggle', optional: true, condition: (v) => v.behaviorTypes?.includes('Té ngã / Đột quỵ') },
+
+        // Đánh nhau params
+        { key: 'fight_minPeople', label: '[Đánh nhau] Số người tối thiểu để báo', type: 'number', placeholder: '2', condition: (v) => v.behaviorTypes?.includes('Đánh nhau / Ẩu đả') },
+        { key: 'fight_confirmSeconds', label: '[Đánh nhau] Thời gian xảy ra tối thiểu', type: 'number', unit: 'giây', placeholder: '3', condition: (v) => v.behaviorTypes?.includes('Đánh nhau / Ẩu đả') },
+        { key: 'fight_excludeZone', label: '[Đánh nhau] Khu vực bỏ qua (sân thể thao)', type: 'zone_hint', optional: true, condition: (v) => v.behaviorTypes?.includes('Đánh nhau / Ẩu đả') },
+        { key: 'fight_severityLevel', label: '[Đánh nhau] Mức độ nguy hiểm', type: 'select', options: ['Nhẹ (ẩu đả)', 'Trung bình', 'Nghiêm trọng (có hung khí)'], condition: (v) => v.behaviorTypes?.includes('Đánh nhau / Ẩu đả') },
       ]},
-      { id: 'hse_proximity', name: 'Khoảng cách người - máy', taskMapType: 'security', params: [
+      { id: 'hse_proximity', name: 'Kiểm soát an toàn người - máy', taskMapType: 'security', desc: 'Cảnh báo khi khoảng cách giữa người và phương tiện quá gần.', params: [
         { key: 'zone', label: 'Vùng nguy hiểm quanh máy', type: 'zone_hint' },
         { key: 'minDistance', label: 'Khoảng cách an toàn tối thiểu', type: 'number', unit: 'mét', placeholder: '1.5' },
         { key: 'alertAction', label: 'Hành động khi vi phạm', type: 'select', options: ['Cảnh báo trên màn hình', 'Gửi webhook + cảnh báo', 'Cả hai'] },
@@ -346,19 +354,19 @@ const DOMAINS: DomainDef[] = [
   {
     key: 'fire', name: 'PCCC', color: 'rose',
     useCases: [
-      { id: 'fir_fire', name: 'Phát hiện khói / Lửa', taskMapType: 'fire', params: [
+      { id: 'fir_fire', name: 'Cảnh báo hỏa hoạn (Khói / Lửa)', taskMapType: 'fire', desc: 'Phát hiện sớm các dấu hiệu hỏa hoạn qua camera thường.', params: [
         { key: 'hazardTypes', label: 'Loại mối nguy cần phát hiện', type: 'multicheck', options: ['Khói', 'Lửa / ngọn lửa'] },
         { key: 'sensitivity', label: 'Mức độ nhạy', type: 'card3', options: ['Cao', 'Trung bình', 'Thấp'] },
         { key: 'dustyEnv', label: 'Môi trường có hơi / bụi thường xuyên (tránh báo nhầm)', type: 'toggle', optional: true },
         { key: 'allowedZone', label: 'Khu vực được phép có khói / lửa', type: 'zone_hint', optional: true },
         { key: 'material', label: 'Vật liệu chủ yếu trong khu vực', type: 'select', optional: true, options: ['Gỗ', 'Nhựa', 'Hóa chất', 'Dầu', 'Hỗn hợp'] },
       ]},
-      { id: 'fir_smoking', name: 'Hút thuốc nơi cấm', taskMapType: 'behavior', params: [
+      { id: 'fir_smoking', name: 'Hút thuốc nơi cấm', taskMapType: 'behavior', desc: 'Phát hiện hành vi hút thuốc lá ở nơi có nguy cơ cháy nổ.', params: [
         { key: 'zone', label: 'Vùng cấm hút thuốc', type: 'zone_hint' },
         { key: 'sensitivity', label: 'Mức độ nhạy', type: 'card3', options: ['Cao', 'Trung bình', 'Thấp'] },
         { key: 'allowedZone', label: 'Khu vực cho phép hút thuốc', type: 'zone_hint', optional: true },
       ]},
-      { id: 'fir_exit', name: 'Chặn / khoá lối thoát hiểm', taskMapType: 'security', params: [
+      { id: 'fir_exit', name: 'Cảnh báo cản trở lối thoát hiểm', taskMapType: 'security', desc: 'Cảnh báo khi hành lang, lối thoát hiểm bị vật cản che lấp.', params: [
         { key: 'exitZones', label: 'Vị trí các lối thoát hiểm', type: 'zone_hint' },
         { key: 'blockedPct', label: 'Coi là bị chặn khi bị che bao nhiêu %', type: 'slider_pct' },
         { key: 'confirmSeconds', label: 'Báo sau bao lâu', type: 'number', unit: 'giây', placeholder: '10' },
@@ -369,7 +377,7 @@ const DOMAINS: DomainDef[] = [
   {
     key: 'retail', name: 'Bán lẻ & khách hàng', color: 'emerald',
     useCases: [
-      { id: 'ret_counting', name: 'Đếm khách vào ra', taskMapType: 'counting', params: [
+      { id: 'ret_counting', name: 'Đếm khách vào ra', taskMapType: 'counting', desc: 'Đo lường lượt khách hàng đi qua cửa/vào khu vực.', params: [
         { key: 'line', label: 'Vị trí cửa vào', type: 'line_hint' },
         { key: 'direction', label: 'Hướng đếm', type: 'card3', options: ['Chỉ vào', 'Chỉ ra', 'Cả 2 chiều'] },
         { key: 'maxSimultaneous', label: 'Cảnh báo khi có bao nhiêu khách đồng thời', type: 'number', optional: true },
@@ -377,26 +385,26 @@ const DOMAINS: DomainDef[] = [
         { key: 'reportPeriod', label: 'Báo cáo tổng kết theo', type: 'select', options: ['Mỗi giờ', 'Mỗi ca', 'Cuối ngày'] },
         { key: 'peakHours', label: 'Giờ cao điểm bình thường', type: 'time_range', optional: true },
       ]},
-      { id: 'ret_heatmap', name: 'Heatmap khu vực', taskMapType: 'retail_analytics', params: [
+      { id: 'ret_heatmap', name: 'Phân tích bản đồ nhiệt (Heatmap)', taskMapType: 'retail_analytics', desc: 'Phân tích khu vực thu hút nhiều sự chú ý của khách hàng nhất.', params: [
         { key: 'zone', label: 'Khu vực giám sát', type: 'zone_hint' },
         { key: 'objectType', label: 'Loại đối tượng', type: 'select', options: ['Người', 'Xe', 'Tất cả'] },
         { key: 'aggregatePeriod', label: 'Khoảng thời gian tổng hợp', type: 'select', options: ['1 giờ', '1 ca', '1 ngày', '1 tuần'] },
         { key: 'gridSize', label: 'Kích thước ô lưới', type: 'number', unit: 'mét', placeholder: '1' },
       ]},
-      { id: 'ret_shelf', name: 'Kệ hàng trống', taskMapType: 'retail_analytics', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kệ hàng khi đầy hàng', params: [
+      { id: 'ret_shelf', name: 'Cảnh báo kệ hàng trống (OOS)', taskMapType: 'retail_analytics', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kệ hàng khi đầy hàng', desc: 'Cảnh báo nhân viên khi hàng hóa trên kệ sắp hết.', params: [
         { key: 'emptyThreshold', label: 'Coi là trống khi diện tích kệ trống vượt', type: 'slider_pct' },
         { key: 'notifyTo', label: 'Ai cần nhận thông báo', type: 'text', placeholder: 'VD: nhân viên kho, trưởng khu vực' },
         { key: 'restockMinutes', label: 'Cần bổ sung hàng trong bao lâu', type: 'number', unit: 'phút', placeholder: '15' },
         { key: 'inventoryTime', label: 'Giờ kiểm kê đầu ngày (không báo)', type: 'time_range', optional: true },
         { key: 'allowRearrange', label: 'Hàng được sắp xếp lại thường xuyên (tránh báo nhầm)', type: 'toggle', optional: true },
       ]},
-      { id: 'ret_demographics', name: 'Phân tích nhân khẩu học', taskMapType: 'retail_analytics', params: [
+      { id: 'ret_demographics', name: 'Phân tích nhân khẩu học khách hàng', taskMapType: 'retail_analytics', desc: 'Phân tích tệp khách hàng theo độ tuổi và giới tính.', params: [
         { key: 'zone', label: 'Khu vực phân tích', type: 'zone_hint' },
         { key: 'attributes', label: 'Thông tin cần thu thập', type: 'multicheck', options: ['Độ tuổi', 'Giới tính'] },
         { key: 'aggregatePeriod', label: 'Khoảng thời gian tổng hợp', type: 'select', options: ['1 giờ', '1 ca', '1 ngày'] },
         { key: 'anonymize', label: 'Ẩn danh hóa khuôn mặt', type: 'toggle' },
       ]},
-      { id: 'ret_queue', name: 'Giám sát hàng chờ', taskMapType: 'counting', params: [
+      { id: 'ret_queue', name: 'Giám sát độ dài hàng chờ', taskMapType: 'counting', desc: 'Đo lường độ dài hàng chờ và thời gian chờ của khách.', params: [
         { key: 'zone', label: 'Khu vực xếp hàng / quầy phục vụ', type: 'zone_hint' },
         { key: 'alertPeople', label: 'Cảnh báo khi số người xếp hàng vượt', type: 'number', placeholder: '8' },
         { key: 'minQueueSeconds', label: 'Phải xếp hàng bao lâu mới tính', type: 'number', unit: 'giây', placeholder: '60' },
@@ -406,7 +414,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'alertOnOvertime', label: 'Cảnh báo khi khách chờ vượt thời gian tối đa', type: 'toggle', optional: true },
         { key: 'peakHours', label: 'Giờ cao điểm thường có hàng dài', type: 'time_range', optional: true },
       ]},
-      { id: 'ret_crowdanalysis', name: 'Phân tích đông / rảnh', taskMapType: 'retail_analytics', params: [
+      { id: 'ret_crowdanalysis', name: 'Đo lường hiệu suất phục vụ', taskMapType: 'retail_analytics', desc: 'Đánh giá tỷ lệ lấp đầy để tối ưu nhân sự phục vụ.', params: [
         { key: 'zone', label: 'Khu vực giám sát', type: 'zone_hint' },
         { key: 'busyThreshold', label: 'Ngưỡng đông', type: 'number', unit: 'người', placeholder: '20' },
         { key: 'quietThreshold', label: 'Ngưỡng vắng', type: 'number', unit: 'người', placeholder: '5' },
@@ -418,30 +426,30 @@ const DOMAINS: DomainDef[] = [
   {
     key: 'warehouse', name: 'Kho bãi & logistics', color: 'cyan',
     useCases: [
-      { id: 'wh_forklift', name: 'Người vào đường xe nâng', taskMapType: 'security', params: [
+      { id: 'wh_forklift', name: 'Chống va chạm người & xe nâng', taskMapType: 'security', desc: 'Cảnh báo va chạm giữa xe nâng và nhân viên.', params: [
         { key: 'zone', label: 'Tuyến đường xe nâng', type: 'zone_hint' },
         { key: 'zoneCondition', label: 'Phản ứng ngay khi', type: 'card2', options: ['Chân chạm viền vùng (intersect)', 'Đứng hẳn trong vùng (inside)'] },
         { key: 'alertLevel', label: 'Mức cảnh báo', type: 'select', options: ['Chỉ thông báo', 'Kích hoạt còi tự động', 'Gửi lệnh dừng xe nâng'] },
         { key: 'allowedPersonnel', label: 'Ai được vào đường xe nâng', type: 'text', optional: true, placeholder: 'VD: lái xe nâng có thẻ vàng' },
         { key: 'forkActiveHours', label: 'Xe nâng chỉ hoạt động vào giờ', type: 'time_range', optional: true },
       ]},
-      { id: 'wh_wrongzone', name: 'Xe vào sai khu vực', taskMapType: 'security', params: [
+      { id: 'wh_wrongzone', name: 'Phân luồng xe nội bộ', taskMapType: 'security', desc: 'Phát hiện phương tiện đi nhầm luồng hoặc vào khu vực sai.', params: [
         { key: 'zone', label: 'Khu vực cấm xe', type: 'zone_hint' },
         { key: 'bannedTypes', label: 'Loại xe bị cấm', type: 'multicheck', options: ['Xe tải', 'Xe máy', 'Xe khách', 'Xe con'] },
         { key: 'allowedList', label: 'Danh sách xe được phép', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
       ]},
-      { id: 'wh_inventory', name: 'Giám sát mức tồn kho kệ', taskMapType: 'retail_analytics', params: [
+      { id: 'wh_inventory', name: 'Theo dõi dung lượng lưu trữ', taskMapType: 'retail_analytics', desc: 'Theo dõi và đánh giá dung lượng lưu trữ trên các kệ hàng.', params: [
         { key: 'shelfZones', label: 'Vị trí các kệ cần giám sát', type: 'zone_hint' },
         { key: 'minStock', label: 'Số lượng tồn tối thiểu', type: 'number', placeholder: '10' },
         { key: 'emptyThreshold', label: 'Coi là hết hàng khi', type: 'slider_pct' },
       ]},
-      { id: 'wh_counting', name: 'Đếm hàng xuất / nhập kho', taskMapType: 'counting', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kiện hàng cần đếm (tuỳ chọn — để trống = đếm tất cả)', params: [
+      { id: 'wh_counting', name: 'Tự động hóa đếm hàng xuất nhập', taskMapType: 'counting', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kiện hàng cần đếm (tuỳ chọn — để trống = đếm tất cả)', desc: 'Đếm số lượng hàng hóa được xếp lên hoặc hạ xuống xe tải.', params: [
         { key: 'line', label: 'Vị trí cổng xuất / nhập', type: 'line_hint' },
         { key: 'plannedQty', label: 'Số lượng theo kế hoạch hôm nay', type: 'number', placeholder: '500' },
         { key: 'deviationPct', label: 'Sai lệch bao nhiêu % thì báo', type: 'number', unit: '%', placeholder: '5' },
         { key: 'truckCount', label: 'Hàng đến từ bao nhiêu chuyến xe', type: 'number', optional: true, placeholder: '3' },
       ]},
-      { id: 'wh_truck', name: 'Xe tải ra vào cổng', taskMapType: 'traffic', params: [
+      { id: 'wh_truck', name: 'Quản lý xe tải ra vào trạm', taskMapType: 'traffic', desc: 'Nhận diện và quản lý xe tải đến giao/nhận hàng.', params: [
         { key: 'useALPR', label: 'Đọc biển số xe tải tự động', type: 'toggle' },
         { key: 'expectedTrucks', label: 'Xe tải dự kiến hôm nay', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
         { key: 'unknownAction', label: 'Hành động khi xe không trong danh sách', type: 'select', options: ['Chỉ cảnh báo', 'Không mở barrier', 'Ghi log + cảnh báo'] },
@@ -1471,6 +1479,7 @@ setSelectedDomain('');
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className={`text-sm font-bold ${isSelected ? c.text : 'text-slate-700'}`}>{uc.name}</div>
+                              {uc.desc && <p className={`text-[10px] mt-0.5 ${isSelected ? c.text.replace('700', '500') : 'text-slate-500'}`}>{uc.desc}</p>}
                               {hasImage && (
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${c.badge}`}>📷 Cần ảnh mẫu</span>
@@ -1596,6 +1605,7 @@ setSelectedDomain('');
                     const c = domainDef ? DOMAIN_COLOR_MAP[domainDef.color] : DOMAIN_COLOR_MAP['emerald'];
 
                     const renderParam = (param: UCParam) => {
+                      if (param.condition && !param.condition(useCaseParamValues)) return null;
                       const val = useCaseParamValues[param.key] || '';
                       const setVal = (v: string) => setUseCaseParamValues(prev => ({ ...prev, [param.key]: v }));
 
@@ -1700,27 +1710,36 @@ setSelectedDomain('');
                         </div>
                       );
 
-                      if (param.type === 'time_range') return (
-                        <div key={param.key}>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
-                          <div className="flex items-center gap-2">
-                            <input type="time" value={(val || '').split('–')[0] || ''} onChange={e => setVal(`${e.target.value}–${(val || '').split('–')[1] || ''}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
-                            <span className="text-xs text-slate-400">đến</span>
-                            <input type="time" value={(val || '').split('–')[1] || ''} onChange={e => setVal(`${(val || '').split('–')[0] || ''}–${e.target.value}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                      if (param.type === 'time_range') {
+                        const startVal = String(val || '').split('–')[0] || '';
+                        const endVal = String(val || '').split('–')[1] || '';
+                        return (
+                          <div key={param.key}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                            <div className="flex items-center gap-2">
+                              <input type="text" placeholder="08:00" value={startVal} onChange={e => setVal(`${e.target.value}–${endVal}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono text-center tracking-widest" maxLength={5} />
+                              <span className="text-xs text-slate-400">đến</span>
+                              <input type="text" placeholder="17:00" value={endVal} onChange={e => setVal(`${startVal}–${e.target.value}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono text-center tracking-widest" maxLength={5} />
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-1.5">Định dạng 24h (Ví dụ: 08:30 đến 17:00)</p>
                           </div>
-                        </div>
-                      );
+                        );
+                      }
 
-                      if (param.type === 'date_range') return (
-                        <div key={param.key}>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
-                          <div className="flex items-center gap-2">
-                            <input type="date" value={(val || '').split('→')[0]?.trim() || ''} onChange={e => setVal(`${e.target.value}→${(val || '').split('→')[1]?.trim() || ''}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
-                            <span className="text-xs text-slate-400">đến</span>
-                            <input type="date" value={(val || '').split('→')[1]?.trim() || ''} onChange={e => setVal(`${(val || '').split('→')[0]?.trim() || ''}→${e.target.value}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                      if (param.type === 'date_range') {
+                        const startVal = String(val || '').split('→')[0]?.trim() || '';
+                        const endVal = String(val || '').split('→')[1]?.trim() || '';
+                        return (
+                          <div key={param.key}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                            <div className="flex items-center gap-2">
+                              <input type="date" value={startVal} onChange={e => setVal(`${e.target.value} → ${endVal}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                              <span className="text-xs text-slate-400">đến</span>
+                              <input type="date" value={endVal} onChange={e => setVal(`${startVal} → ${e.target.value}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                            </div>
                           </div>
-                        </div>
-                      );
+                        );
+                      }
 
                       if (param.type === 'slider_pct') return (
                         <div key={param.key}>
