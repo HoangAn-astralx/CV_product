@@ -28,6 +28,8 @@ export interface CountingZone {
   id: string;
   name: string;
   type: 'zone' | 'line';
+  /** 'monitor' = AI giám sát trong vùng này; 'exclude' = vùng ngoại lệ / được phép (AI bỏ qua) */
+  role?: 'monitor' | 'exclude';
   points: { x: number; y: number }[];
   lineStart?: { x: number; y: number };
   lineEnd?: { x: number; y: number };
@@ -37,16 +39,24 @@ export interface CountingZone {
   maxLimit?: number;
 }
 
+export interface ScheduleSlot {
+  id: string;
+  days: string[]; // 'T2'|'T3'|'T4'|'T5'|'T6'|'T7'|'CN'
+  start: string;  // 'HH:mm'
+  end: string;    // 'HH:mm'
+}
+
 export interface Pipeline {
   id: string;
   name: string;
   cameraId: string;
   detectorName: string;
-  monitoringMode?: 'standard' | 'smart';
+  monitoringMode?: 'standard' | 'smart' | 'defect_detection';
   detectionTarget?: string;
   detectionRule?: string;
   searchScope?: 'whole_scene' | 'roi';
-  config?: Record<string, string | number | boolean | undefined>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  config?: Record<string, any>;
   searchQuery?: string;
   description?: string;
   countingZones: CountingZone[];
@@ -58,6 +68,7 @@ export interface Pipeline {
   };
   scheduleStart?: string;
   scheduleEnd?: string;
+  scheduleSlots?: ScheduleSlot[];
   isActive: boolean;
   createdAt: string;
 }
