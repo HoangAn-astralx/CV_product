@@ -1,4 +1,4 @@
-import React, { useState, Dispatch, SetStateAction } from 'react';
+import React, { useState, useRef, Dispatch, SetStateAction } from 'react';
 import { Camera, Pipeline, CountingZone, AlertRule, ScheduleSlot } from '../types';
 import { PIPELINE_TEMPLATES } from '../mockData';
 import {
@@ -60,6 +60,256 @@ function formatScheduleSlots(slots: ScheduleSlot[]): string {
 
 // Per-task quick suggestions for Smart AI mode
 const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; description: string }>> = {
+
+  
+  tra_alpr: [
+    { id: 't_alpr1', name: 'Đọc biển số cổng chính', description: 'Nhận diện tự động biển số các phương tiện ra vào cổng chính' },
+    { id: 't_alpr2', name: 'Cảnh báo biển số đen', description: 'Cảnh báo khi phát hiện xe nằm trong danh sách đen tiến vào' },
+    { id: 't_alpr3', name: 'Biển số ngoại tỉnh', description: 'Phát hiện và thống kê các xe có biển số ngoài tỉnh đi qua trạm' },
+    { id: 't_alpr4', name: 'Tìm xe theo biển số', description: 'Tìm kiếm nhanh biển số xe tải khả nghi trong bãi đỗ' }
+  ],
+  tra_count: [
+    { id: 't_cnt1', name: 'Đếm xe qua vạch', description: 'Đếm số lượng ô tô và xe máy đi qua vạch đếm' },
+    { id: 't_cnt2', name: 'Thống kê lượng xe tải', description: 'Đếm và thống kê số chuyến xe tải chở hàng ra vào' },
+    { id: 't_cnt3', name: 'Đếm xe máy giờ cao điểm', description: 'Thống kê lưu lượng xe máy đi qua ngã tư vào giờ tan tầm' },
+    { id: 't_cnt4', name: 'Đếm xe vào bãi', description: 'Đếm tự động số lượng ô tô đi vào bãi gửi xe dưới hầm' }
+  ],
+  tra_parking: [
+    { id: 't_pk1', name: 'Dừng đỗ trái phép', description: 'Cảnh báo xe ô tô dừng đỗ tại khu vực cấm đỗ trước sảnh' },
+    { id: 't_pk2', name: 'Đỗ xe quá giờ', description: 'Phát hiện xe đỗ tại khu vực bốc dỡ hàng quá 15 phút' },
+    { id: 't_pk3', name: 'Đỗ chiếm làn đường', description: 'Cảnh báo xe tải đỗ chiếm vạch kẻ đường dành cho người đi bộ' },
+    { id: 't_pk4', name: 'Đỗ sai vị trí VIP', description: 'Phát hiện xe lạ đỗ vào khu vực dành riêng cho khách hàng VIP' }
+  ],
+  tra_speed: [
+    { id: 't_sp1', name: 'Chạy quá tốc độ', description: 'Cảnh báo xe chạy vượt quá 40km/h trong khu dân cư' },
+    { id: 't_sp2', name: 'Xe máy phóng nhanh', description: 'Phát hiện xe máy chạy tốc độ cao tại khu vực giao lộ' },
+    { id: 't_sp3', name: 'Xe tải đi quá nhanh', description: 'Cảnh báo xe tải chạy quá 30km/h trong khuôn viên nhà máy' },
+    { id: 't_sp4', name: 'Giám sát tốc độ tối thiểu', description: 'Phát hiện xe di chuyển chậm bất thường trên cao tốc' }
+  ],
+  prd_label: [
+    { id: 'p_lb1', name: 'Kiểm tra dán nhãn', description: 'Phát hiện sản phẩm bị dán nhãn lệch hoặc rách bao bì' },
+    { id: 'p_lb2', name: 'Đọc mã vạch/OCR', description: 'Đọc văn bản và mã vạch trên nhãn để xác nhận thông tin' },
+    { id: 'p_lb3', name: 'Nhãn in mờ', description: 'Cảnh báo khi chữ in trên tem nhãn của sản phẩm bị mờ, không rõ' },
+    { id: 'p_lb4', name: 'Dán sai tem', description: 'Phát hiện thùng hàng bị dán sai loại tem so với quy định' }
+  ],
+  prd_assembly: [
+    { id: 'p_as1', name: 'Kiểm tra linh kiện', description: 'Cảnh báo bảng mạch thiếu linh kiện hoặc lắp ráp sai vị trí' },
+    { id: 'p_as2', name: 'Sai sót công đoạn', description: 'Phát hiện công nhân bỏ qua bước siết ốc trên dây chuyền' },
+    { id: 'p_as3', name: 'Phát hiện vết nứt', description: 'Phát hiện các vết nứt nhỏ trên bề mặt vỏ nhựa của sản phẩm' },
+    { id: 'p_as4', name: 'Lắp ngược chiều', description: 'Cảnh báo khi bộ phận nắp chai bị lắp ngược hoặc bị kênh' }
+  ],
+  prd_counting: [
+    { id: 'p_cn1', name: 'Đếm thùng hàng', description: 'Đếm số lượng thùng carton chạy qua băng chuyền' },
+    { id: 'p_cn2', name: 'Đếm sản phẩm đóng gói', description: 'Đếm chính xác số chai/lọ thành phẩm trước khi đóng thùng' },
+    { id: 'p_cn3', name: 'Kiểm đếm bao tải', description: 'Đếm tự động số lượng bao phân bón xuất khỏi dây chuyền' },
+    { id: 'p_cn4', name: 'Đếm linh kiện lỗi', description: 'Đếm và thống kê số linh kiện bị loại ra khỏi băng chuyền' }
+  ],
+  prd_productivity: [
+    { id: 'p_pd1', name: 'Đo lường thời gian trễ', description: 'Tính toán thời gian băng chuyền dừng hoạt động' },
+    { id: 'p_pd2', name: 'Phân tích nhịp độ', description: 'Theo dõi tốc độ làm việc trung bình của công nhân tại trạm' },
+    { id: 'p_pd3', name: 'Phát hiện máy dừng', description: 'Cảnh báo ngay khi máy ép nhựa ngừng hoạt động quá 2 phút' },
+    { id: 'p_pd4', name: 'Tính số sản phẩm/giờ', description: 'Đo lường tự động số lượng sản phẩm hoàn thành mỗi giờ' }
+  ],
+  hse_ppe: [
+    { id: 'h_pp1', name: 'Thiếu mũ bảo hộ', description: 'Cảnh báo công nhân không đội mũ bảo hộ tại công trường' },
+    { id: 'h_pp2', name: 'Không mặc áo phản quang', description: 'Phát hiện người không mặc áo phản quang vào khu vực máy xúc' },
+    { id: 'h_pp3', name: 'Không mang giày bảo hộ', description: 'Phát hiện công nhân đi dép lê hoặc không mang giày an toàn' },
+    { id: 'h_pp4', name: 'Thiếu kính hàn', description: 'Cảnh báo thợ hàn không đeo kính bảo hộ khi làm việc' }
+  ],
+  hse_machine: [
+    { id: 'h_mc1', name: 'Đứng gần máy ép', description: 'Cảnh báo khi người lao động đứng quá gần khu vực dập cắt' },
+    { id: 'h_mc2', name: 'Vượt rào chắn an toàn', description: 'Phát hiện nhân viên bước qua vạch vàng cảnh báo an toàn' },
+    { id: 'h_mc3', name: 'Thò tay vào máy', description: 'Cảnh báo khẩn cấp khi tay công nhân tiến sát lưỡi cưa' },
+    { id: 'h_mc4', name: 'Chui vào gầm máy', description: 'Phát hiện hành vi nguy hiểm chui vào gầm dây chuyền đang chạy' }
+  ],
+  hse_fight: [
+    { id: 'h_fg1', name: 'Đánh nhau tại xưởng', description: 'Phát hiện hành vi ẩu đả, xô xát giữa các công nhân' },
+    { id: 'h_fg2', name: 'Bạo lực tại cổng', description: 'Cảnh báo xô xát xảy ra khu vực kiểm soát ra vào' },
+    { id: 'h_fg3', name: 'Đám đông căng thẳng', description: 'Phát hiện đám đông có dấu hiệu kích động, chỉ trỏ lớn tiếng' },
+    { id: 'h_fg4', name: 'Người ngã do xô đẩy', description: 'Phát hiện người bị ngã xuống đất sau tình huống giằng co' }
+  ],
+  hse_phone: [
+    { id: 'h_ph1', name: 'Dùng điện thoại khi lái xe', description: 'Phát hiện tài xế xe nâng đang sử dụng điện thoại' },
+    { id: 'h_ph2', name: 'Dùng điện thoại tại chuyền', description: 'Cảnh báo công nhân bấm điện thoại trong giờ làm việc' },
+    { id: 'h_ph3', name: 'Cầm điện thoại khu vực cấm', description: 'Phát hiện nhân viên rút điện thoại ra tại kho chứa hóa chất dễ cháy' },
+    { id: 'h_ph4', name: 'Vừa đi vừa bấm điện thoại', description: 'Cảnh báo người vừa đi bộ vừa nhìn màn hình điện thoại tại lối đi xe nâng' }
+  ],
+  hse_proximity: [
+    { id: 'h_pr1', name: 'Người lại gần xe nâng', description: 'Báo động khi có người đi bộ đến gần xe nâng đang hoạt động' },
+    { id: 'h_pr2', name: 'Xung đột giao thông xưởng', description: 'Cảnh báo xe điện và người đi bộ sắp va chạm tại ngã tư xưởng' },
+    { id: 'h_pr3', name: 'Lại gần cần cẩu', description: 'Cảnh báo khi công nhân bước vào bán kính hoạt động của cần cẩu' },
+    { id: 'h_pr4', name: 'Đứng sau đuôi xe tải', description: 'Phát hiện người đứng trong điểm mù phía sau xe tải đang lùi' }
+  ],
+  fir_fire: [
+    { id: 'f_fi1', name: 'Phát hiện khói', description: 'Cảnh báo sớm khi có khói đen bốc lên từ khu vực kho bãi' },
+    { id: 'f_fi2', name: 'Phát hiện ngọn lửa', description: 'Phát hiện ngọn lửa bùng phát tại khu vực chứa hóa chất' },
+    { id: 'f_fi3', name: 'Khói mù hành lang', description: 'Cảnh báo khói dày đặc che khuất camera tại hành lang thoát hiểm' },
+    { id: 'f_fi4', name: 'Tia lửa điện', description: 'Phát hiện các tia lửa tóe ra bất thường từ tủ điện' }
+  ],
+  fir_smoking: [
+    { id: 'f_sm1', name: 'Hút thuốc trong xưởng', description: 'Cảnh báo nhân viên hút thuốc tại khu vực cấm lửa' },
+    { id: 'f_sm2', name: 'Hút thuốc kho chứa', description: 'Phát hiện người cầm điếu thuốc đang cháy ở kho bao bì' },
+    { id: 'f_sm3', name: 'Nhả khói thuốc lá', description: 'Nhận diện luồng khói nhả ra từ miệng người tại trạm xăng' },
+    { id: 'f_sm4', name: 'Hút thuốc góc khuất', description: 'Cảnh báo người trốn ra góc chân cầu thang bộ để hút thuốc' }
+  ],
+  fir_exit: [
+    { id: 'f_ex1', name: 'Vật cản lối thoát hiểm', description: 'Cảnh báo khi có thùng hàng đặt chắn ngang lối thoát hiểm' },
+    { id: 'f_ex2', name: 'Cửa thoát hiểm bị khóa', description: 'Phát hiện hành vi khóa hoặc chốt chặt cửa thoát hiểm khẩn cấp' },
+    { id: 'f_ex3', name: 'Để xe trước lối thoát', description: 'Cảnh báo ô tô hoặc xe máy đỗ bít lối ra vào thoát hiểm' },
+    { id: 'f_ex4', name: 'Tập kết rác lối thoát', description: 'Phát hiện các túi rác hoặc phế liệu bị chất đống trước cửa thoát hiểm' }
+  ],
+  ret_counting: [
+    { id: 'r_cn1', name: 'Đếm khách vào ra', description: 'Thống kê lượng khách hàng đi qua cửa chính cửa hàng' },
+    { id: 'r_cn2', name: 'Khách hàng lên tầng', description: 'Đếm số lượng khách sử dụng thang cuốn để lên tầng 2' },
+    { id: 'r_cn3', name: 'Khách vào khu dùng thử', description: 'Đếm số khách đi vào khu vực trải nghiệm sản phẩm mới' },
+    { id: 'r_cn4', name: 'Đếm theo nhóm', description: 'Phát hiện và đếm khách đi vào theo nhóm gia đình hoặc cá nhân' }
+  ],
+  ret_heatmap: [
+    { id: 'r_hm1', name: 'Bản đồ nhiệt quầy', description: 'Phân tích vùng khách hàng tập trung đông nhất tại quầy mỹ phẩm' },
+    { id: 'r_hm2', name: 'Điểm nóng lối đi', description: 'Xác định các kệ hàng thu hút nhiều người dừng lại xem nhất' },
+    { id: 'r_hm3', name: 'Thời gian dừng chân', description: 'Đo lường khu vực khách hàng thường xuyên đứng lại lâu nhất' },
+    { id: 'r_hm4', name: 'Góc khuất ít người', description: 'Báo cáo các góc chết trong cửa hàng mà khách hiếm khi bước vào' }
+  ],
+  ret_shelf: [
+    { id: 'r_sh1', name: 'Kệ hàng trống', description: 'Cảnh báo nhân viên khi kệ trưng bày nước giải khát hết hàng' },
+    { id: 'r_sh2', name: 'Hàng hóa lộn xộn', description: 'Phát hiện tình trạng hàng hóa bị đổ gãy, sai vị trí trên kệ' },
+    { id: 'r_sh3', name: 'Thiếu sản phẩm khuyến mãi', description: 'Cảnh báo khu vực trưng bày sản phẩm hot bị trống chỗ' },
+    { id: 'r_sh4', name: 'Hàng rơi xuống sàn', description: 'Phát hiện hộp sản phẩm bị rớt từ trên kệ xuống lối đi' }
+  ],
+  ret_queue: [
+    { id: 'r_qu1', name: 'Hàng đợi thanh toán', description: 'Cảnh báo khi có hơn 5 khách hàng đang xếp hàng chờ thanh toán' },
+    { id: 'r_qu2', name: 'Chờ tại quầy dịch vụ', description: 'Phát hiện khách hàng đứng chờ quá lâu tại quầy tư vấn' },
+    { id: 'r_qu3', name: 'Mở thêm quầy', description: 'Cảnh báo gọi thu ngân mở thêm quầy khi hàng đợi dài quá 4 mét' },
+    { id: 'r_qu4', name: 'Khách hàng bỏ đi', description: 'Phát hiện khách hàng rời khỏi hàng đợi do chờ quá lâu' }
+  ],
+  ret_crowdanalysis: [
+    { id: 'r_ca1', name: 'Nhân khẩu học khách', description: 'Thống kê tỷ lệ nam/nữ và độ tuổi ước lượng của khách mua sắm' },
+    { id: 'r_ca2', name: 'Nhận diện khách VIP', description: 'Nhận diện nhanh chóng khách hàng VIP khi bước vào cửa hàng' },
+    { id: 'r_ca3', name: 'Phát hiện trẻ em đi lạc', description: 'Phát hiện trẻ em đứng khóc một mình không có người lớn đi kèm' },
+    { id: 'r_ca4', name: 'Đám đông sự kiện', description: 'Đo lường số lượng khách vây quanh khu vực tổ chức sự kiện' }
+  ],
+  ret_staff_absence: [
+    { id: 'r_sa1', name: 'Vắng mặt tại quầy', description: 'Cảnh báo khi quầy thu ngân không có nhân viên trực quá 3 phút' },
+    { id: 'r_sa2', name: 'Nhân viên lơ là', description: 'Phát hiện nhân viên không đứng đúng vị trí phân công' },
+    { id: 'r_sa3', name: 'Thiếu người tiếp khách', description: 'Cảnh báo khách vào cửa hàng mà không có nhân viên ra tiếp đón' },
+    { id: 'r_sa4', name: 'Nhân viên tụ tập', description: 'Phát hiện 3 nhân viên trở lên đứng túm tụm nói chuyện riêng' }
+  ],
+  wh_forklift: [
+    { id: 'w_fl1', name: 'Xe nâng chạy quá tốc độ', description: 'Cảnh báo xe nâng di chuyển quá tốc độ trong kho hẹp' },
+    { id: 'w_fl2', name: 'Xe nâng sai tuyến', description: 'Phát hiện xe nâng đi vào khu vực dành riêng cho người đi bộ' },
+    { id: 'w_fl3', name: 'Đỗ xe nâng cản trở', description: 'Cảnh báo xe nâng đỗ chình ình giữa ngã ba lối đi trong kho' },
+    { id: 'w_fl4', name: 'Lùi xe nguy hiểm', description: 'Phát hiện xe nâng lùi mà không có người xi-nhan tại khu vực khuất' }
+  ],
+  wh_wrongzone: [
+    { id: 'w_wz1', name: 'Để kiện hàng sai bãi', description: 'Phát hiện pallet xếp nhầm vào khu vực xuất hàng đi quốc tế' },
+    { id: 'w_wz2', name: 'Đỗ xe sai làn bốc dỡ', description: 'Cảnh báo xe tải đỗ vào bãi xuất hàng khi chưa đến lượt' },
+    { id: 'w_wz3', name: 'Xếp hàng vượt vạch', description: 'Phát hiện các thùng hàng bị xếp lấn ra ngoài vạch kẻ lối đi' },
+    { id: 'w_wz4', name: 'Để rác nhầm chỗ', description: 'Phát hiện thùng rác hoặc vật phế liệu để vào bãi tập kết hàng mới' }
+  ],
+  wh_inventory: [
+    { id: 'w_iv1', name: 'Kiểm kê pallet tự động', description: 'Quét và đếm số lượng pallet đang tồn tại trên kệ kệ Rack' },
+    { id: 'w_iv2', name: 'Thống kê diện tích trống', description: 'Tính toán không gian trống trên sàn kho để xếp hàng mới' },
+    { id: 'w_iv3', name: 'Phát hiện kệ trống', description: 'Cảnh báo các ô kệ Rack đã hết hàng để dọn chỗ lưu kho' },
+    { id: 'w_iv4', name: 'Kiểm tra xếp chồng', description: 'Phát hiện thùng hàng bị xếp chồng quá cao nguy cơ đổ vỡ' }
+  ],
+  wh_counting: [
+    { id: 'w_cn1', name: 'Đếm số chuyến bốc dỡ', description: 'Đếm số lượt xe nâng gắp hàng từ xe tải vào kho' },
+    { id: 'w_cn2', name: 'Đếm số kiện xuất đi', description: 'Tự động đếm số thùng hàng được đẩy lên container' },
+    { id: 'w_cn3', name: 'Đếm bao bì', description: 'Đếm số lượng bao tải xi măng được chuyển qua băng tải' },
+    { id: 'w_cn4', name: 'Thống kê hàng nhập', description: 'Đếm số lượng pallet được dỡ xuống từ xe container' }
+  ],
+  wh_truck: [
+    { id: 'w_tr1', name: 'Quản lý xe tải ra vào', description: 'Đọc biển số và theo dõi thời gian xe tải dừng tại trạm cân' },
+    { id: 'w_tr2', name: 'Hướng dẫn đỗ xe tải', description: 'Phát hiện Dock bốc dỡ trống để điều phối xe tải tiến vào' },
+    { id: 'w_tr3', name: 'Xe tải đỗ quá lâu', description: 'Cảnh báo xe tải chiếm dụng cửa bốc dỡ quá 2 giờ đồng hồ' },
+    { id: 'w_tr4', name: 'Lùi xe sai cửa', description: 'Phát hiện xe tải lùi nhầm vào cửa Dock đang sửa chữa' }
+  ],
+  wh_wrongitem: [
+    { id: 'w_wi1', name: 'Phân loại nhầm hàng', description: 'Phát hiện thùng hàng khác màu/kích thước bị lẫn vào dây chuyền' },
+    { id: 'w_wi2', name: 'Hàng rớt khỏi băng chuyền', description: 'Cảnh báo khi có kiện hàng bị rơi rớt xuống gầm băng chuyền' },
+    { id: 'w_wi3', name: 'Thùng hàng rách nát', description: 'Phát hiện hộp carton bị móp méo, rách vỡ trên băng tải xuất' },
+    { id: 'w_wi4', name: 'Lẫn dị vật', description: 'Cảnh báo khi có dị vật (như cờ lê, giẻ lau) nằm trên băng chuyền' }
+  ],
+  bld_door_abnormal: [
+    { id: 'b_da1', name: 'Cửa sảnh mở lâu', description: 'Cảnh báo khi cửa kính sảnh chính bị kẹp mở không đóng lại' },
+    { id: 'b_da2', name: 'Cậy phá cửa', description: 'Phát hiện hành vi tác động vật lý mạnh vào cửa kính sảnh' },
+    { id: 'b_da3', name: 'Mở cửa ngoài giờ', description: 'Cảnh báo nếu cửa phòng giám đốc bị mở sau 20:00' },
+    { id: 'b_da4', name: 'Chặn cửa bằng vật cứng', description: 'Phát hiện có ghế hoặc gạch được dùng để chèn không cho cửa đóng' }
+  ],
+  bld_elevator_queue: [
+    { id: 'b_eq1', name: 'Ùn tắc sảnh thang máy', description: 'Báo động khi có quá nhiều người xếp hàng chờ thang máy giờ cao điểm' },
+    { id: 'b_eq2', name: 'Hành vi chen lấn thang', description: 'Phát hiện tình trạng xô đẩy, chen lấn khi chờ thang máy' },
+    { id: 'b_eq3', name: 'Giữ cửa thang máy lâu', description: 'Cảnh báo khi có người cố tình đứng chặn giữ cửa thang máy quá lâu' },
+    { id: 'b_eq4', name: 'Đem hàng cồng kềnh', description: 'Phát hiện người chở xe đẩy hàng cồng kềnh vào thang máy hành khách' }
+  ],
+  bld_meeting_room: [
+    { id: 'b_mr1', name: 'Phòng họp có người', description: 'Phát hiện phòng họp đang được sử dụng dù chưa đặt lịch' },
+    { id: 'b_mr2', name: 'Đếm người trong phòng họp', description: 'Đếm số người tham gia cuộc họp để điều chỉnh điều hòa' },
+    { id: 'b_mr3', name: 'Quên tắt điện/thiết bị', description: 'Cảnh báo phòng họp không có người nhưng máy chiếu vẫn bật' },
+    { id: 'b_mr4', name: 'Họp quá giờ', description: 'Cảnh báo cuộc họp kéo dài lấn sang lịch đặt phòng của người khác' }
+  ],
+  bld_smoking: [
+    { id: 'b_sm1', name: 'Hút thuốc hành lang', description: 'Cảnh báo khi có người hút thuốc tại hành lang chung' },
+    { id: 'b_sm2', name: 'Hút thuốc cầu thang bộ', description: 'Phát hiện nhân viên hút thuốc lén tại cầu thang thoát hiểm' },
+    { id: 'b_sm3', name: 'Hút thuốc nhà vệ sinh', description: 'Phát hiện khói nhả ra từ cửa khu vực nhà vệ sinh' },
+    { id: 'b_sm4', name: 'Hút thuốc hầm để xe', description: 'Cảnh báo người cầm điếu thuốc tại khu vực hầm đỗ xe dễ cháy' }
+  ],
+  bld_reception: [
+    { id: 'b_rc1', name: 'Khách chờ tại lễ tân', description: 'Báo hiệu cho nhân viên lễ tân khi có khách đứng chờ quá 1 phút' },
+    { id: 'b_rc2', name: 'Khách không hẹn trước', description: 'Nhận diện và báo cáo khách lạ đi lại khu vực sảnh lễ tân' },
+    { id: 'b_rc3', name: 'Tụ tập quầy lễ tân', description: 'Cảnh báo khi có quá đông khách (trên 10 người) vây quanh quầy' },
+    { id: 'b_rc4', name: 'Shipper giao đồ', description: 'Phát hiện nhân viên giao hàng mặc đồng phục (Grab, Shopee) đang chờ' }
+  ],
+  hc_ppe_sterile: [
+    { id: 'h_ps1', name: 'Thiếu đồ bảo hộ phẫu thuật', description: 'Cảnh báo bác sĩ không đội mũ, đeo khẩu trang trước khi vào phòng mổ' },
+    { id: 'h_ps2', name: 'Thiếu găng tay', description: 'Phát hiện nhân viên y tế không đeo găng tay khi xử lý mẫu vật' },
+    { id: 'h_ps3', name: 'Không mặc áo choàng', description: 'Phát hiện người không mặc áo choàng cách ly đi vào buồng bệnh đặc biệt' },
+    { id: 'h_ps4', name: 'Mặc sai quy cách PPE', description: 'Cảnh báo đồ bảo hộ bị rách hoặc mặc không kín sát' }
+  ],
+  hc_queue: [
+    { id: 'h_qu1', name: 'Chờ lấy số thứ tự', description: 'Cảnh báo khu vực máy lấy số đang có quá đông bệnh nhân xếp hàng' },
+    { id: 'h_qu2', name: 'Ùn tắc trước cửa khám', description: 'Phát hiện lượng người chờ khám tại phòng nội tổng hợp quá đông' },
+    { id: 'h_qu3', name: 'Hàng chờ cấp cứu', description: 'Báo động khi có bệnh nhân phải chờ ở hành lang khu vực cấp cứu' },
+    { id: 'h_qu4', name: 'Chờ thanh toán viện phí', description: 'Đếm số lượng người xếp hàng nộp tiền viện phí giờ cao điểm' }
+  ],
+  hc_hand_hygiene: [
+    { id: 'h_hh1', name: 'Không sát khuẩn tay', description: 'Cảnh báo nhân viên y tế không sát khuẩn tay trước khi vào buồng bệnh' },
+    { id: 'h_hh2', name: 'Tuân thủ rửa tay', description: 'Theo dõi tỷ lệ người nhà bệnh nhân rửa tay sát khuẩn tại sảnh' },
+    { id: 'h_hh3', name: 'Không rửa tay sau khám', description: 'Cảnh báo bác sĩ không sát khuẩn lại tay sau khi rời khỏi phòng khám' },
+    { id: 'h_hh4', name: 'Sát khuẩn quá nhanh', description: 'Phát hiện hành vi rửa tay chiếu lệ dưới 5 giây' }
+  ],
+  hc_ppe_medical: [
+    { id: 'h_pm1', name: 'Không khẩu trang sảnh', description: 'Cảnh báo khách ra vào bệnh viện không đeo khẩu trang y tế' },
+    { id: 'h_pm2', name: 'Đeo khẩu trang sai cách', description: 'Phát hiện người kéo khẩu trang xuống cằm tại khu vực cách ly' },
+    { id: 'h_pm3', name: 'Bỏ khẩu trang khi ho', description: 'Phát hiện bệnh nhân tháo khẩu trang ra để ho/hắt hơi' },
+    { id: 'h_pm4', name: 'Nhân viên không khẩu trang', description: 'Cảnh báo y tá/bác sĩ không đeo khẩu trang khi giao tiếp bệnh nhân' }
+  ],
+  edu_leave: [
+    { id: 'e_lv1', name: 'Học sinh trốn học', description: 'Phát hiện học sinh leo rào hoặc trốn khỏi khuôn viên trường' },
+    { id: 'e_lv2', name: 'Ra cổng giờ học', description: 'Cảnh báo học sinh di chuyển ra hướng cổng chính khi đang có tiết' },
+    { id: 'e_lv3', name: 'Trốn ở góc khuất', description: 'Phát hiện học sinh núp sau nhà vệ sinh hoặc gốc cây trong giờ học' },
+    { id: 'e_lv4', name: 'Trèo tường rào', description: 'Báo động khi có người trèo qua tường rào bảo vệ của trường học' }
+  ],
+  edu_violence: [
+    { id: 'e_vl1', name: 'Bạo lực học đường', description: 'Phát hiện đám đông học sinh tụ tập và có xô xát ở góc sân trường' },
+    { id: 'e_vl2', name: 'Đánh nhau trong lớp', description: 'Cảnh báo hành vi ẩu đả giữa các học sinh khi giáo viên vắng mặt' },
+    { id: 'e_vl3', name: 'Đe dọa/Trấn lột', description: 'Phát hiện một nhóm học sinh bao vây dồn ép một học sinh khác' },
+    { id: 'e_vl4', name: 'Vũ khí trong trường', description: 'Cảnh báo khẩn cấp khi phát hiện học sinh cầm gậy gộc hoặc vật sắc nhọn' }
+  ],
+  edu_attendance: [
+    { id: 'e_at1', name: 'Điểm danh tự động', description: 'Nhận diện và ghi nhận sĩ số học sinh vào lớp học' },
+    { id: 'e_at2', name: 'Đi trễ', description: 'Xác định học sinh đi vào lớp sau khi tiếng chuông đã reo' },
+    { id: 'e_at3', name: 'Rời lớp sớm', description: 'Ghi nhận học sinh xách cặp đi ra khỏi lớp trước giờ tan trường' },
+    { id: 'e_at4', name: 'Vắng mặt quá lâu', description: 'Cảnh báo khi học sinh xin ra ngoài đi vệ sinh quá 15 phút chưa quay lại' }
+  ],
+  edu_traffic: [
+    { id: 'e_tr1', name: 'Đậu xe chiếm lề đường', description: 'Cảnh báo phụ huynh đỗ xe máy sai quy định trước cổng trường' },
+    { id: 'e_tr2', name: 'Ùn tắc giờ tan tầm', description: 'Phát hiện tình trạng ùn tắc giao thông cục bộ khi học sinh ra về' },
+    { id: 'e_tr3', name: 'Bán hàng rong cản lối', description: 'Cảnh báo xe đẩy bán hàng rong lấn chiếm vạch sang đường của học sinh' },
+    { id: 'e_tr4', name: 'Xe ô tô quay đầu hẹp', description: 'Phát hiện ô tô quay đầu gây ách tắc ngay trước cổng trường học' }
+  ],
+
+
   sec_camera_tamper: [
     { id: 'ct1', name: 'Che tay trước ống kính', description: 'Cảnh báo khi có người cố tình dùng tay che camera' },
     { id: 'ct2', name: 'Xịt sơn/Dán băng dính', description: 'Phát hiện ống kính bị xịt sơn đen hoặc dán kín' },
@@ -244,12 +494,6 @@ const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; d
     { id: 'br3', name: 'Phòng kỹ thuật điện', description: 'Cảnh báo nhân viên không chuyên môn tiếp cận tủ điện tổng' },
     { id: 'br4', name: 'Lối đi nội bộ VIP', description: 'Phát hiện người sử dụng trái phép hành lang dành riêng cho ban lãnh đạo' },
   ],
-  hc_fall: [
-    { id: 'hf1', name: 'Phòng bệnh nhân', description: 'Phát hiện bệnh nhân ngã xuống sàn trong phòng điều trị' },
-    { id: 'hf2', name: 'Ngã trong nhà vệ sinh', description: 'Cảnh báo khẩn cấp nếu có người trượt ngã tại nhà vệ sinh' },
-    { id: 'hf3', name: 'Ngã tại cầu thang', description: 'Phát hiện người cao tuổi, bệnh nhân vấp ngã khu vực bậc thang' },
-    { id: 'hf4', name: 'Hành lang vắng', description: 'Báo động nếu bệnh nhân đột quỵ tại hành lang ít người qua lại' },
-  ],
   edu_recess: [
     { id: 'er1', name: 'Khu vực cấm', description: 'Phát hiện học sinh tiếp cận sân thượng hoặc phòng kỹ thuật' },
     { id: 'er2', name: 'Tụ tập góc khuất', description: 'Cảnh báo nhóm học sinh tụ tập ở sau nhà vệ sinh hoặc góc sân bóng' },
@@ -285,6 +529,92 @@ const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; d
     { id: 'r5', name: 'Hành vi lấy rồi trả hàng', description: 'Theo dõi khách cầm lên rồi đặt lại sản phẩm để tối ưu kệ' },
     { id: 'r6', name: 'Phòng thử đồ chờ lâu', description: 'Cảnh báo khi phòng thử đồ có hàng chờ dài bất thường' },
   ],
+};
+
+// Per-use-case example prompts for Smart mode placeholder
+const TASK_EXAMPLE_PROMPTS: Record<string, string> = {
+  sec_intrusion:     'VD: "Cảnh báo khi có người xâm nhập khu vực cấm sau 22h"',
+  sec_camera_tamper: 'VD: "Phát hiện camera bị che tay hoặc xịt sơn vào ống kính"',
+  sec_door_abnormal: 'VD: "Cảnh báo khi cửa phòng server bị mở sau 18h"',
+  sec_wrong_way:     'VD: "Phát hiện xe máy đi ngược chiều tại cổng ra"',
+  sec_abandoned_object: 'VD: "Cảnh báo vali để ở sảnh quá 10 phút không ai lấy"',
+  sec_loitering:     'VD: "Phát hiện người lảng vảng bất thường trước cổng chính"',
+  sec_afterhours:    'VD: "Cảnh báo nếu còn người trong văn phòng sau 22h"',
+  sec_assetloss:     'VD: "Báo động ngay nếu laptop trên bàn bị di dời khỏi vị trí"',
+  sec_crowd:         'VD: "Cảnh báo khi có từ 5 người tụ tập trước cổng chính"',
+  sec_vehicle_reid:  'VD: "Tìm kiếm xe tải màu trắng khả nghi trong bãi đỗ"',
+  security:          'VD: "Phát hiện người di chuyển trong văn phòng sau 22h"',
+  counting:          'VD: "Đếm số khách hàng đi qua cửa chính theo ngày"',
+  ppe:               'VD: "Cảnh báo công nhân không đội mũ bảo hộ tại công trường"',
+  fire:              'VD: "Cảnh báo sớm khi phát hiện khói hoặc ngọn lửa trong kho"',
+  tra_alpr:          'VD: "Nhận diện biển số các xe ra vào cổng chính"',
+  tra_count:         'VD: "Đếm số ô tô và xe máy đi qua vạch đếm"',
+  tra_parking:       'VD: "Cảnh báo xe đỗ quá 15 phút tại khu vực cấm"',
+  tra_speed:         'VD: "Phát hiện xe chạy quá 40km/h trong khu dân cư"',
+  tra_congestion:    'VD: "Cảnh báo ùn tắc khi có hơn 5 xe chờ tại cổng"',
+  tra_smartpark:     'VD: "Cảnh báo khi bãi đỗ sắp đầy dưới 10% chỗ trống"',
+  prd_label:         'VD: "Phát hiện sản phẩm bị dán nhãn lệch hoặc rách bao bì"',
+  prd_assembly:      'VD: "Cảnh báo bảng mạch thiếu linh kiện trên dây chuyền"',
+  prd_counting:      'VD: "Đếm số thùng carton chạy qua băng chuyền"',
+  prd_productivity:  'VD: "Theo dõi tốc độ băng chuyền và phát hiện khi dừng quá 2 phút"',
+  hse_ppe:           'VD: "Cảnh báo công nhân không đội mũ bảo hộ tại công trường"',
+  hse_machine:       'VD: "Báo động khi người đứng quá gần máy ép đang chạy"',
+  hse_fight:         'VD: "Phát hiện ẩu đả giữa công nhân tại khu vực xưởng"',
+  hse_phone:         'VD: "Phát hiện tài xế xe nâng sử dụng điện thoại khi lái"',
+  hse_proximity:     'VD: "Cảnh báo khi người đi bộ đến gần xe nâng đang hoạt động"',
+  fir_fire:          'VD: "Cảnh báo sớm khi có khói đen bốc lên từ kho bãi"',
+  fir_smoking:       'VD: "Cảnh báo nhân viên hút thuốc tại khu vực cấm lửa"',
+  fir_exit:          'VD: "Phát hiện thùng hàng chắn lối thoát hiểm"',
+  ret_counting:      'VD: "Đếm số khách hàng đi vào cửa hàng theo ngày"',
+  ret_heatmap:       'VD: "Phân tích vùng khách tập trung đông nhất tại quầy mỹ phẩm"',
+  ret_shelf:         'VD: "Cảnh báo khi kệ trưng bày nước giải khát hết hàng"',
+  ret_queue:         'VD: "Cảnh báo khi có hơn 5 khách xếp hàng chờ thanh toán"',
+  ret_crowdanalysis: 'VD: "Thống kê tỷ lệ nam/nữ và độ tuổi khách mua sắm"',
+  ret_staff_absence: 'VD: "Cảnh báo quầy thu ngân không có nhân viên trực quá 3 phút"',
+  retail_analytics:  'VD: "Phân tích vị trí khách đi lại nhiều nhất trong cửa hàng"',
+  wh_forklift:       'VD: "Cảnh báo xe nâng chạy quá tốc độ trong kho hẹp"',
+  wh_wrongzone:      'VD: "Phát hiện pallet xếp nhầm vào khu vực xuất hàng"',
+  wh_inventory:      'VD: "Quét và đếm số pallet tồn trên kệ Rack"',
+  wh_counting:       'VD: "Đếm số lượt xe nâng gắp hàng từ xe tải vào kho"',
+  wh_truck:          'VD: "Đọc biển số và theo dõi thời gian xe tải dừng tại trạm"',
+  wh_wrongitem:      'VD: "Phát hiện thùng hàng lẫn màu bị trộn vào dây chuyền"',
+  bld_door_abnormal: 'VD: "Cảnh báo khi cửa kính sảnh chính bị mở quá lâu"',
+  bld_elevator_queue: 'VD: "Báo động khi có quá nhiều người chờ thang máy giờ cao điểm"',
+  bld_meeting_room:  'VD: "Phát hiện phòng họp không người nhưng máy chiếu vẫn bật"',
+  bld_smoking:       'VD: "Cảnh báo khi có người hút thuốc tại hành lang chung"',
+  bld_reception:     'VD: "Báo hiệu cho lễ tân khi có khách đứng chờ quá 1 phút"',
+  bld_restricted:    'VD: "Báo động nếu có người không phận sự vào phòng server"',
+  bld_inout:         'VD: "Đếm nhân viên ra vào qua cổng chính theo ca"',
+  bld_public_density: 'VD: "Đo mức độ đông đúc tại sảnh chính toà nhà"',
+  hc_ppe_sterile:    'VD: "Cảnh báo bác sĩ không đội mũ trước khi vào phòng mổ"',
+  hc_queue:          'VD: "Cảnh báo khu vực máy lấy số đang quá đông bệnh nhân"',
+  hc_hand_hygiene:   'VD: "Cảnh báo nhân viên không sát khuẩn tay trước khi vào buồng bệnh"',
+  hc_ppe_medical:    'VD: "Cảnh báo khách ra vào bệnh viện không đeo khẩu trang"',
+  hc_patient_escape: 'VD: "Cảnh báo khi bệnh nhân rời khỏi cổng bệnh viện"',
+  hc_restricted:     'VD: "Phát hiện người lạ vào kho thuốc ngoài giờ hành chính"',
+  hc_crowd_restricted: 'VD: "Cảnh báo ùn ứ người nhà tại hành lang khu cấp cứu"',
+  edu_leave:         'VD: "Phát hiện học sinh leo rào trốn khỏi khuôn viên trường"',
+  edu_violence:      'VD: "Phát hiện đám đông học sinh tụ tập và xô xát ở sân trường"',
+  edu_attendance:    'VD: "Điểm danh tự động và cảnh báo học sinh đi trễ"',
+  edu_traffic:       'VD: "Cảnh báo phụ huynh đỗ xe sai quy định trước cổng trường"',
+  edu_escape:        'VD: "Phát hiện học sinh leo tường ra khỏi trường trong giờ học"',
+  edu_cheating:      'VD: "Phát hiện học sinh sử dụng điện thoại trong phòng thi"',
+  edu_weapons:       'VD: "Cảnh báo ngay khi phát hiện dao/gậy trong khuôn viên trường"',
+  edu_recess:        'VD: "Phát hiện học sinh tụ tập góc khuất sau nhà vệ sinh"',
+  ap_abandoned_baggage: 'VD: "Cảnh báo vali để quá 5 phút tại sảnh chờ"',
+  ap_restricted:     'VD: "Cảnh báo người lạ đi vào khu vực đường băng"',
+  ap_baggage_carousel: 'VD: "Phát hiện kẹt hành lý hoặc ùn ứ trên băng chuyền"',
+  ap_weapon:         'VD: "Cảnh báo khẩn khi phát hiện súng trong hành lý"',
+  ap_safety_line:    'VD: "Báo động khi hành khách lấn qua vạch vàng lúc tàu đến"',
+  ap_queue:          'VD: "Cảnh báo khi hàng chờ check-in quá dài"',
+  traffic:           'VD: "Đọc biển số và đếm xe ra vào cổng công ty"',
+  behavior:          'VD: "Phát hiện hành vi đánh nhau trong khuôn viên"',
+  defect_surface:    'VD: "Phát hiện lỗi xước, móp trên bề mặt sản phẩm"',
+  defect_assembly:   'VD: "Phát hiện linh kiện bị thiếu hoặc lắp ráp sai"',
+  defect_label:      'VD: "Phát hiện in lỗi, chữ mờ trên tem nhãn"',
+  defect_foreign:    'VD: "Phát hiện dị vật lạ nằm trong thùng thành phẩm"',
+  label_inspection:  'VD: "Kiểm tra tem nhãn bị lệch hoặc rách bao bì"',
+  assembly_inspection: 'VD: "Phát hiện bảng mạch thiếu linh kiện"',
 };
 
 const STANDARD_MODEL_NAMES: Record<string, string> = {
@@ -745,13 +1075,6 @@ const DOMAINS: DomainDef[] = [
   {
     key: 'healthcare', name: 'Y tế', color: 'teal',
     useCases: [
-      { id: 'hc_fall', name: 'Giám sát bệnh nhân ngã', taskMapType: 'behavior', desc: 'Phát hiện bệnh nhân ngã xuống sàn trong buồng bệnh, hành lang, nhà vệ sinh hoặc khu phục hồi chức năng.', params: [
-        { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
-        { key: 'confirmSeconds', label: 'Xác nhận ngã sau', type: 'number', unit: 'giây' },
-        { key: 'excludeZone', label: 'Khu vực giường bệnh (loại trừ)', type: 'zone_hint', optional: true },
-        { key: 'alertLevel', label: 'Mức độ ưu tiên cảnh báo', type: 'select', options: ['Thấp', 'Vừa', 'Khẩn'] },
-        { key: 'notifyTo', label: 'Người nhận cảnh báo', type: 'text', placeholder: 'VD: điều dưỡng trực / bác sĩ trực' },
-      ]},
       { id: 'hc_ppe_sterile', name: 'Tuân thủ trang phục vô khuẩn', taskMapType: 'ppe', desc: 'Phát hiện người không mặc đúng trang phục vô khuẩn vào khu phòng mổ, ICU, phòng sạch.', params: [
         { key: 'zone', label: 'Vùng vô khuẩn', type: 'zone_hint' },
         { key: 'requiredPPE', label: 'Trang phục bắt buộc', type: 'multicheck', options: ['Áo mổ', 'Mũ phẫu thuật', 'Khẩu trang', 'Bao giày'] },
@@ -1142,42 +1465,53 @@ export default function PipelineBuilder({
   const [scheduleSlots, setScheduleSlots] = useState<ScheduleSlot[]>([]); // [] = 24/7
 
   // AI mode
-  const [monitoringMode, setMonitoringMode] = useState<'standard' | 'smart' | 'defect_detection'>('smart');
-  const [inferredMode, setInferredMode] = useState<'standard' | 'smart' | 'defect_detection'>('smart');
   const [userDescription, setUserDescription] = useState('');
+  const [smartFlowState, setSmartFlowState] = useState<'idle' | 'preview' | 'applied'>('idle');
+
   const [routedModelName, setRoutedModelName] = useState('YOLO-NAS-S');
+
   const [routedModelReason, setRoutedModelReason] = useState('Mặc định');
+
   const [searchQuery, setSearchQuery] = useState('');
+
   const [searchScope, setSearchScope] = useState<'whole_scene' | 'roi'>('whole_scene');
 
-  // Standard config
-  const [standardFunction, setStandardFunction] = useState<'security' | 'counting'>('security');
+
+
   const [detectionTarget, setDetectionTarget] = useState('person');
+
   const [customTarget, setCustomTarget] = useState('');
+
   const [detectionRule, setDetectionRule] = useState('enter_area');
+
   const [alertDuration, setAlertDuration] = useState(10);
+
   const [alertCount, setAlertCount] = useState(1);
+
   const [cooldown, setCooldown] = useState(60);
+
   const [confidence, setConfidence] = useState(0.65);
+
   const [iou, setIou] = useState(0.45);
+
   const [tracker, setTracker] = useState('bytetrack');
+
   const [frameSkip, setFrameSkip] = useState(0);
+
   const [inferenceFps, setInferenceFps] = useState(15);
+
   const [maxLimit, setMaxLimit] = useState(5);
+
   const [similarityThreshold, setSimilarityThreshold] = useState(0.78);
+
   const [retrievalTopK, setRetrievalTopK] = useState(5);
 
-  // Task-specific
-  const [countingDirection, setCountingDirection] = useState<'in' | 'out' | 'both'>('both');
-  const [ppeItems, setPpeItems] = useState({ hardhat: true, vest: true, glove: false, mask: false });
-  const [fireSensitivity, setFireSensitivity] = useState<'low' | 'medium' | 'high'>('high');
-  const [behaviorItems, setBehaviorItems] = useState({ fall: false, violence: false, crowd: false, smoking: false, phone: false, weapon: false });
-  const [retailMode, setRetailMode] = useState<'heatmap' | 'demographics'>('heatmap');
 
-  // Zone spatial condition: 'inside' = center of bbox in polygon; 'intersect' = bbox edge touches polygon
+
   const [zoneCondition, setZoneCondition] = useState<'inside' | 'intersect'>('inside');
 
-  // Counting: reference product image (only count this product)
+
+
   const [countingProductImage, setCountingProductImage] = useState<string | null>(null);
 
   // AI context hints for smart mode
@@ -1208,6 +1542,14 @@ const [selectedDomain, setSelectedDomain] = useState<string>('');
   const [useCaseParamValues, setUseCaseParamValues] = useState<Record<string, string>>({});
   const [useCaseImages, setUseCaseImages] = useState<string[]>([]);
   const [useCaseImageROIs, setUseCaseImageROIs] = useState<Record<number, BoundingBox[]>>({});
+  const [inputMode, setInputMode] = useState<'standard' | 'smart'>('standard');
+  const useCaseParamsCache = useRef<Record<string, Record<string, string>>>({});
+  const useCaseImagesCache = useRef<Record<string, string[]>>({});
+  const useCaseImageROIsCache = useRef<Record<string, Record<number, BoundingBox[]>>>({});
+  const userDescriptionCache = useRef<Record<string, string>>({});
+  const smartFlowStateCache = useRef<Record<string, 'idle' | 'preview' | 'applied'>>({});
+  const multiZonesCache = useRef<Record<string, Record<string, DrawnZone[]>>>({});
+  const drawingPointsCache = useRef<Record<string, { x: number; y: number }[]>>({});
 
   // UI
   // Performance presets
@@ -1224,7 +1566,6 @@ const [selectedDomain, setSelectedDomain] = useState<string>('');
   // UI
   const [savedToast, setSavedToast] = useState(false);
   const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
-  const [ruleCondition, setRuleCondition] = useState('count_lt_min');
 
   // Derived
   const activeCamera = cameras.find(c => c.id === selectedCameraIds[0]);
@@ -1261,7 +1602,6 @@ const [selectedDomain, setSelectedDomain] = useState<string>('');
     setEditingPipelineId(null);
     setSelectedCameraIds([]);
     setFlowName('');
-    setMonitoringMode('smart');
     setUserDescription('');
     setRoutedModelName('YOLO-NAS-S');
     setRoutedModelReason('Mặc định');
@@ -1304,23 +1644,36 @@ setSelectedDomain('');
     setUseCaseParamValues({});
     setUseCaseImages([]);
     setUseCaseImageROIs({});
+    useCaseParamsCache.current = {};
+    useCaseImagesCache.current = {};
+    useCaseImageROIsCache.current = {};
+    userDescriptionCache.current = {};
+    smartFlowStateCache.current = {};
+    multiZonesCache.current = {};
+    drawingPointsCache.current = {};
+    setUserDescription('');
+    setSmartFlowState('idle');
   };
 
   const inferMonitoringConfig = (text: string, hasRoi: boolean): InferredMonitoringConfig => {
+    
     const lw = text.toLowerCase();
-    const hasPpe = ['mũ', 'áo phản quang', 'bảo hộ', 'ppe', 'an toàn'].some(k => lw.includes(k));
-    const hasVehicle = ['xe', 'ô tô', 'oto', 'xe máy', 'motorcycle', 'truck', 'tải'].some(k => lw.includes(k));
-    const hasPerson = ['người', 'khách', 'nhân viên', 'công nhân', 'person'].some(k => lw.includes(k));
-    const asksCount = ['đếm', 'số lượng', 'bao nhiêu', 'count'].some(k => lw.includes(k));
-    const usesLine = ['vào ra', 'ra vào', 'đi qua', 'qua cổng', 'cross', 'line'].some(k => lw.includes(k));
-    const usesExit = ['rời khỏi', 'đi ra', 'exit'].some(k => lw.includes(k));
-    const usesIntrusion = ['xâm nhập', 'đi vào', 'vào khu vực', 'enter'].some(k => lw.includes(k));
-    const usesLoiter = ['lảng vảng', 'ở lại lâu', 'loiter', 'quá lâu'].some(k => lw.includes(k));
-    const hasDefect = ['lỗi', 'móp', 'rách', 'xước', 'hỏng', 'defect'].some(k => lw.includes(k));
-    const hasAbandoned = ['bỏ lại', 'leaving', 'balo', 'ba lô', 'túi'].some(k => lw.includes(k));
-    const hasRemoval = ['lấy hàng', 'lấy khỏi', 'remove'].some(k => lw.includes(k));
+    const hasPpe = ['mũ', 'áo phản quang', 'bảo hộ', 'ppe', 'an toàn', 'găng tay', 'khẩu trang'].some(k => lw.includes(k));
+    const hasVehicle = ['xe', 'ô tô', 'oto', 'xe máy', 'motorcycle', 'truck', 'tải', 'biển số'].some(k => lw.includes(k));
+    const hasPerson = ['người', 'khách', 'nhân viên', 'công nhân', 'person', 'bác sĩ', 'học sinh', 'phụ huynh', 'tài xế', 'bảo vệ'].some(k => lw.includes(k));
+    const asksCount = ['đếm', 'số lượng', 'bao nhiêu', 'count', 'thống kê', 'kiểm kê', 'tỷ lệ'].some(k => lw.includes(k));
+    const usesLine = ['vào ra', 'ra vào', 'đi qua', 'qua cổng', 'cross', 'line', 'lên tầng'].some(k => lw.includes(k));
+    const usesExit = ['rời khỏi', 'đi ra', 'exit', 'trốn'].some(k => lw.includes(k));
+    const usesIntrusion = ['xâm nhập', 'đi vào', 'vào khu vực', 'enter', 'leo trèo', 'lẻn vào', 'vượt rào'].some(k => lw.includes(k));
+    const usesLoiter = ['lảng vảng', 'ở lại lâu', 'loiter', 'quá lâu', 'đứng lâu', 'chờ', 'xếp hàng', 'tụ tập', 'đám đông'].some(k => lw.includes(k));
+    const hasDefect = ['lỗi', 'móp', 'rách', 'xước', 'hỏng', 'defect', 'nhãn lệch', 'thiếu linh kiện', 'sai sót', 'nhầm', 'rớt'].some(k => lw.includes(k));
+    const hasAbandoned = ['bỏ lại', 'leaving', 'balo', 'ba lô', 'túi', 'vali', 'thùng hàng', 'pallet'].some(k => lw.includes(k));
+    const hasRemoval = ['lấy hàng', 'lấy khỏi', 'remove', 'mất', 'trộm', 'cậy phá', 'gỡ xuống'].some(k => lw.includes(k));
+    const hasFire = ['khói', 'cháy', 'lửa', 'ngọn lửa', 'hút thuốc'].some(k => lw.includes(k));
+    const hasPhone = ['điện thoại'].some(k => lw.includes(k));
+    const hasFight = ['đánh nhau', 'xô xát', 'bạo lực', 'bạo loạn', 'hỗn chiến'].some(k => lw.includes(k));
     const usesKnownTarget = hasPerson || hasVehicle;
-    const needsOpen = hasPpe || hasDefect || hasAbandoned || hasRemoval || (!usesKnownTarget && text.trim().length > 0);
+    const needsOpen = hasPpe || hasDefect || hasAbandoned || hasRemoval || hasFire || hasPhone || hasFight || (!usesKnownTarget && text.trim().length > 0);
 
     if (!needsOpen && usesKnownTarget) {
       const target = hasVehicle ? 'vehicle' : 'person';
@@ -1343,28 +1696,153 @@ setSelectedDomain('');
     };
   };
 
+  const analyzePrompt = (text: string) => {
+    const lw = text.toLowerCase();
+    const findings: string[] = [];
+    const add = (msg: string) => { if (!findings.includes(msg)) findings.push(msg); };
+
+    let action = 'giám sát và phân tích';
+    let target = 'các đối tượng';
+    let location = 'khu vực được chỉ định';
+    let time = '';
+    let condition = 'nếu có dấu hiệu bất thường';
+
+    
+    
+    // ── Hành vi chính ──
+    if (/xâm\s+nhập|đột\s+nhập|leo\s+trèo|lẻn\s+vào|trốn|trèo\s+tường/.test(lw)) { action = 'phát hiện xâm nhập/đột nhập'; add('Hành vi: Xâm nhập / đột nhập'); }
+    else if (/lảng\s+vảng|ở\s+lại\s+lâu|dòm\s+ngó|đứng\s+lâu|đứng\s+lại|chờ/.test(lw)) { action = 'phát hiện lảng vảng/chờ đợi lâu'; add('Hành vi: Lảng vảng / chờ đợi quá lâu'); }
+    else if (/đi\s+ngược|ngược\s+chiều|lắp\s+ngược/.test(lw)) { action = 'cảnh báo ngược chiều/ngược hướng'; add('Hành vi: Ngược chiều / ngược hướng'); }
+    else if (/che\s+(tay|kính)|bịt|dán|tác\s+động/.test(lw)) { action = 'phát hiện phá hoại camera'; add('Hành vi: Che/phá hoại camera'); }
+    else if (/bỏ\s+lại|vô\s+chủ|leaving|bỏ\s+quên/.test(lw)) { action = 'phát hiện vật thể vô chủ'; add('Hành vi: Bỏ lại đồ vật'); }
+    else if (/lấy\s+(mất|đi|trộm)|di\s+dời|mất|gỡ\s+xuống/.test(lw)) { action = 'cảnh báo mất cắp/di dời'; add('Hành vi: Đồ vật bị lấy mất'); }
+    else if (/đếm|số\s+lượng|count|thống\s+kê|kiểm\s+kê|tỷ\s+lệ/.test(lw)) { action = 'thống kê số lượng'; add('Hành vi: Đếm số lượng / thống kê'); }
+    else if (/vào\s+ra|ra\s+vào|đi\s+qua/.test(lw)) { action = 'giám sát lưu lượng'; add('Hành vi: Đi qua (vào/ra)'); }
+    else if (/đánh\s+nhau|xô\s+xát|bạo\s+loạn|hỗn\s+chiến|đe\s+dọa|trấn\s+lột/.test(lw)) { action = 'phát hiện bạo lực/đánh nhau'; add('Hành vi: Bạo lực / đe dọa'); }
+    else if (/tụ\s+tập|đám\s+đông|đông\s+người|ùn\s+tắc|kẹt|ách\s+tắc/.test(lw)) { action = 'phát hiện đám đông/ùn tắc'; add('Hành vi: Đám đông / ùn tắc'); }
+    else if (/khói|cháy|lửa|ngọn\s+lửa|tia\s+lửa/.test(lw)) { action = 'phát hiện khói/lửa cháy'; add('Hành vi: Cháy nổ / có khói'); }
+    else if (/hút\s+thuốc/.test(lw)) { action = 'phát hiện hút thuốc'; add('Hành vi: Hút thuốc sai quy định'); }
+    else if (/điện\s+thoại/.test(lw)) { action = 'phát hiện sử dụng điện thoại'; add('Hành vi: Dùng điện thoại'); }
+    else if (/mũ\s+bảo\s+hộ|áo\s+phản\s+quang|găng\s+tay|khẩu\s+trang|giày\s+bảo\s+hộ|kính\s+hàn|áo\s+choàng/.test(lw)) { action = 'kiểm tra đồ bảo hộ (PPE)'; add('Hành vi: Không tuân thủ đồ bảo hộ'); }
+    else if (/nhãn|mã\s+vạch|ocr|thông\s+tin|in\s+mờ/.test(lw)) { action = 'nhận diện và đọc nhãn'; add('Hành vi: Kiểm tra nhãn mác / OCR'); }
+    else if (/vượt\s+quá\s+tốc\s+độ|phóng\s+nhanh|tốc\s+độ/.test(lw)) { action = 'phát hiện vi phạm tốc độ'; add('Hành vi: Chạy quá tốc độ'); }
+    else if (/dừng\s+đỗ|đỗ\s+xe/.test(lw)) { action = 'phát hiện đỗ xe sai quy định'; add('Hành vi: Dừng đỗ sai quy định'); }
+    else if (/biển\s+số|ngoại\s+tỉnh|danh\s+sách\s+đen/.test(lw)) { action = 'nhận diện biển số xe'; add('Hành vi: Nhận diện biển số xe'); }
+    else if (/thiếu\s+linh\s+kiện|sai\s+sót|nhầm|rách|lệch|rớt|móp|kênh|nứt|dị\s+vật/.test(lw)) { action = 'kiểm tra lỗi sản phẩm/quy trình'; add('Hành vi: Lỗi sản phẩm / quy trình'); }
+    else if (/vắng\s+mặt|lơ\s+là|quên\s+tắt/.test(lw)) { action = 'giám sát nhân sự/thiết bị'; add('Hành vi: Vắng mặt / lơ là / quên tắt thiết bị'); }
+    else if (/xếp\s+hàng/.test(lw)) { action = 'phát hiện hàng đợi/xếp hàng'; add('Hành vi: Khách xếp hàng dài'); }
+    else if (/rửa\s+tay|sát\s+khuẩn/.test(lw)) { action = 'kiểm tra vệ sinh/sát khuẩn'; add('Hành vi: Không rửa tay/sát khuẩn'); }
+    else if (/điểm\s+danh|đi\s+trễ|rời\s+lớp/.test(lw)) { action = 'ghi nhận chuyên cần'; add('Hành vi: Điểm danh / đi trễ / rời sớm'); }
+    else if (/vượt\s+vạch|lấn\s+chiếm|chiếm\s+dụng|cản\s+trở|cản\s+lối|chặn|bít\s+lối/.test(lw)) { action = 'phát hiện cản trở lối đi'; add('Hành vi: Cản trở / chiếm dụng không gian'); }
+    else if (/ngã|vấp\s+ngã|tai\s+nạn/.test(lw)) { action = 'phát hiện té ngã/tai nạn'; add('Hành vi: Té ngã / tai nạn'); }
+    else if (/đi\s+lạc|khóc/.test(lw)) { action = 'phát hiện trẻ em đi lạc/khóc'; add('Hành vi: Trẻ em đi lạc'); }
+    else if (/vũ\s+khí|gậy\s+gộc|sắc\s+nhọn/.test(lw)) { action = 'phát hiện mang vũ khí'; add('Hành vi: Mang vũ khí / vật nguy hiểm'); }
+    else if (/bán\s+hàng\s+rong/.test(lw)) { action = 'phát hiện bán hàng rong'; add('Hành vi: Bán hàng rong'); }
+    else if (/ho|hắt\s+hơi/.test(lw)) { action = 'giám sát dịch tễ'; add('Hành vi: Ho / hắt hơi'); }
+    else if (/thò\s+tay|chui\s+vào/.test(lw)) { action = 'phát hiện hành vi nguy hiểm'; add('Hành vi: Thò tay/chui vào máy móc'); }
+
+    // ── Đối tượng giám sát ──
+    if (/người\s+lạ|kẻ\s+gian|đối\s+tượng\s+khả\s+nghi|đối\s+tượng/.test(lw)) { target = 'đối tượng lạ/nghi vấn'; add('Đối tượng: Người lạ / khả nghi'); }
+    else if (/nhân\s+viên|bảo\s+vệ|công\s+nhân|người|bác\s+sĩ|y\s+tế|tài\s+xế|thợ|shipper/.test(lw)) { target = 'nhân sự/con người'; add('Đối tượng: Người / Nhân sự / Y tế'); }
+    else if (/khách\s+hàng|khách|bệnh\s+nhân|học\s+sinh|phụ\s+huynh|trẻ\s+em/.test(lw)) { target = 'người ra vào'; add('Đối tượng: Khách / Bệnh nhân / Học sinh / Trẻ em'); }
+    else if (/xe\s+máy|ô\s+tô|oto|x[eê]\s+tải|xe|container/.test(lw)) { target = 'phương tiện giao thông'; add('Đối tượng: Xe / Phương tiện'); }
+    else if (/vali|túi\s+xách|ba\s+lô|balo|hành\s+lý|cặp/.test(lw)) { target = 'hành lý/túi xách'; add('Vật thể: Hành lý / túi xách'); }
+    else if (/thùng\s+hàng|kiện\s+hàng|gói\s+hàng|pallet|bao\s+tải/.test(lw)) { target = 'thùng hàng/kiện hàng'; add('Vật thể: Kiện hàng / pallet / bao tải'); }
+    else if (/laptop|thiết\s+bị|máy\s+tính|máy\s+chiếu/.test(lw)) { target = 'thiết bị điện tử'; add('Vật thể: Thiết bị điện/điện tử'); }
+    else if (/bình\s+chữa\s+cháy/.test(lw)) { target = 'bình chữa cháy'; add('Vật thể: Bình chữa cháy'); }
+    else if (/rác|vật\s+phế\s+thải|phế\s+liệu/.test(lw)) { target = 'rác/phế thải'; add('Vật thể: Rác / phế thải'); }
+    else if (/sản\s+phẩm|chai|lọ|linh\s+kiện/.test(lw)) { target = 'sản phẩm/linh kiện'; add('Đối tượng: Sản phẩm / linh kiện'); }
+    else if (/hàng\s+cồng\s+kềnh|xe\s+đẩy/.test(lw)) { target = 'xe đẩy/hàng cồng kềnh'; add('Vật thể: Xe đẩy / hàng cồng kềnh'); }
+    else if (/tủ\s+điện|máy\s+móc|máy\s+ép|lưỡi\s+cưa|cần\s+cẩu/.test(lw)) { target = 'máy móc/thiết bị nặng'; add('Vật thể: Máy móc / thiết bị nặng'); }
+
+    // ── Khu vực cụ thể ──
+    const places: [RegExp, string][] = [
+      [/kho\s+hàng|kho\s+bãi|nhà\s+xưởng|kho|xưởng|chuyền|băng\s+chuyền|băng\s+tải/, 'nhà xưởng/dây chuyền/kho'],
+      [/cổng\s+\w+|cổng/, 'cổng'],
+      [/cửa\s+(kho|thoát\s*hiểm|phòng\s+server|hàng|khám|dock)|cửa/, 'cửa'],
+      [/tường\s+rào/, 'tường rào'],
+      [/bãi\s+đỗ|bãi\s+xe|nhà\s+xe|trạm|dock/, 'bãi đỗ xe/trạm'],
+      [/sảnh|lobby|lễ\s+tân|quầy/, 'khu vực sảnh/quầy'],
+      [/hành\s+lang|lối\s+đi/, 'hành lang/lối đi'],
+      [/lối\s+thoát/, 'lối thoát hiểm'],
+      [/thang\s+máy|thang\s+cuốn|cầu\s+thang/, 'thang máy/thang bộ'],
+      [/cây\s+atm|atm/, 'cây ATM'],
+      [/đường\s+băng|khoang\s+hành\s+lý/, 'khu vực hàng không'],
+      [/phòng\s+mổ|buồng\s+bệnh|cách\s+ly|nội\s+tổng\s+hợp|y\s+tế|cấp\s+cứu/, 'khu vực y tế'],
+      [/lớp\s+học|sân\s+trường|khuôn\s+viên\s+trường|nhà\s+vệ\s+sinh/, 'khu vực trường học/nội bộ'],
+      [/kệ|rack/, 'kệ hàng'],
+      [/khu\s+vực\s+(cấm|nguy\s*hiểm|điện\s+cao\s+thế|thi\s+công|bảo\s+vệ)|trạm\s+biến\s+áp|công\s+trường/, 'khu vực hạn chế'],
+    ];
+
+    // ── Thời gian cụ thể ──
+    if (/ban\s+đêm|buổi\s+tối|đêm/.test(lw)) { time = ' vào ban đêm'; add('Khung giờ: Ban đêm'); }
+    else if (/buổi\s+sáng/.test(lw)) { time = ' vào buổi sáng'; add('Khung giờ: Buổi sáng'); }
+    else if (/ngoài\s+giờ|sau\s+giờ/.test(lw)) { time = ' ngoài giờ hành chính'; add('Khung giờ: Ngoài giờ làm việc'); }
+    else {
+      const timeRange = lw.match(/(?:từ|sau)\s+(\d+)[:h]?\s*(?:giờ)?\s*(?:đến|->|tới)\s*(\d+)[:h]?\s*(?:giờ)?/);
+      if (timeRange) { time = ` trong khung giờ ${timeRange[1]}h - ${timeRange[2]}h`; add(`Khung giờ: ${timeRange[1]}h - ${timeRange[2]}h`); }
+      else {
+        const after = lw.match(/sau\s+(\d+)[:h]?\s*(?:giờ)?/);
+        if (after) { time = ` sau ${after[1]}h`; add(`Khung giờ: sau ${after[1]}h`); }
+      }
+    }
+
+    // ── Mức độ phản hồi ──
+    if (/ngay\s+lập\s+tức|tức\s+thì/.test(lw)) { condition = 'cảnh báo ngay lập tức'; add('Phản hồi: Cảnh báo ngay lập tức'); }
+    else {
+      const dur = lw.match(/(\d+)\s*(phút|giây)/);
+      if (dur) { condition = `sẽ báo động nếu xảy ra liên tục quá ${dur[1]} ${dur[2]}`; add(`Ngưỡng: Xảy ra liên tục ${dur[1]} ${dur[2]}`); }
+      else { condition = 'sẽ tự động ghi nhận và gửi cảnh báo'; }
+    }
+
+    const summary = `Hệ thống AI sẽ ${action} đối với ${target} tại ${location}${time}, và ${condition}.`;
+
+    return { summary, findings };
+  };
+
+  const handleSmartApply = () => {
+    if (!userDescription.trim() || !selectedUseCaseDef) return;
+    const inferred = inferMonitoringConfig(userDescription, drawingPoints.length > 0 || currentCamZones.length > 0);
+    setRoutedModelName(inferred.model);
+    setRoutedModelReason('Tự suy luận từ mô tả.');
+    setSearchScope(inferred.scope);
+    setDetectionTarget(inferred.target || 'person');
+    setDetectionRule(inferred.rule);
+    setInferenceFps(Number(inferred.config.inferenceFps || 15));
+    setAlertDuration(Number(inferred.config.alertDuration || 10));
+    setAlertCount(Number(inferred.config.alertCount || 1));
+    setCooldown(Number(inferred.config.cooldown || 60));
+    setConfidence(Number(inferred.config.confidence || 0.65));
+    setIou(Number(inferred.config.iou || 0.45));
+    setTracker(String(inferred.config.tracker || 'bytetrack'));
+    setFrameSkip(Number(inferred.config.frameSkip || 0));
+    const updates: Record<string, string> = {};
+    const targetParam = selectedUseCaseDef.params?.find(p => p.key === 'target');
+    if (targetParam && inferred.target) {
+      const targetMap: Record<string, string> = { person: 'Người', vehicle: 'Xe' };
+      if (targetMap[inferred.target]) updates['target'] = targetMap[inferred.target];
+    }
+    const ruleParam = selectedUseCaseDef.params?.find(p => p.key === 'rule');
+    if (ruleParam && inferred.rule && (ruleParam.options || []).includes(inferred.rule)) {
+      updates['rule'] = inferred.rule;
+    }
+    if (Object.keys(updates).length > 0) setUseCaseParamValues(prev => ({ ...prev, ...updates }));
+  };
+
   const handleDescriptionChange = (text: string) => {
     setUserDescription(text);
     if (!text.trim()) { setRoutedModelName('Chưa xác định'); setRoutedModelReason('Vui lòng mô tả yêu cầu.'); return; }
     const inferred = inferMonitoringConfig(text, drawingPoints.length > 0 || currentCamZones.length > 0);
-    setInferredMode(inferred.mode);
     setRoutedModelName(inferred.model);
-    setRoutedModelReason(inferred.mode === 'standard' ? 'Tự suy luận cấu hình YOLO chuẩn từ mô tả.' : 'Tự suy luận LocateAnything từ ngôn ngữ tự nhiên.');
-    setRuleCondition(inferred.rule);
+    setRoutedModelReason('Tự suy luận từ mô tả.');
     setSearchScope(inferred.scope);
-    setSearchQuery(inferred.searchQuery || '');
-    if (inferred.mode === 'standard') {
-      setDetectionTarget(inferred.target || 'person');
-      setConfidence(Number(inferred.config.confidence || 0.65));
-      setIou(Number(inferred.config.iou || 0.45));
-      setTracker(String(inferred.config.tracker || 'bytetrack'));
-      setFrameSkip(Number(inferred.config.frameSkip || 0));
-      setInferenceFps(Number(inferred.config.inferenceFps || 15));
-    } else {
-      setSimilarityThreshold(Number(inferred.config.similarityThreshold || 0.78));
-      setRetrievalTopK(Number(inferred.config.retrievalTopK || 5));
-    }
+    setDetectionTarget(inferred.target || 'person');
     setDetectionRule(inferred.rule);
+    setConfidence(Number(inferred.config.confidence || 0.65));
+    setIou(Number(inferred.config.iou || 0.45));
+    setTracker(String(inferred.config.tracker || 'bytetrack'));
+    setFrameSkip(Number(inferred.config.frameSkip || 0));
+    setInferenceFps(Number(inferred.config.inferenceFps || 15));
     setAlertDuration(Number(inferred.config.alertDuration || 10));
     setAlertCount(Number(inferred.config.alertCount || 1));
     setCooldown(Number(inferred.config.cooldown || 60));
@@ -1372,16 +1850,15 @@ setSelectedDomain('');
 
   const applyTemplate = (tpl: any) => {
     handleDescriptionChange(tpl.description || '');
-    if (tpl.ruleCondition) setRuleCondition(tpl.ruleCondition);
   };
 
   const hydratePipelineForEdit = (pipe: Pipeline) => {
     setEditingPipelineId(pipe.id);
     setSelectedCameraIds([pipe.cameraId]);
     setFlowName(pipe.name);
-    setMonitoringMode(pipe.monitoringMode || 'smart');
     setUserDescription(pipe.description || pipe.searchQuery || '');
     setRoutedModelName(pipe.detectorName || 'Chưa xác định');
+    setInputMode(pipe.detectorName === 'Thông minh' ? 'smart' : 'standard');
     setRoutedModelReason('Đã nạp từ luồng hiện có.');
     setSearchQuery(pipe.searchQuery || '');
     setSearchScope(pipe.searchScope || 'whole_scene');
@@ -1400,26 +1877,39 @@ setSelectedDomain('');
       }));
     if (restoredZones.length > 0) setMultiZones({ [pipe.cameraId]: restoredZones });
 
-    if (pipe.monitoringMode === 'standard') {
-      setDetectionTarget(pipe.detectionTarget || 'person');
-      if (pipe.detectionRule === 'object_counting') { setStandardFunction('counting'); setDetectionRule('object_counting'); }
-      else { setStandardFunction('security'); setDetectionRule(pipe.detectionRule || 'enter_area'); }
-      setAlertDuration(Number(pipe.config?.alertDuration || 10));
-      setAlertCount(Number(pipe.config?.alertCount || 1));
-      setCooldown(Number(pipe.config?.cooldown || 60));
-      setConfidence(Number(pipe.config?.confidence || 0.65));
-      setIou(Number(pipe.config?.iou || 0.45));
-      setTracker(String(pipe.config?.tracker || 'bytetrack'));
-      setFrameSkip(Number(pipe.config?.frameSkip || 0));
-      setInferenceFps(Number(pipe.config?.inferenceFps || 15));
-      setZoneCondition((pipe.config?.zoneCondition as 'inside' | 'intersect') || 'inside');
-      setCountingProductImage((pipe.config?.countingProductImage as string) || null);
-    } else if (pipe.monitoringMode === 'smart') {
-      setSimilarityThreshold(Number(pipe.config?.similarityThreshold || 0.78));
-      setRetrievalTopK(Number(pipe.config?.retrievalTopK || 5));
-      setCooldown(Number(pipe.config?.cooldown || 60));
-      if (pipe.config?.aiContext) setAiContext(pipe.config.aiContext as { environment: string; normalBehavior: string; specialNotes: string });
-    } else if (pipe.monitoringMode === 'defect_detection') {
+    // Restore from use case config if available
+    if (pipe.config?.useCaseId) {
+      const uc = DOMAINS.flatMap(d => d.useCases).find(u => u.id === pipe.config.useCaseId);
+      if (uc) {
+        const domain = DOMAINS.find(d => d.useCases.some(u => u.id === uc.id));
+        if (domain) setSelectedDomain(domain.key);
+        setSelectedUseCaseDef(uc);
+        setTaskType(uc.taskMapType);
+        if (pipe.config?.useCaseParams) {
+          const params = pipe.config.useCaseParams as Record<string, string>;
+          setUseCaseParamValues(params);
+          useCaseParamsCache.current[uc.id] = params;
+        }
+        if (pipe.config?.useCaseImages) {
+          const images = pipe.config.useCaseImages as string[];
+          setUseCaseImages(images);
+          useCaseImagesCache.current[uc.id] = images;
+        }
+        if (pipe.config?.useCaseImageROIs) {
+          const rois = pipe.config.useCaseImageROIs as Record<number, BoundingBox[]>;
+          setUseCaseImageROIs(rois);
+          useCaseImageROIsCache.current[uc.id] = rois;
+        }
+      }
+    }
+
+    // Common params
+    setAlertDuration(Number(pipe.config?.alertDuration || 10));
+    setAlertCount(Number(pipe.config?.alertCount || 1));
+    setCooldown(Number(pipe.config?.cooldown || 60));
+    setInferenceFps(Number(pipe.config?.inferenceFps || 15));
+
+    if (pipe.monitoringMode === 'defect_detection' || pipe.config?.enableSSIM !== undefined || pipe.config?.goldenSamples) {
       setGoldenSamples((pipe.config?.goldenSamples as unknown) as string[] || []);
       setEnableSSIM(Boolean(pipe.config?.enableSSIM ?? true));
       setEnableCNN(Boolean(pipe.config?.enableCNN ?? false));
@@ -1427,14 +1917,16 @@ setSelectedDomain('');
       setExpectedOCRText(String(pipe.config?.expectedOCRText || ''));
       setDefectSensitivity(pipe.config?.defectSensitivity as 'low' | 'medium' | 'high' || 'medium');
       setInspectionROIs((pipe.config?.inspectionROIs as unknown) as Record<number, BoundingBox[]> || {});
+    } else {
+      setConfidence(Number(pipe.config?.confidence || 0.65));
+      setIou(Number(pipe.config?.iou || 0.45));
+      setTracker(String(pipe.config?.tracker || 'bytetrack'));
+      setFrameSkip(Number(pipe.config?.frameSkip || 0));
     }
     setCurrentStep('task');
   };
 
   const handleNext = () => {
-    if (currentStep === 'task' && taskType.startsWith('defect_')) {
-      setMonitoringMode('defect_detection');
-    }
     const idx = WIZARD_STEPS.indexOf(currentStep);
     if (idx < WIZARD_STEPS.length - 1) setCurrentStep(WIZARD_STEPS[idx + 1]);
   };
@@ -1492,42 +1984,46 @@ setSelectedDomain('');
       let finalTarget: string | undefined;
       let finalRule = 'semantic_match';
 
-      const ucExtra = selectedUseCaseDef ? {
-        useCaseId: selectedUseCaseDef.id,
-        useCaseName: selectedUseCaseDef.name,
-        useCaseParams: Object.keys(useCaseParamValues).length > 0 ? useCaseParamValues : undefined,
-        useCaseImages: useCaseImages.length > 0 ? useCaseImages : undefined,
-        useCaseImageROIs: Object.keys(useCaseImageROIs).length > 0 ? useCaseImageROIs : undefined,
-      } : {};
-
-      if (monitoringMode === 'standard') {
+      if (selectedUseCaseDef) {
+        finalTarget = useCaseParamValues['target'] || undefined;
+        finalRule = useCaseParamValues['rule'] || 'semantic_match';
+        finalConfig = {
+          ...useCaseParamValues,
+          alertDuration, alertCount, cooldown, inferenceFps,
+          useCaseId: selectedUseCaseDef.id,
+          useCaseName: selectedUseCaseDef.name,
+          useCaseParams: Object.keys(useCaseParamValues).length > 0 ? useCaseParamValues : undefined,
+          useCaseImages: useCaseImages.length > 0 ? useCaseImages : undefined,
+          useCaseImageROIs: Object.keys(useCaseImageROIs).length > 0 ? useCaseImageROIs : undefined,
+        };
+      } else if (taskType.startsWith('defect_')) {
+        finalRule = 'defect_detected';
+        finalConfig = {
+          goldenSamples: useCaseImages.length > 0 ? useCaseImages : goldenSamples,
+          inspectionROIs, enableSSIM, enableCNN, enableOCR, expectedOCRText,
+          alertDuration, alertCount, cooldown, inferenceFps,
+        };
+      } else {
         finalTarget = detectionTarget === 'custom' ? customTarget : detectionTarget;
         finalRule = detectionRule;
-        finalConfig = { alertDuration, alertCount, cooldown, confidence, iou, tracker, frameSkip, inferenceFps, zoneCondition, countingProductImage: countingProductImage || undefined, ...ucExtra };
-      } else if (monitoringMode === 'smart') {
-        finalRule = ruleCondition;
-        finalConfig = { similarityThreshold, retrievalTopK, cooldown, alertDuration, inferenceFps, aiContext: (aiContext.environment || aiContext.normalBehavior || aiContext.specialNotes) ? aiContext : undefined, ...ucExtra };
-      } else {
-        finalRule = 'defect_detected';
-        finalConfig = { goldenSamples: useCaseImages.length > 0 ? useCaseImages : goldenSamples, inspectionROIs, enableSSIM, enableCNN, enableOCR, expectedOCRText, alertDuration, alertCount, cooldown, inferenceFps, ...ucExtra };
+        finalConfig = {
+          alertDuration, alertCount, cooldown, inferenceFps,
+          confidence, iou, tracker, frameSkip,
+        };
       }
 
       return {
         id: editingPipelineId || `pipe-${Date.now()}-${cameraId}`,
         name: flowName.trim() || `Luồng giám sát - ${cam?.name.split(' ')[1] || 'Camera'}`,
         cameraId,
-        detectorName: monitoringMode === 'standard'
-          ? (STANDARD_MODEL_NAMES[taskType] || 'YOLO-NAS-S')
-          : monitoringMode === 'defect_detection'
-          ? `CNN Defect Inspector${enableOCR ? ' + OCR' : ''}${enableCNN ? ' + CNN' : ''}`
-          : (routedModelName || 'LocateAnything-3B'),
-        monitoringMode,
+        detectorName: inputMode === 'smart' ? 'Thông minh' : 'Tiêu chuẩn',
+        monitoringMode: taskType.startsWith('defect_') ? 'defect_detection' : undefined,
         detectionTarget: finalTarget,
         detectionRule: finalRule,
         searchScope,
         config: finalConfig,
-        searchQuery: monitoringMode === 'smart' ? searchQuery : undefined,
-        description: monitoringMode === 'smart' ? userDescription : undefined,
+        searchQuery: userDescription || undefined,
+        description: userDescription || undefined,
         countingZones,
         alertChannels: channels,
         scheduleSlots: scheduleSlots.length > 0 ? scheduleSlots : undefined,
@@ -1670,7 +2166,6 @@ setSelectedDomain('');
                             <td className="px-4 py-3">
                               <div className="font-bold text-sm text-slate-800">{pipe.name}</div>
                               {pipe.searchQuery && <div className="mt-0.5 max-w-[200px] truncate text-[11px] text-slate-400">{pipe.searchQuery}</div>}
-                              <span className="mt-1 inline-block text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded">{TASK_LABELS[pipe.monitoringMode || ''] || pipe.monitoringMode}</span>
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-start gap-2 text-xs text-slate-600">
@@ -1881,94 +2376,145 @@ setSelectedDomain('');
               <p className="text-xs text-slate-500 mt-1">Chọn lĩnh vực và bài toán cụ thể để cấu hình.</p>
             </div>
 
+            
             {/* ── Domain browser ── */}
-            <div className="space-y-4">
+            <div className="space-y-6">
               {/* Domain strip */}
-              <div className="flex gap-2 flex-wrap">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {DOMAINS.map(domain => {
                   const c = DOMAIN_COLOR_MAP[domain.color];
                   const isActive = selectedDomain === domain.key;
                   return (
                     <button
                       key={domain.key}
-                      onClick={() => { setSelectedDomain(isActive ? '' : domain.key); }}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-xs font-bold transition-all cursor-pointer ${isActive ? `${c.activeBg} ${c.activeText} border-transparent shadow-md` : `bg-white ${c.text} ${c.border} hover:${c.bg}`}`}
+                      onClick={() => {
+                        setSelectedDomain(isActive ? '' : domain.key);
+                        if (isActive || selectedUseCaseDef) {
+                          if (selectedUseCaseDef) {
+                            useCaseParamsCache.current[selectedUseCaseDef.id] = useCaseParamValues;
+                            useCaseImagesCache.current[selectedUseCaseDef.id] = useCaseImages;
+                            useCaseImageROIsCache.current[selectedUseCaseDef.id] = useCaseImageROIs;
+                          }
+                          setSelectedUseCaseDef(null); setUseCaseParamValues({}); setUseCaseImages([]);
+                        }
+                      }}
+                      className={`relative flex items-center p-4 rounded-2xl border transition-all duration-300 text-left overflow-hidden group hover:-translate-y-0.5 hover:shadow-md cursor-pointer ${isActive ? `${c.border} bg-white shadow-lg ring-2 ring-offset-1 ${c.text.replace('text-', 'ring-')}` : `bg-white border-slate-200 hover:border-slate-300`}`}
                     >
-                      {domain.key === 'security' && <Shield size={14} />}
-                      {domain.key === 'traffic' && <Car size={14} />}
-                      {domain.key === 'production' && <Cpu size={14} />}
-                      {domain.key === 'safety' && <HardHat size={14} />}
-                      {domain.key === 'fire' && <Flame size={14} />}
-                      {domain.key === 'retail' && <Store size={14} />}
-                      {domain.key === 'warehouse' && <Package size={14} />}
-                      {domain.name}
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isActive ? 'bg-white/25 text-white' : c.badge}`}>{domain.useCases.length}</span>
+                      {isActive && <div className={`absolute -right-12 -top-12 w-32 h-32 rounded-full blur-3xl opacity-20 ${c.activeBg}`} />}
+                      
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mr-3 transition-colors ${isActive ? c.activeBg + ' text-white shadow-inner' : c.bg + ' ' + c.text + ' group-hover:' + c.activeBg + ' group-hover:text-white'}`}>
+                        {domain.key === 'security' && <Shield size={20} />}
+                        {domain.key === 'traffic' && <Car size={20} />}
+                        {domain.key === 'production' && <Cpu size={20} />}
+                        {domain.key === 'safety' && <HardHat size={20} />}
+                        {domain.key === 'fire' && <Flame size={20} />}
+                        {domain.key === 'retail' && <Store size={20} />}
+                        {domain.key === 'warehouse' && <Package size={20} />}
+                      </div>
+                      <div className="flex-1 relative z-10">
+                        <div className={`font-bold text-sm ${isActive ? c.text : 'text-slate-800'}`}>{domain.name}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5 font-medium">{domain.useCases.length} bài toán</div>
+                      </div>
                     </button>
                   );
                 })}
               </div>
 
               {/* Use case list */}
-              {selectedDomain && (() => {
-                const domain = DOMAINS.find(d => d.key === selectedDomain)!;
-                const c = DOMAIN_COLOR_MAP[domain.color];
-                return (
-                  <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div className={`px-5 py-3 border-b border-slate-100 flex items-center gap-2 ${c.bg}`}>
-                      <span className={`text-xs font-bold ${c.text}`}>{domain.name}</span>
-                      <span className="text-xs text-slate-400">— chọn bài toán cụ thể</span>
-                    </div>
-                    <div className="divide-y divide-slate-50">
-                      {domain.useCases.map(uc => {
-                        const isSelected = selectedUseCaseDef?.id === uc.id;
-                        const hasImage = uc.needsImage;
-                        return (
-                          <button
-                            key={uc.id}
-                            onClick={() => {
-                              setSelectedUseCaseDef(isSelected ? null : uc);
-                              setTaskType(uc.taskMapType);
-                              if (!isSelected) {
-                                setUseCaseParamValues({});
-                                setUseCaseImages([]);
-                              }
-                            }}
-                            className={`w-full text-left flex items-center gap-4 px-5 py-4 transition-colors cursor-pointer ${isSelected ? `${c.bg}` : 'hover:bg-slate-50'}`}
-                          >
-                            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${isSelected ? `${c.activeBg} border-transparent` : 'border-slate-300'}`}>
-                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className={`text-sm font-bold ${isSelected ? c.text : 'text-slate-700'}`}>{uc.name}</div>
-                              {uc.desc && <p className={`text-[10px] mt-0.5 ${isSelected ? c.text.replace('700', '500') : 'text-slate-500'}`}>{uc.desc}</p>}
-                              {hasImage && (
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${c.badge}`}>📷 Cần ảnh mẫu</span>
+              <div className={`transition-all duration-500 overflow-hidden ${selectedDomain ? 'opacity-100 max-h-[2000px]' : 'opacity-0 max-h-0'}`}>
+                {selectedDomain && (() => {
+                  const domain = DOMAINS.find(d => d.key === selectedDomain)!;
+                  const c = DOMAIN_COLOR_MAP[domain.color];
+                  return (
+                    <div className={`bg-slate-50 border rounded-3xl p-5 md:p-6 relative overflow-hidden ${c.border.replace('border-', 'border-').replace('200', '100')}`}>
+                      {/* Sub-header background element */}
+                      <div className={`absolute top-0 left-0 w-full h-32 opacity-10 bg-gradient-to-b from-${domain.color}-500 to-transparent`} />
+                      
+                      <div className="relative z-10 flex items-center gap-2 mb-5">
+                        <span className={`text-sm font-black uppercase tracking-wider ${c.text}`}>{domain.name}</span>
+                        <span className="text-sm text-slate-400 font-medium">— Chọn một bài toán cụ thể để cấu hình</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 relative z-10">
+                        {domain.useCases.map(uc => {
+                          const isSelected = selectedUseCaseDef?.id === uc.id;
+                          const hasImage = uc.needsImage;
+                          return (
+                            <button
+                              key={uc.id}
+                              onClick={() => {
+                                if (selectedUseCaseDef && selectedUseCaseDef.id !== uc.id) {
+                                  useCaseParamsCache.current[selectedUseCaseDef.id] = useCaseParamValues;
+                                  useCaseImagesCache.current[selectedUseCaseDef.id] = useCaseImages;
+                                  useCaseImageROIsCache.current[selectedUseCaseDef.id] = useCaseImageROIs;
+                                }
+                                setSelectedUseCaseDef(isSelected ? null : uc);
+                                setTaskType(uc.taskMapType);
+                                if (!isSelected) {
+                                  setUseCaseParamValues(useCaseParamsCache.current[uc.id] || {});
+                                  setUseCaseImages(useCaseImagesCache.current[uc.id] || []);
+                                  setUseCaseImageROIs(useCaseImageROIsCache.current[uc.id] || {});
+                                }
+                                setMultiZones({});
+                                setDrawingPoints([]);
+                                setUserDescription('');
+                                setSmartFlowState('idle');
+                              }}
+                              className={`text-left flex flex-col p-4 rounded-2xl border transition-all duration-200 cursor-pointer group hover:-translate-y-1 hover:shadow-lg ${isSelected ? `${c.border} ${c.bg} shadow-md ring-1 ring-offset-0 ${c.text.replace('text-', 'ring-').replace('700', '400')}` : 'bg-white border-slate-200 hover:border-slate-300'}`}
+                            >
+                              <div className="flex items-start justify-between w-full mb-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isSelected ? c.activeBg + ' text-white shadow-inner' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200 group-hover:text-slate-600'}`}>
+                                  {isSelected ? <Check size={14} strokeWidth={3} /> : <div className="w-1.5 h-1.5 rounded-full bg-current" />}
                                 </div>
-                              )}
-                            </div>
-                            {isSelected && <Check size={16} className={c.text} />}
-                          </button>
-                        );
-                      })}
+                                {hasImage && (
+                                  <span className={`text-[9px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${isSelected ? 'bg-white/60 ' + c.text : 'bg-slate-100 text-slate-500'}`}>
+                                    <CamIcon size={10} /> Cần ảnh mẫu
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`text-sm font-bold leading-tight mb-1 ${isSelected ? c.text : 'text-slate-800'}`}>{uc.name}</div>
+                              {uc.desc && <p className={`text-[11px] leading-relaxed flex-1 ${isSelected ? c.text.replace('700', '600') : 'text-slate-500'}`}>{uc.desc}</p>}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
+              </div>
 
               {/* Selected use case chip */}
-              {selectedUseCaseDef && (
-                <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-                  <Check size={16} className="text-emerald-600 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-bold text-emerald-800">{selectedUseCaseDef.name}</span>
-                    <span className="text-xs text-emerald-600 ml-2">· Tiếp tục để cấu hình tham số →</span>
-                  </div>
-                  <button onClick={() => { setSelectedUseCaseDef(null); setUseCaseParamValues({}); setUseCaseImages([]); }} className="text-emerald-400 hover:text-rose-500 cursor-pointer transition-colors"><X size={14} /></button>
-                </div>
-              )}
+              <div className={`transition-all duration-300 overflow-hidden ${selectedUseCaseDef ? 'opacity-100 max-h-40 mt-6' : 'opacity-0 max-h-0'}`}>
+                {selectedUseCaseDef && (() => {
+                  const domain = DOMAINS.find(d => d.useCases.some(u => u.id === selectedUseCaseDef.id));
+                  const c = domain ? DOMAIN_COLOR_MAP[domain.color] : DOMAIN_COLOR_MAP['emerald'];
+                  return (
+                    <div className={`flex items-center gap-4 border rounded-2xl p-4 shadow-sm relative overflow-hidden ${c.bg} ${c.border}`}>
+                      <div className={`absolute top-0 left-0 w-1 h-full ${c.activeBg}`} />
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${c.activeBg} text-white shadow-inner`}>
+                        <Check size={20} strokeWidth={3} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${c.text.replace('700', '600')}`}>Đã chọn bài toán</div>
+                        <div className={`text-base font-black truncate ${c.text}`}>{selectedUseCaseDef.name}</div>
+                      </div>
+                      <button onClick={() => {
+                        if (selectedUseCaseDef) {
+                          useCaseParamsCache.current[selectedUseCaseDef.id] = useCaseParamValues;
+                          useCaseImagesCache.current[selectedUseCaseDef.id] = useCaseImages;
+                          useCaseImageROIsCache.current[selectedUseCaseDef.id] = useCaseImageROIs;
+                        }
+                        setSelectedUseCaseDef(null); setUseCaseParamValues({}); setUseCaseImages([]);
+                      }} className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${c.border} bg-white ${c.text} hover:${c.bg} hover:shadow-sm`}>
+                        Thay đổi
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
 
               {!selectedDomain && (
+
                 <div className="text-center py-10 text-slate-400 text-sm border border-dashed border-slate-200 rounded-2xl">
                   ↑ Chọn lĩnh vực để xem danh sách bài toán
                 </div>
@@ -2056,11 +2602,27 @@ setSelectedDomain('');
             ) : (
               /* ── Non-defect: 2-column layout ── */
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                {/* Left: AI mode + params + FPS */}
+                {/* Left: params + timing + performance */}
                 <div className="lg:col-span-7 space-y-4">
 
-                  {/* ── Use-case specific param form (only when selected from domain browser) ── */}
-                  {selectedUseCaseDef && (() => {
+                  {/* ── Mode selector + domain params / smart input ── */}
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-1 h-4 rounded-full bg-emerald-500" />
+                      <span className="text-xs font-bold text-slate-700">{selectedUseCaseDef?.name || 'Chưa chọn bài toán'}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => setInputMode('standard')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold transition-all cursor-pointer ${inputMode === 'standard' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}>
+                        <FileText size={14} /> Tiêu chuẩn
+                      </button>
+                      <button onClick={() => setInputMode('smart')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold transition-all cursor-pointer ${inputMode === 'smart' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}>
+                        <Sparkles size={14} /> Thông minh
+                      </button>
+                    </div>
+
+                    {inputMode === 'standard' ? (
+                      /* ── Standard: direct domain params ── */
+                      selectedUseCaseDef && (() => {
                     const uc = selectedUseCaseDef;
                     const domainDef = DOMAINS.find(d => d.useCases.some(u => u.id === uc.id));
                     const c = domainDef ? DOMAIN_COLOR_MAP[domainDef.color] : DOMAIN_COLOR_MAP['emerald'];
@@ -2381,395 +2943,187 @@ setSelectedDomain('');
                         )}
                       </div>
                     );
-                  })()}
+                  })()
 
-                  {/* Mode selection */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-3">Công nghệ AI</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setMonitoringMode('standard')}
-                        className={`text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${monitoringMode === 'standard' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Sliders size={16} className={monitoringMode === 'standard' ? 'text-emerald-600' : 'text-slate-400'} />
-                          <span className={`text-sm font-bold ${monitoringMode === 'standard' ? 'text-emerald-800' : 'text-slate-700'}`}>Tiêu chuẩn</span>
-                          {monitoringMode === 'standard' && <Check size={14} className="text-emerald-600 ml-auto" />}
-                        </div>
-                        <p className="text-[10px] text-slate-500">Quy tắc cố định, nhanh, thích hợp bài toán thông dụng.</p>
-                      </button>
-                      <button
-                        onClick={() => setMonitoringMode('smart')}
-                        className={`text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${monitoringMode === 'smart' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Sparkles size={16} className={monitoringMode === 'smart' ? 'text-emerald-600' : 'text-slate-400'} />
-                          <span className={`text-sm font-bold ${monitoringMode === 'smart' ? 'text-emerald-800' : 'text-slate-700'}`}>Thông minh</span>
-                          {monitoringMode === 'smart' && <Check size={14} className="text-emerald-600 ml-auto" />}
-                        </div>
-                        <p className="text-[10px] text-slate-500">AI hiểu ngôn ngữ tự nhiên, linh hoạt với mọi yêu cầu.</p>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Task-specific params */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Tham số phát hiện</label>
-
-                    {monitoringMode === 'smart' ? (
-                      <>
-                        <textarea
-                          value={userDescription} onChange={e => handleDescriptionChange(e.target.value)}
-                          placeholder='Mô tả bằng tiếng Việt: "Cảnh báo khi có người xâm nhập khu vực cấm sau 22h"'
-                          className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 resize-none"
-                        />
-                        {/* Task-specific quick suggestions */}
-                        {(() => {
-                          const suggestions = selectedUseCaseDef && TASK_SMART_SUGGESTIONS[selectedUseCaseDef.id] 
-                            ? TASK_SMART_SUGGESTIONS[selectedUseCaseDef.id] 
-                            : TASK_SMART_SUGGESTIONS[taskType];
-                          if (!suggestions) return null;
-                          return (
-                            <details className="group" defaultOpen>
-                              <summary className="text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 list-none flex items-center gap-1.5 select-none">
-                                <ChevronRight size={12} className="group-open:rotate-90 transition-transform flex-shrink-0" />
-                                Gợi ý nhanh
-                              </summary>
-                              <div className="mt-3 grid grid-cols-2 gap-2">
-                                {suggestions.map(s => (
-                                  <button
-                                    key={s.id}
-                                    onClick={() => handleDescriptionChange(s.description)}
-                                    className={`text-left border p-2.5 rounded-lg transition-all cursor-pointer ${userDescription === s.description ? 'border-emerald-400 bg-emerald-50' : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50'}`}
-                                  >
-                                    <h5 className={`font-bold text-[11px] ${userDescription === s.description ? 'text-emerald-700' : 'text-slate-700'}`}>{s.name}</h5>
-                                    <p className="text-[9px] text-slate-400 mt-0.5 line-clamp-2">{s.description}</p>
-                                  </button>
-                                ))}
-                              </div>
-                            </details>
-                          );
-                        })()}
-
-                        {/* Sensitivity selector */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Độ nhạy phát hiện</label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {([
-                              { value: 0.65, label: 'Rộng', desc: 'Bắt nhiều hơn, có thể có báo nhầm' },
-                              { value: 0.78, label: 'Cân bằng', desc: 'Đề xuất cho hầu hết nghiệp vụ', recommended: true },
-                              { value: 0.88, label: 'Chính xác', desc: 'Ít báo nhầm, có thể bỏ sót nhẹ' },
-                            ] as const).map(opt => (
-                              <button
-                                key={opt.value}
-                                onClick={() => setSimilarityThreshold(opt.value)}
-                                className={`relative p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer ${similarityThreshold === opt.value ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
-                              >
-                                {(opt as any).recommended && similarityThreshold !== opt.value && (
-                                  <span className="absolute -top-2 left-2 text-[8px] bg-slate-700 text-white px-1.5 py-0.5 rounded font-bold">Đề xuất</span>
-                                )}
-                                <p className={`text-xs font-bold ${similarityThreshold === opt.value ? 'text-emerald-700' : 'text-slate-700'}`}>{opt.label}</p>
-                                <p className="text-[9px] text-slate-400 mt-0.5 leading-snug">{opt.desc}</p>
-                              </button>
-                            ))}
+                      ) : (
+                        /* ── Smart: textarea + suggestions + Áp dụng ── */
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Sparkles size={15} className="text-emerald-500" />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Mô tả bằng ngôn ngữ tự nhiên</span>
                           </div>
-                        </div>
-
-                        {/* Timing params */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sự kiện sau</label>
-                            <div className="flex items-center gap-2">
-                              <input type="number" min={1} value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                              <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
-                            </div>
-                            <p className="text-[9px] text-slate-400 mt-1">Phải diễn ra liên tục bao lâu trước khi báo</p>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
-                            <div className="flex items-center gap-2">
-                              <input type="number" min={0} value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                              <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
-                            </div>
-                            <p className="text-[9px] text-slate-400 mt-1">Chờ bao lâu trước khi cho phép báo tiếp</p>
-                          </div>
-                        </div>
-
-                        {/* Ngữ cảnh AI đã được gỡ bỏ theo yêu cầu */}
-                      </>
-                    ) : (
-                      <>
-                        {(taskType === 'security' || taskType === 'counting') && (
-                          <>
-                            {!(['sec_camera_tamper', 'sec_wrong_way', 'sec_abandoned_object', 'sec_door_abnormal', 'bld_restricted', 'sec_loitering'].includes(selectedUseCaseDef?.id || '')) && (
-                              <>
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Đối tượng phát hiện</label>
-                                  {(() => {
-                                    const isProductCounting = selectedUseCaseDef?.id === 'prd_counting' || selectedUseCaseDef?.id === 'wh_counting';
-                                    const isPeopleCounting = selectedUseCaseDef?.id === 'ret_counting' || selectedUseCaseDef?.id === 'ret_queue';
-                                    return (
-                                      <select value={detectionTarget} onChange={e => setDetectionTarget(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                        {/* People (shown for general + retail counting; hidden for product/item counting) */}
-                                        {!isProductCounting && <option value="person">Người</option>}
-                                        {/* Vehicles (hidden for product counting and retail people counting) */}
-                                        {!isProductCounting && !isPeopleCounting && <option value="vehicle">Phương tiện (chung)</option>}
-                                        {!isProductCounting && !isPeopleCounting && <option value="motorcycle">Xe máy</option>}
-                                        {!isProductCounting && !isPeopleCounting && <option value="truck">Xe tải / Xe buýt</option>}
-                                        {!isProductCounting && !isPeopleCounting && <option value="bicycle">Xe đạp</option>}
-                                        {/* Forklift — industrial, shown unless retail people counting */}
-                                        {!isPeopleCounting && <option value="forklift">Xe nâng</option>}
-                                        {/* Products — only for counting tasks and not for retail people counting */}
-                                        {taskType === 'counting' && !isPeopleCounting && <option value="package">Hàng hoá / Thùng hộp</option>}
-                                        {!isProductCounting && !isPeopleCounting && <option value="pet">Thú cưng / Động vật</option>}
-                                        {!isPeopleCounting && <option value="unknown_object">Vật thể không xác định</option>}
-                                        <option value="custom">Tuỳ chỉnh...</option>
-                                      </select>
-                                    );
-                                  })()}
-                                </div>
-                                {detectionTarget === 'custom' && (
-                                  <input type="text" value={customTarget} onChange={e => setCustomTarget(e.target.value)} placeholder="VD: box, helmet, forklift" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm mt-2" />
-                                )}
-                              </>
-                            )}
-                            {taskType === 'security' && (
-                              <>
-                                {/* When a specific use case is selected from domain browser, the rule is implicit — hide the dropdown */}
-                                {!selectedUseCaseDef && (
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Luật cảnh báo</label>
-                                  <select value={detectionRule} onChange={e => setDetectionRule(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                    <option value="enter_area">Xâm nhập vùng cấm</option>
-                                    <option value="exit_area">Rời khỏi khu vực</option>
-                                    <option value="cross_line">Vượt ranh giới / Vạch ảo</option>
-                                    <option value="appear">Xuất hiện đột ngột</option>
-                                    <option value="disappear">Vật thể rời vị trí / Vật thể bị lấy đi</option>
-                                    <option value="loitering">Dừng đỗ / Lảng vảng lâu</option>
-                                    <option value="crowd_gathering">Tụ tập đông người</option>
-                                  </select>
-                                </div>
-                                )}
-                                {/* Zone condition — only relevant for zone-based rules when no specific use case selected */}
-                                {!selectedUseCaseDef && (detectionRule === 'enter_area' || detectionRule === 'exit_area' || detectionRule === 'loitering') && (
-                                  <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Điều kiện kích hoạt vùng</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      {([
-                                        { value: 'inside' as const, label: 'Tâm trong vùng', desc: 'Tâm bounding box nằm bên trong polygon' },
-                                        { value: 'intersect' as const, label: 'Chạm vào vùng', desc: 'Bất kỳ phần nào của bbox chạm viền polygon' },
-                                      ]).map(opt => (
-                                        <button key={opt.value} type="button" onClick={() => setZoneCondition(opt.value)}
-                                          className={`text-left p-2.5 rounded-xl border-2 cursor-pointer transition-all ${zoneCondition === opt.value ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
-                                          <p className={`text-[11px] font-bold ${zoneCondition === opt.value ? 'text-emerald-700' : 'text-slate-700'}`}>{opt.label}</p>
-                                          <p className="text-[9px] text-slate-400 mt-0.5 leading-snug">{opt.desc}</p>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            {taskType === 'counting' && (
-                              <>
-                                {!(['bld_elevator_queue', 'edu_attendance', 'bld_meeting_room'].includes(selectedUseCaseDef?.id || '')) && (
-                                  <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Hướng đếm</label>
-                                  <select value={countingDirection} onChange={e => setCountingDirection(e.target.value as any)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                    <option value="in">Chỉ đếm chiều vào</option>
-                                    <option value="out">Chỉ đếm chiều ra</option>
-                                    <option value="both">Đếm cả 2 chiều</option>
-                                    </select>
-                                  </div>
-                                )}
-                                {/* Product image — only show when NOT using a domain use case that already uploaded images */}
-                                {!(['prd_counting', 'wh_counting', 'ret_counting', 'ret_queue', 'tra_smartpark', 'tra_count', 'bld_elevator_queue', 'bld_inout', 'hc_queue', 'edu_attendance', 'ap_queue', 'bld_meeting_room'].includes(selectedUseCaseDef?.id || '')) && (
-                                <div>
-                                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ảnh sản phẩm cần đếm <span className="font-normal normal-case text-slate-400">(Tuỳ chọn)</span></label>
-                                  <p className="text-[9px] text-slate-400 mb-2">Upload ảnh mẫu để AI chỉ đếm riêng loại sản phẩm này. Để trống = đếm tất cả đối tượng đã chọn.</p>
-                                  {countingProductImage ? (
-                                    <div className="relative flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl p-2">
-                                      <img src={countingProductImage} alt="Sản phẩm cần đếm" className="w-14 h-14 object-cover rounded-lg border border-slate-200 flex-shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-semibold text-slate-700">Ảnh mẫu đã chọn</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">AI sẽ chỉ đếm sản phẩm có ngoại hình tương tự ảnh này</p>
-                                      </div>
-                                      <button type="button" onClick={() => setCountingProductImage(null)} className="text-slate-300 hover:text-rose-500 transition-colors p-1 cursor-pointer flex-shrink-0">
-                                        <X size={14} />
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <label className="block border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:bg-slate-50 hover:border-emerald-300 transition-colors cursor-pointer">
-                                      <input type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (!file) return;
-                                        const reader = new FileReader();
-                                        reader.onload = (ev) => setCountingProductImage(ev.target?.result as string);
-                                        reader.readAsDataURL(file);
-                                        e.target.value = '';
-                                      }} />
-                                      <Package size={18} className="mx-auto text-slate-300 mb-1.5" />
-                                      <p className="text-xs text-slate-500">Kéo thả hoặc click để upload ảnh sản phẩm</p>
-                                      <p className="text-[10px] text-slate-400 mt-0.5">JPG, PNG · Tối đa 5MB</p>
-                                    </label>
-                                  )}
-                                </div>
-                                )}
-                                {/* When product counting UC was selected, remind user their images are already set above */}
-                                {(selectedUseCaseDef?.id === 'prd_counting' || selectedUseCaseDef?.id === 'wh_counting') && useCaseImages.length > 0 && (
-                                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                                    <Package size={13} className="text-emerald-600 flex-shrink-0" />
-                                    <p className="text-[10px] text-emerald-700">{useCaseImages.length} ảnh mẫu sản phẩm đã được upload ở bước trên</p>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            <div className="grid grid-cols-3 gap-3">
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau (giây)</label>
-                                <input type="number" value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                                <p className="text-[9px] text-slate-400 mt-1">Phải diễn ra liên tục bao lâu</p>
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ngưỡng số lượng</label>
-                                <input type="number" value={alertCount} onChange={e => setAlertCount(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                                <p className="text-[9px] text-slate-400 mt-1">Phát hiện ≥ N đối tượng thì báo</p>
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
-                                <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                                <p className="text-[9px] text-slate-400 mt-1">Chờ trước khi báo tiếp (giây)</p>
-                              </div>
-                            </div>
-                          </>
-                        )}
-
-                        {taskType === 'ppe' && (
-                          <>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Cảnh báo khi KHÔNG mang</label>
-                              <div className="grid grid-cols-2 gap-2">
-                                {[['hardhat', 'Mũ bảo hộ'], ['vest', 'Áo dạ quang'], ['glove', 'Găng tay'], ['mask', 'Khẩu trang']].map(([k, label]) => (
-                                  <label key={k} className="flex items-center gap-2 p-2.5 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
-                                    <input type="checkbox" checked={ppeItems[k as keyof typeof ppeItems]} onChange={() => setPpeItems(p => ({ ...p, [k]: !p[k as keyof typeof ppeItems] }))} className="w-4 h-4 rounded text-emerald-600" />
-                                    <span className="text-sm text-slate-700">{label}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
-                              <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                              <p className="text-[9px] text-slate-400 mt-1">Chờ trước khi báo tiếp (giây)</p>
-                            </div>
-                          </>
-                        )}
-
-                        {taskType === 'fire' && (
-                          <>
-                            <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-600">Mặc định: Khói (Smoke) & Lửa (Fire)</div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mức độ nhạy cảm</label>
-                              <select value={fireSensitivity} onChange={e => setFireSensitivity(e.target.value as any)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                <option value="high">Cao – Báo khi có vệt khói/lửa nhỏ</option>
-                                <option value="medium">Trung bình – Báo khi đám cháy rõ</option>
-                                <option value="low">Thấp – Tránh báo giả do hơi nước</option>
-                              </select>
-                            </div>
-                          </>
-                        )}
-
-                        {taskType === 'traffic' && (
-                          <>
-                            {!(['tra_congestion', 'tra_smartpark', 'tra_count'].includes(selectedUseCaseDef?.id || '')) && (
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Đối tượng giao thông</label>
-                                <select value={detectionTarget} onChange={e => setDetectionTarget(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                  <option value="vehicle">Mọi loại xe</option>
-                                  <option value="car">Ô tô</option>
-                                  <option value="motorcycle">Xe máy</option>
-                                  <option value="truck">Xe tải / Xe buýt</option>
-                                  <option value="license_plate">Biển số xe (ALPR)</option>
-                                </select>
-                              </div>
-                            )}
-                            {!selectedUseCaseDef ? (
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Luật giao thông</label>
-                                <select value={detectionRule} onChange={e => setDetectionRule(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                  <option value="alpr">Nhận diện & Đọc biển số</option>
-                                  <option value="wrong_way">Đi ngược chiều</option>
-                                  <option value="illegal_parking">Dừng đỗ sai quy định</option>
-                                </select>
-                              </div>
-                            ) : (
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Luật giao thông</label>
-                                <input type="text" value={selectedUseCaseDef.name} disabled className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-500 cursor-not-allowed" />
-                                <p className="text-[9px] text-slate-400 mt-1">Đã cấu hình riêng cho bài toán này.</p>
-                              </div>
-                            )}
-                          </>
-                        )}
-
-                        {taskType === 'behavior' && (
-                          <>
-                            {!selectedUseCaseDef ? (
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Hành vi cần phát hiện</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {[['fall', 'Té ngã / Đột quỵ'], ['violence', 'Đánh nhau / Ẩu đả'], ['crowd', 'Tụ tập đông người'], ['smoking', 'Hút thuốc'], ['phone', 'Dùng điện thoại'], ['weapon', 'Người mang vũ khí']].map(([k, label]) => (
-                                    <label key={k} className="flex items-center gap-2 p-2.5 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
-                                      <input type="checkbox" checked={behaviorItems[k as keyof typeof behaviorItems]} onChange={() => setBehaviorItems(p => ({ ...p, [k]: !p[k as keyof typeof behaviorItems] }))} className="w-4 h-4 rounded text-emerald-600" />
-                                      <span className="text-sm text-slate-700">{label}</span>
-                                    </label>
+                          <textarea
+                            value={userDescription}
+                            onChange={e => { setUserDescription(e.target.value); setSmartFlowState('idle'); }}
+                            placeholder={TASK_EXAMPLE_PROMPTS[selectedUseCaseDef?.id || ''] || 'VD: "Cảnh báo khi có người xâm nhập khu vực cấm sau 22h"'}
+                            className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:bg-white focus:outline-none focus:border-emerald-500 resize-none"
+                          />
+                          {(() => {
+                            const suggestions = TASK_SMART_SUGGESTIONS[selectedUseCaseDef?.id || ''];
+                            if (!suggestions || suggestions.length === 0) return null;
+                            return (
+                              <details className="group">
+                                <summary className="text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 list-none flex items-center gap-1.5 select-none">
+                                  <ChevronRight size={12} className="group-open:rotate-90 transition-transform flex-shrink-0" />
+                                  Gợi ý nhanh
+                                </summary>
+                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                  {suggestions.map(s => (
+                                    <button
+                                      key={s.id}
+                                      onClick={() => { setUserDescription(s.description); setSmartFlowState('idle'); }}
+                                      className={`text-left border p-2.5 rounded-lg transition-all cursor-pointer ${userDescription === s.description ? 'border-emerald-400 bg-emerald-50' : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50'}`}
+                                    >
+                                      <h5 className={`font-bold text-[11px] ${userDescription === s.description ? 'text-emerald-700' : 'text-slate-700'}`}>{s.name}</h5>
+                                      <p className="text-[9px] text-slate-400 mt-0.5 line-clamp-2">{s.description}</p>
+                                    </button>
                                   ))}
                                 </div>
-                              </div>
-                            ) : (
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Hành vi cần phát hiện</label>
-                                <input type="text" value={selectedUseCaseDef.name} disabled className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-500 cursor-not-allowed" />
-                                <p className="text-[9px] text-slate-400 mt-1">Đã cấu hình riêng cho bài toán này.</p>
-                              </div>
-                            )}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau (giây)</label>
-                                <input type="number" value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                                <p className="text-[9px] text-slate-400 mt-1">Hành vi phải diễn ra liên tục bao lâu</p>
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
-                                <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                                <p className="text-[9px] text-slate-400 mt-1">Chờ trước khi báo tiếp (giây)</p>
-                              </div>
+                              </details>
+                            );
+                          })()}
+                          {smartFlowState === 'idle' && userDescription.trim() && (
+                            <div className="flex justify-end pt-2">
+                              <button onClick={() => setSmartFlowState('preview')} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2">
+                                <Activity size={13} /> Phân tích yêu cầu
+                              </button>
                             </div>
-                          </>
-                        )}
+                          )}
 
-                        {taskType === 'retail_analytics' && (
-                          <>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Chế độ phân tích</label>
-                              <select value={retailMode} onChange={e => setRetailMode(e.target.value as any)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                                <option value="heatmap">Biểu đồ nhiệt (Heatmap)</option>
-                                {selectedUseCaseDef?.id !== 'bld_public_density' && (
-                                  <option value="demographics">Nhân khẩu học (tuổi, giới tính)</option>
-                                )}
-                                <option value="flow">Luồng di chuyển khách hàng</option>
-                              </select>
+                          {smartFlowState === 'preview' && userDescription.trim() && (() => {
+                            const { summary, findings } = analyzePrompt(userDescription);
+                            if (findings.length === 0) {
+                              return (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5 text-[11px] text-amber-800 mt-2">
+                                  Không tìm thấy thông tin cấu hình rõ ràng từ mô tả. Bạn có muốn áp dụng cấu hình mặc định?
+                                  <div className="flex items-center justify-end pt-2 gap-2 mt-2 border-t border-amber-200/50">
+                                    <button onClick={() => setSmartFlowState('idle')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg transition-colors cursor-pointer">
+                                      Chỉnh sửa mô tả
+                                    </button>
+                                    <button onClick={() => { handleSmartApply(); setSmartFlowState('applied'); }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2">
+                                      <Check size={13} /> Vẫn áp dụng
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3 mt-2 shadow-inner shadow-emerald-100/50">
+                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 uppercase tracking-wide">
+                                  <Activity size={14} /> AI đã phân tích bài toán của bạn như sau:
+                                </div>
+                                <div className="text-[13px] text-emerald-900 font-medium leading-relaxed bg-emerald-100/50 p-3 rounded-lg border border-emerald-200">
+                                  {summary}
+                                </div>
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-3 mb-1">Các tham số bóc tách được:</div>
+                                <ul className="space-y-1.5 bg-white p-3 rounded-lg border border-emerald-100/60 shadow-sm">
+                                  {findings.map((f, i) => (
+                                    <li key={i} className="text-[12px] text-slate-700 flex items-start gap-2">
+                                      <span className="text-emerald-500 mt-0.5">▸</span>
+                                      {f}
+                                    </li>
+                                  ))}
+                                </ul>
+                                <p className="text-[11px] text-slate-500 italic mt-1">Bạn vui lòng kiểm tra lại cấu hình trên. Nếu đã chính xác, hãy xác nhận áp dụng.</p>
+                                <div className="flex items-center justify-end pt-2 gap-2 mt-2 border-t border-emerald-100">
+                                  <button onClick={() => setSmartFlowState('idle')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-[11px] font-bold rounded-lg transition-colors cursor-pointer">
+                                    Nhập lại
+                                  </button>
+                                  <button onClick={() => { handleSmartApply(); setSmartFlowState('applied'); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2 shadow-sm shadow-emerald-200">
+                                    <Check size={13} /> Xác nhận áp dụng
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {smartFlowState === 'applied' && userDescription.trim() && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between mt-2">
+                              <div className="flex items-center gap-2 text-emerald-700 text-[11px] font-bold">
+                                <Check size={14} /> Đã áp dụng cấu hình từ mô tả
+                              </div>
+                              <button onClick={() => setSmartFlowState('idle')} className="text-[10px] text-emerald-600 hover:text-emerald-800 underline cursor-pointer">
+                                Thay đổi
+                              </button>
                             </div>
+                          )}
+
+                          {selectedUseCaseDef && (
                             <div>
-                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
-                              <input type="number" value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm" />
-                              <p className="text-[9px] text-slate-400 mt-1">Chờ trước khi báo tiếp (giây)</p>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ảnh tham chiếu & mô tả<span className="font-normal normal-case text-slate-400 ml-1">(tuỳ chọn — upload ảnh và khoanh vùng kèm mô tả)</span></label>
+                              {useCaseImages.length > 0 && (
+                                <div className="flex flex-col gap-3 mb-3">
+                                  {useCaseImages.map((img, idx) => (
+                                    <ImageRoiDrawer
+                                      key={idx}
+                                      imgSrc={img}
+                                      rois={useCaseImageROIs[idx] || []}
+                                      onChange={(rois) => setUseCaseImageROIs(prev => ({ ...prev, [idx]: rois }))}
+                                      onRemove={() => {
+                                        setUseCaseImages(prev => prev.filter((_, i) => i !== idx));
+                                        setUseCaseImageROIs(prev => {
+                                          const next = { ...prev };
+                                          delete next[idx];
+                                          const reindexed: Record<number, BoundingBox[]> = {};
+                                          Object.keys(next).forEach(k => { const n = Number(k); reindexed[n > idx ? n - 1 : n] = next[n]; });
+                                          return reindexed;
+                                        });
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                              <label className="block border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:bg-slate-50 hover:border-emerald-300 transition-colors cursor-pointer">
+                                <input type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={(e) => {
+                                  Array.from(e.target.files || []).forEach((file: File) => {
+                                    if (file.size > 5 * 1024 * 1024) { alert('File quá lớn (tối đa 5MB)'); return; }
+                                    const reader = new FileReader();
+                                    reader.onload = (ev) => {
+                                      setUseCaseImages(prev => [...prev, ev.target!.result as string]);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  });
+                                  e.target.value = '';
+                                }} />
+                                <Package size={16} className="mx-auto text-slate-300 mb-1.5" />
+                                <p className="text-xs text-slate-500">Upload ảnh tham chiếu · JPG, PNG · Tối đa 5MB</p>
+                                {useCaseImages.length > 0 && <p className="text-[10px] text-emerald-600 mt-0.5">Thêm ảnh nữa</p>}
+                              </label>
                             </div>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                  {/* ── Common timing params (smart mode only) ── */}
+                  {inputMode === 'smart' && !taskType.startsWith('defect_') && (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Ngưỡng cảnh báo</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau</label>
+                          <div className="flex items-center gap-2">
+                            <input type="number" min={1} value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                            <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
+                          </div>
+                          <p className="text-[9px] text-slate-400 mt-1">Phải diễn ra liên tục bao lâu trước khi báo</p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ngưỡng số lượng</label>
+                          <input type="number" min={1} value={alertCount} onChange={e => setAlertCount(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                          <p className="text-[9px] text-slate-400 mt-1">Phát hiện ≥ N đối tượng thì báo</p>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
+                          <div className="flex items-center gap-2">
+                            <input type="number" min={0} value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                            <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
+                          </div>
+                          <p className="text-[9px] text-slate-400 mt-1">Chờ bao lâu trước khi cho phép báo tiếp</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Performance presets */}
                   {(() => {
@@ -3132,14 +3486,6 @@ setSelectedDomain('');
           const isMultiCam = selectedCameraIds.length > 1;
           const hasZones = pvZones.length > 0;
 
-          // Label helpers
-          const targetLabel = detectionTarget === 'custom'
-            ? (customTarget || 'Tuỳ chỉnh')
-            : ({ person: 'Người', vehicle: 'Phương tiện', motorcycle: 'Xe máy', truck: 'Xe tải', bicycle: 'Xe đạp' } as Record<string, string>)[detectionTarget] || detectionTarget;
-          const ruleLabel = ({ enter_area: 'Xâm nhập vùng', exit_area: 'Ra khỏi vùng', cross_line: 'Vượt vạch', loitering: 'Dừng đỗ lâu', appear: 'Xuất hiện đối tượng', object_counting: 'Đếm đối tượng' } as Record<string, string>)[detectionRule] || detectionRule;
-          const presetLabel = perfPreset === 'economy' ? '🌿 Tiết kiệm' : perfPreset === 'precise' ? '🎯 Chính xác' : '⚡ Cân bằng';
-          const modeLabel = monitoringMode === 'smart' ? '✦ Luồng thông minh' : monitoringMode === 'defect_detection' ? '🔬 Kiểm tra lỗi' : '⚙ Tiêu chuẩn';
-
           // ── Problem statement generator ──────────────────────────────────
           const generateProblemStatement = (): string => {
             const scheduleDesc = scheduleSlots.length === 0 ? '24/7' : formatScheduleSlots(scheduleSlots);
@@ -3151,42 +3497,22 @@ setSelectedDomain('');
                 (excludeZones.length > 0 ? `, bỏ qua ${excludeZones.length} vùng ngoại lệ (${excludeZones.map(z => z.name).join(', ')})` : '')
               : 'toàn bộ khung hình';
 
-            if (monitoringMode === 'smart') {
-              const contextParts: string[] = [];
-              if (aiContext.environment) contextParts.push(`môi trường: ${aiContext.environment}`);
-              if (aiContext.normalBehavior) contextParts.push(`bỏ qua: ${aiContext.normalBehavior}`);
-              if (aiContext.specialNotes) contextParts.push(`lưu ý: ${aiContext.specialNotes}`);
-              const baseDesc = userDescription.trim() || 'giám sát theo yêu cầu người dùng';
-              return `AI sẽ ${baseDesc} ${zoneDesc}` +
-                (contextParts.length > 0 ? ` (${contextParts.join('; ')})` : '') +
-                `. Hệ thống chạy ${scheduleDesc}, xác nhận sự kiện sau ${alertDuration}s và nghỉ ${cooldown}s giữa các cảnh báo liên tiếp.`;
+            if (selectedUseCaseDef) {
+              const baseDesc = userDescription.trim() || selectedUseCaseDef.name || 'giám sát theo nghiệp vụ';
+              return `AI thực hiện ${baseDesc} ${zoneDesc}. Hệ thống chạy ${scheduleDesc}, xác nhận sự kiện sau ${alertDuration}s và nghỉ ${cooldown}s giữa các cảnh báo liên tiếp.`;
             }
 
-            if (monitoringMode === 'standard') {
-              const tLabel = detectionTarget === 'custom' ? (customTarget || 'đối tượng tuỳ chỉnh') :
-                ({ person: 'người', vehicle: 'phương tiện', motorcycle: 'xe máy', truck: 'xe tải', bicycle: 'xe đạp', forklift: 'xe nâng', package: 'hàng hoá/thùng hộp', pet: 'thú cưng', unknown_object: 'vật thể không xác định' } as Record<string,string>)[detectionTarget] || detectionTarget;
-              const rLabel = ({ enter_area: 'xâm nhập vùng cấm', exit_area: 'rời khỏi khu vực', cross_line: 'vượt ranh giới ảo', appear: 'xuất hiện đột ngột', disappear: 'mất/bị lấy đi', loitering: 'dừng đỗ/lảng vảng lâu', crowd_gathering: 'tụ tập đông người', object_counting: 'vượt ngưỡng số lượng' } as Record<string,string>)[detectionRule] || detectionRule;
-              const condDesc = (detectionRule === 'enter_area' || detectionRule === 'exit_area' || detectionRule === 'loitering')
-                ? (zoneCondition === 'inside' ? ' (tâm đối tượng nằm trong vùng)' : ' (bất kỳ phần nào chạm vào vùng)')
-                : '';
-              const productDesc = countingProductImage ? ' — chỉ đếm sản phẩm khớp ảnh mẫu đã upload' : '';
-              return `Hệ thống theo dõi ${tLabel} và phát cảnh báo theo luật "${rLabel}"${condDesc} ${zoneDesc}${productDesc}. ` +
-                `Sự kiện cần diễn ra liên tục ${alertDuration}s trước khi cảnh báo. Luồng chạy ${scheduleDesc}.`;
+            if (taskType.startsWith('defect_')) {
+              const methods = [enableSSIM && 'kiểm tra bề mặt (MS-SSIM + FSIM)', enableCNN && 'đặc trưng ngữ nghĩa (DINOv2)', enableOCR && 'đọc nhãn mác (PaddleOCR)'].filter(Boolean).join(', ');
+              return `AI so sánh sản phẩm thực tế với ${goldenSamples.length > 0 ? `${goldenSamples.length} ảnh mẫu chuẩn` : 'ảnh mẫu (chưa upload)'} sử dụng ${methods || 'kiểm tra bề mặt mặc định'}. Mỗi sản phẩm được phân tích tại ${inferenceFps} FPS và nhận phán quyết OK/NG theo ngưỡng đã cấu hình.`;
             }
 
-            // defect_detection
-            const methods = [enableSSIM && 'kiểm tra bề mặt (MS-SSIM + FSIM)', enableCNN && 'đặc trưng ngữ nghĩa (DINOv2)', enableOCR && 'đọc nhãn mác (PaddleOCR)'].filter(Boolean).join(', ');
-            return `AI so sánh sản phẩm thực tế với ${goldenSamples.length > 0 ? `${goldenSamples.length} ảnh mẫu chuẩn` : 'ảnh mẫu (chưa upload)'} sử dụng ${methods || 'kiểm tra bề mặt mặc định'}. ` +
-              `Mỗi sản phẩm được phân tích tại ${inferenceFps} FPS và nhận phán quyết OK/NG theo ngưỡng đã cấu hình.`;
+            const baseDesc = userDescription.trim() || 'giám sát theo yêu cầu người dùng';
+            return `AI sẽ ${baseDesc} ${zoneDesc}. Hệ thống chạy ${scheduleDesc}, xác nhận sự kiện sau ${alertDuration}s và nghỉ ${cooldown}s giữa các cảnh báo liên tiếp.`;
           };
 
-          // Always resolve a meaningful model name for display
-          const displayModelName =
-            monitoringMode === 'defect_detection'
-              ? `CNN Defect Inspector${enableOCR ? ' + OCR' : ''}${enableCNN ? ' + CNN' : ''}`
-              : monitoringMode === 'standard'
-              ? (STANDARD_MODEL_NAMES[taskType] || 'YOLO-NAS-S')
-              : (routedModelName && routedModelName !== 'Chưa xác định' ? routedModelName : 'LocateAnything-3B');
+          // Resolve input mode for display
+          const displayMode = inputMode === 'smart' ? 'Thông minh' : 'Tiêu chuẩn';
 
           return (
             <div className="space-y-5">
@@ -3389,7 +3715,7 @@ setSelectedDomain('');
                           <span className="text-xs font-semibold text-slate-800 flex-1">{row.value}</span>
                         </div>
                       ))}
-                      {monitoringMode === 'smart' && userDescription && (
+                      {userDescription && (
                         <div className="pt-3 border-t border-slate-100">
                           <p className="text-[10px] text-slate-500 mb-1 font-bold uppercase">Mô tả yêu cầu</p>
                           <p className="text-xs text-slate-700 italic line-clamp-3">"{userDescription}"</p>
@@ -3405,12 +3731,10 @@ setSelectedDomain('');
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Cấu hình AI</span>
                     </div>
                     <div className="p-4 space-y-2.5">
-                      {/* Mode */}
+                      {/* Model */}
                       <div className="flex items-center gap-3">
                         <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Chế độ</span>
-                        <span className="text-[11px] font-semibold text-slate-800">
-                          {monitoringMode === 'smart' ? 'Luồng thông minh' : monitoringMode === 'defect_detection' ? 'Kiểm tra lỗi' : 'Tiêu chuẩn'}
-                        </span>
+                        <span className="text-[11px] font-semibold text-slate-800">{displayMode}</span>
                       </div>
 
                       {/* Performance preset */}
@@ -3422,30 +3746,24 @@ setSelectedDomain('');
                         </span>
                       </div>
 
-                      {/* Standard: target + rule */}
-                      {monitoringMode === 'standard' && (
-                        <>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Đối tượng</span>
-                            <span className="text-[11px] font-semibold text-slate-800">{targetLabel}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Quy tắc</span>
-                            <span className="text-[11px] font-semibold text-slate-800">{ruleLabel}</span>
-                          </div>
-                        </>
+                      {/* Use case params summary */}
+                      {selectedUseCaseDef && (
+                        <div className="flex items-start gap-3">
+                          <span className="text-[11px] text-slate-400 w-24 flex-shrink-0 pt-px">Nghiệp vụ</span>
+                          <span className="text-[11px] font-semibold text-slate-800">{selectedUseCaseDef.name}</span>
+                        </div>
                       )}
 
-                      {/* Smart: search query */}
-                      {monitoringMode === 'smart' && searchQuery && (
+                      {/* Description */}
+                      {userDescription && (
                         <div className="flex items-start gap-3">
-                          <span className="text-[11px] text-slate-400 w-24 flex-shrink-0 pt-px">Từ khoá AI</span>
-                          <span className="text-[11px] font-semibold text-slate-800 line-clamp-2">{searchQuery}</span>
+                          <span className="text-[11px] text-slate-400 w-24 flex-shrink-0 pt-px">Mô tả</span>
+                          <span className="text-[11px] font-semibold text-slate-800 line-clamp-2">{userDescription}</span>
                         </div>
                       )}
 
                       {/* Defect: samples + features */}
-                      {monitoringMode === 'defect_detection' && (
+                      {taskType.startsWith('defect_') && (
                         <>
                           <div className="flex items-center gap-3">
                             <span className="text-[11px] text-slate-400 w-24 flex-shrink-0">Ảnh mẫu</span>
@@ -3476,7 +3794,7 @@ setSelectedDomain('');
                             <p className="text-[9px] text-slate-400">Tạm ngưng sau báo</p>
                             <p className="text-xs font-bold text-slate-700">{cooldown}s</p>
                           </div>
-                          {monitoringMode !== 'defect_detection' && maxLimit > 0 && (
+                          {!taskType.startsWith('defect_') && maxLimit > 0 && (
                             <div>
                               <p className="text-[9px] text-slate-400">Giới hạn số lượng</p>
                               <p className="text-xs font-bold text-slate-700">&gt; {maxLimit}</p>
@@ -3562,7 +3880,7 @@ setSelectedDomain('');
             ) : (
               <button
                 onClick={handleNext}
-                disabled={currentStep === 'camera' && selectedCameraIds.length === 0}
+                disabled={(currentStep === 'camera' && selectedCameraIds.length === 0) || (currentStep === 'task' && !selectedUseCaseDef)}
                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Tiếp tục <ArrowRight size={14} />

@@ -160,7 +160,7 @@ const ImageRoiDrawer: React.FC<ImageRoiDrawerProps> = ({ imgSrc, rois, onChange,
                         if (e.key === 'Enter') commitLabel();
                         if (e.key === 'Escape') { setLabelingIdx(null); setLabelDraft(''); }
                       }}
-                      placeholder="VD: vết xước, móp..."
+                      placeholder="VD: PPE không đạt chuẩn, tư thế bất thường..."
                       className="text-[10px] border rounded-lg px-2 py-1 bg-white shadow-lg outline-none w-28"
                       style={{ borderColor: color }}
                       onClick={e => e.stopPropagation()}
