@@ -1656,43 +1656,91 @@ setSelectedDomain('');
   };
 
   const inferMonitoringConfig = (text: string, hasRoi: boolean): InferredMonitoringConfig => {
-    
     const lw = text.toLowerCase();
-    const hasPpe = ['mũ', 'áo phản quang', 'bảo hộ', 'ppe', 'an toàn', 'găng tay', 'khẩu trang'].some(k => lw.includes(k));
-    const hasVehicle = ['xe', 'ô tô', 'oto', 'xe máy', 'motorcycle', 'truck', 'tải', 'biển số'].some(k => lw.includes(k));
-    const hasPerson = ['người', 'khách', 'nhân viên', 'công nhân', 'person', 'bác sĩ', 'học sinh', 'phụ huynh', 'tài xế', 'bảo vệ'].some(k => lw.includes(k));
-    const asksCount = ['đếm', 'số lượng', 'bao nhiêu', 'count', 'thống kê', 'kiểm kê', 'tỷ lệ'].some(k => lw.includes(k));
-    const usesLine = ['vào ra', 'ra vào', 'đi qua', 'qua cổng', 'cross', 'line', 'lên tầng'].some(k => lw.includes(k));
-    const usesExit = ['rời khỏi', 'đi ra', 'exit', 'trốn'].some(k => lw.includes(k));
-    const usesIntrusion = ['xâm nhập', 'đi vào', 'vào khu vực', 'enter', 'leo trèo', 'lẻn vào', 'vượt rào'].some(k => lw.includes(k));
-    const usesLoiter = ['lảng vảng', 'ở lại lâu', 'loiter', 'quá lâu', 'đứng lâu', 'chờ', 'xếp hàng', 'tụ tập', 'đám đông'].some(k => lw.includes(k));
-    const hasDefect = ['lỗi', 'móp', 'rách', 'xước', 'hỏng', 'defect', 'nhãn lệch', 'thiếu linh kiện', 'sai sót', 'nhầm', 'rớt'].some(k => lw.includes(k));
-    const hasAbandoned = ['bỏ lại', 'leaving', 'balo', 'ba lô', 'túi', 'vali', 'thùng hàng', 'pallet'].some(k => lw.includes(k));
-    const hasRemoval = ['lấy hàng', 'lấy khỏi', 'remove', 'mất', 'trộm', 'cậy phá', 'gỡ xuống'].some(k => lw.includes(k));
-    const hasFire = ['khói', 'cháy', 'lửa', 'ngọn lửa', 'hút thuốc'].some(k => lw.includes(k));
-    const hasPhone = ['điện thoại'].some(k => lw.includes(k));
-    const hasFight = ['đánh nhau', 'xô xát', 'bạo lực', 'bạo loạn', 'hỗn chiến'].some(k => lw.includes(k));
-    const usesKnownTarget = hasPerson || hasVehicle;
-    const needsOpen = hasPpe || hasDefect || hasAbandoned || hasRemoval || hasFire || hasPhone || hasFight || (!usesKnownTarget && text.trim().length > 0);
+    const inc = (k: string) => lw.includes(k);
 
-    if (!needsOpen && usesKnownTarget) {
-      const target = hasVehicle ? 'vehicle' : 'person';
-      const rule = usesLine ? 'cross_line' : usesExit ? 'exit_area' : usesIntrusion ? 'enter_area' : usesLoiter ? 'loitering' : asksCount ? 'object_counting' : 'appear';
+    const hasPpe = ['mũ bảo hộ', 'áo phản quang', 'bảo hộ lao động', 'ppe', 'găng tay', 'khẩu trang', 'giày bảo hộ', 'kính hàn', 'áo choàng', 'kính bảo hộ'].some(inc);
+    const hasVehicle = ['ô tô', 'oto', 'xe máy', 'xe tải', 'container', 'biển số', 'xe bọc thép'].some(inc);
+    const hasForklift = ['xe nâng', 'forklift'].some(inc);
+    const hasPerson = ['người', 'khách', 'nhân viên', 'công nhân', 'bác sĩ', 'học sinh', 'phụ huynh', 'tài xế', 'bảo vệ', 'thợ', 'y tá', 'shipper'].some(inc);
+    const asksCount = ['đếm', 'số lượng', 'bao nhiêu', 'thống kê', 'kiểm kê', 'tỷ lệ', 'sĩ số', 'bao nhiêu người'].some(inc);
+    const usesLine = ['vào ra', 'ra vào', 'đi qua', 'qua cổng', 'qua vạch', 'lên tầng', 'cross line'].some(inc);
+    const usesExit = ['rời khỏi', 'đi ra khỏi', 'rời lớp', 'rời phòng', 'thoát ra', 'trốn khỏi', 'ra cổng'].some(inc);
+    const usesIntrusion = ['xâm nhập', 'đi vào', 'vào khu vực', 'leo trèo', 'lẻn vào', 'vượt rào', 'bước vào', 'vào lớp', 'tiến vào', 'leo rào', 'đột nhập'].some(inc);
+    const usesLoiter = ['lảng vảng', 'ở lại lâu', 'quá lâu', 'đứng lâu', 'lai vảng', 'dòm ngó', 'theo dõi quanh', 'đứng chờ lâu'].some(inc);
+    const hasDefect = ['lỗi', 'móp', 'rách', 'xước', 'hỏng', 'nhãn lệch', 'thiếu linh kiện', 'sai sót', 'rớt', 'nứt', 'kênh', 'lắp ngược', 'lắp sai', 'vết nứt', 'in mờ'].some(inc);
+    const hasAbandoned = ['bỏ lại', 'vô chủ', 'balo', 'ba lô', 'vali', 'thùng lạ', 'không ai nhận'].some(inc);
+    const hasRemoval = ['lấy mất', 'lấy khỏi', 'bị mất', 'trộm', 'cậy phá', 'gỡ xuống', 'bị dời', 'bị lấy', 'di dời'].some(inc);
+    const hasFire = ['khói', 'cháy', 'ngọn lửa', 'tia lửa', 'bốc lửa'].some(inc);
+    const hasSmoking = ['hút thuốc', 'điếu thuốc', 'khói thuốc', 'nhả khói'].some(inc);
+    const hasPhone = ['điện thoại', 'bấm điện thoại', 'nhìn màn hình'].some(inc);
+    const hasFight = ['đánh nhau', 'xô xát', 'bạo lực', 'bạo loạn', 'hỗn chiến', 'ẩu đả', 'bao vây', 'dồn ép', 'trấn lột'].some(inc);
+    const hasWrongWay = ['ngược chiều', 'nhầm làn', 'đi ngược', 'sai chiều', 'đi lùi'].some(inc);
+    const hasWrongZone = ['sai tuyến', 'sai bãi', 'sai khu vực', 'nhầm tuyến', 'nhầm chỗ', 'để sai', 'xếp nhầm', 'đỗ sai', 'lấn vạch', 'vượt vạch'].some(inc);
+    const hasDoorAnomaly = ['cửa mở quá', 'mở lâu', 'bị kẹp mở', 'cậy phá cửa', 'chèn cửa', 'chặn cửa', 'khóa cửa thoát'].some(inc);
+    const hasCrowdBlock = ['cản lối thoát', 'chắn thoát hiểm', 'bít lối thoát', 'vật cản thoát hiểm', 'cửa thoát hiểm bị'].some(inc);
+    const hasEmptyShelf = ['kệ trống', 'hết hàng', 'thiếu sản phẩm', 'trống chỗ'].some(inc);
+    const hasProductivity = ['năng suất', 'nhịp độ', 'thời gian trễ', 'máy dừng', 'băng tải dừng', 'ngừng hoạt động', 'số sản phẩm/giờ'].some(inc);
+    const hasProximity = ['lại gần xe nâng', 'đứng sau đuôi', 'bán kính cần cẩu', 'va chạm xe', 'điểm mù'].some(inc);
+    const hasHeatmap = ['bản đồ nhiệt', 'heatmap', 'dừng chân', 'điểm nóng', 'khu vực tập trung'].some(inc);
+    const hasDemographic = ['nhân khẩu', 'giới tính', 'độ tuổi', 'nam nữ', 'tỷ lệ nam'].some(inc);
+    const hasHandHygiene = ['sát khuẩn', 'rửa tay'].some(inc);
+    const hasAfterHours = ['ngoài giờ', 'sau giờ làm', 'ban đêm', 'sau 18', 'sau 20', 'sau 22'].some(inc);
+    const isUrgent = ['ngay lập tức', 'tức thì', 'khẩn cấp'].some(inc);
+
+    const durMatch = lw.match(/quá\s+(\d+)\s*(phút|giây|tiếng)/);
+    const customDuration = durMatch
+      ? (durMatch[2] === 'phút' ? Number(durMatch[1]) * 60 : durMatch[2] === 'tiếng' ? Number(durMatch[1]) * 3600 : Number(durMatch[1]))
+      : null;
+
+    const isOpenVocab = hasPpe || hasDefect || hasAbandoned || hasRemoval || hasFire || hasSmoking || hasPhone || hasFight
+      || hasWrongWay || hasWrongZone || hasDoorAnomaly || hasCrowdBlock || hasEmptyShelf || hasProductivity
+      || hasProximity || hasHeatmap || hasDemographic || hasHandHygiene;
+    const usesKnownTarget = hasPerson || hasVehicle || hasForklift;
+
+    if (!isOpenVocab && usesKnownTarget) {
+      const target = (hasForklift || hasVehicle) ? 'vehicle' : 'person';
+      const rule = usesLine ? 'cross_line' : usesExit ? 'exit_area' : usesIntrusion ? 'enter_area'
+        : usesLoiter ? 'loitering' : asksCount ? 'object_counting' : 'appear';
       return {
         mode: 'standard', model: 'YOLO-NAS-S', target, rule,
         scope: hasRoi ? 'roi' : 'whole_scene',
-        countingType: usesLine || rule === 'cross_line' ? 'line' : 'zone',
-        config: { alertDuration: usesLoiter ? 60 : 10, alertCount: asksCount ? maxLimit : 1, cooldown: lw.includes('ngay') ? 15 : 60, confidence: 0.65, iou: 0.45, tracker: 'bytetrack', frameSkip: usesLine ? 0 : 1, inferenceFps: 15 },
+        countingType: usesLine ? 'line' : 'zone',
+        config: {
+          alertDuration: customDuration ?? (usesLoiter ? 60 : hasAfterHours ? 5 : 10),
+          alertCount: asksCount ? maxLimit : 1,
+          cooldown: isUrgent ? 15 : 60,
+          confidence: 0.65, iou: 0.45, tracker: 'bytetrack',
+          frameSkip: usesLine ? 0 : 1, inferenceFps: 15,
+        },
       };
     }
 
-    const rule = hasPpe ? 'safety_violation' : hasDefect ? 'defect_detected' : hasAbandoned ? 'abandoned_object' : hasRemoval ? 'object_removed' : usesIntrusion ? 'enter_area' : asksCount ? 'object_counting' : 'semantic_match';
+    const rule = hasPpe ? 'safety_violation'
+      : hasDefect ? 'defect_detected'
+      : hasAbandoned ? 'abandoned_object'
+      : hasRemoval ? 'object_removed'
+      : hasFire || hasSmoking ? 'fire_smoke'
+      : hasCrowdBlock || hasWrongZone ? 'zone_violation'
+      : hasDoorAnomaly ? 'door_anomaly'
+      : usesIntrusion ? 'enter_area'
+      : usesExit ? 'exit_area'
+      : usesLoiter ? 'loitering'
+      : asksCount ? 'object_counting'
+      : 'semantic_match';
+
     return {
       mode: 'smart',
       model: hasPpe ? 'YOLO-NAS + LocateAnything (Crop Mode)' : 'LocateAnything-3B',
       rule, scope: hasRoi ? 'roi' : 'whole_scene', countingType: 'zone',
       searchQuery: hasPpe ? 'người không đội mũ bảo hộ, người không mặc áo phản quang' : text,
-      config: { similarityThreshold: hasDefect ? 0.82 : 0.78, retrievalTopK: hasRoi ? 5 : 8, cooldown: lw.includes('ngay') ? 15 : 60, alertDuration: usesLoiter ? 60 : 10, alertCount: asksCount ? maxLimit : 1 },
+      config: {
+        similarityThreshold: hasDefect ? 0.82 : 0.78,
+        retrievalTopK: hasRoi ? 5 : 8,
+        cooldown: isUrgent ? 15 : 60,
+        alertDuration: customDuration ?? (usesLoiter ? 60 : 10),
+        alertCount: asksCount ? maxLimit : 1,
+      },
     };
   };
 
@@ -1707,96 +1755,249 @@ setSelectedDomain('');
     let time = '';
     let condition = 'nếu có dấu hiệu bất thường';
 
-    
-    
     // ── Hành vi chính ──
-    if (/xâm\s+nhập|đột\s+nhập|leo\s+trèo|lẻn\s+vào|trốn|trèo\s+tường/.test(lw)) { action = 'phát hiện xâm nhập/đột nhập'; add('Hành vi: Xâm nhập / đột nhập'); }
-    else if (/lảng\s+vảng|ở\s+lại\s+lâu|dòm\s+ngó|đứng\s+lâu|đứng\s+lại|chờ/.test(lw)) { action = 'phát hiện lảng vảng/chờ đợi lâu'; add('Hành vi: Lảng vảng / chờ đợi quá lâu'); }
-    else if (/đi\s+ngược|ngược\s+chiều|lắp\s+ngược/.test(lw)) { action = 'cảnh báo ngược chiều/ngược hướng'; add('Hành vi: Ngược chiều / ngược hướng'); }
-    else if (/che\s+(tay|kính)|bịt|dán|tác\s+động/.test(lw)) { action = 'phát hiện phá hoại camera'; add('Hành vi: Che/phá hoại camera'); }
-    else if (/bỏ\s+lại|vô\s+chủ|leaving|bỏ\s+quên/.test(lw)) { action = 'phát hiện vật thể vô chủ'; add('Hành vi: Bỏ lại đồ vật'); }
-    else if (/lấy\s+(mất|đi|trộm)|di\s+dời|mất|gỡ\s+xuống/.test(lw)) { action = 'cảnh báo mất cắp/di dời'; add('Hành vi: Đồ vật bị lấy mất'); }
-    else if (/đếm|số\s+lượng|count|thống\s+kê|kiểm\s+kê|tỷ\s+lệ/.test(lw)) { action = 'thống kê số lượng'; add('Hành vi: Đếm số lượng / thống kê'); }
-    else if (/vào\s+ra|ra\s+vào|đi\s+qua/.test(lw)) { action = 'giám sát lưu lượng'; add('Hành vi: Đi qua (vào/ra)'); }
-    else if (/đánh\s+nhau|xô\s+xát|bạo\s+loạn|hỗn\s+chiến|đe\s+dọa|trấn\s+lột/.test(lw)) { action = 'phát hiện bạo lực/đánh nhau'; add('Hành vi: Bạo lực / đe dọa'); }
-    else if (/tụ\s+tập|đám\s+đông|đông\s+người|ùn\s+tắc|kẹt|ách\s+tắc/.test(lw)) { action = 'phát hiện đám đông/ùn tắc'; add('Hành vi: Đám đông / ùn tắc'); }
-    else if (/khói|cháy|lửa|ngọn\s+lửa|tia\s+lửa/.test(lw)) { action = 'phát hiện khói/lửa cháy'; add('Hành vi: Cháy nổ / có khói'); }
-    else if (/hút\s+thuốc/.test(lw)) { action = 'phát hiện hút thuốc'; add('Hành vi: Hút thuốc sai quy định'); }
-    else if (/điện\s+thoại/.test(lw)) { action = 'phát hiện sử dụng điện thoại'; add('Hành vi: Dùng điện thoại'); }
-    else if (/mũ\s+bảo\s+hộ|áo\s+phản\s+quang|găng\s+tay|khẩu\s+trang|giày\s+bảo\s+hộ|kính\s+hàn|áo\s+choàng/.test(lw)) { action = 'kiểm tra đồ bảo hộ (PPE)'; add('Hành vi: Không tuân thủ đồ bảo hộ'); }
-    else if (/nhãn|mã\s+vạch|ocr|thông\s+tin|in\s+mờ/.test(lw)) { action = 'nhận diện và đọc nhãn'; add('Hành vi: Kiểm tra nhãn mác / OCR'); }
-    else if (/vượt\s+quá\s+tốc\s+độ|phóng\s+nhanh|tốc\s+độ/.test(lw)) { action = 'phát hiện vi phạm tốc độ'; add('Hành vi: Chạy quá tốc độ'); }
-    else if (/dừng\s+đỗ|đỗ\s+xe/.test(lw)) { action = 'phát hiện đỗ xe sai quy định'; add('Hành vi: Dừng đỗ sai quy định'); }
-    else if (/biển\s+số|ngoại\s+tỉnh|danh\s+sách\s+đen/.test(lw)) { action = 'nhận diện biển số xe'; add('Hành vi: Nhận diện biển số xe'); }
-    else if (/thiếu\s+linh\s+kiện|sai\s+sót|nhầm|rách|lệch|rớt|móp|kênh|nứt|dị\s+vật/.test(lw)) { action = 'kiểm tra lỗi sản phẩm/quy trình'; add('Hành vi: Lỗi sản phẩm / quy trình'); }
-    else if (/vắng\s+mặt|lơ\s+là|quên\s+tắt/.test(lw)) { action = 'giám sát nhân sự/thiết bị'; add('Hành vi: Vắng mặt / lơ là / quên tắt thiết bị'); }
-    else if (/xếp\s+hàng/.test(lw)) { action = 'phát hiện hàng đợi/xếp hàng'; add('Hành vi: Khách xếp hàng dài'); }
-    else if (/rửa\s+tay|sát\s+khuẩn/.test(lw)) { action = 'kiểm tra vệ sinh/sát khuẩn'; add('Hành vi: Không rửa tay/sát khuẩn'); }
-    else if (/điểm\s+danh|đi\s+trễ|rời\s+lớp/.test(lw)) { action = 'ghi nhận chuyên cần'; add('Hành vi: Điểm danh / đi trễ / rời sớm'); }
-    else if (/vượt\s+vạch|lấn\s+chiếm|chiếm\s+dụng|cản\s+trở|cản\s+lối|chặn|bít\s+lối/.test(lw)) { action = 'phát hiện cản trở lối đi'; add('Hành vi: Cản trở / chiếm dụng không gian'); }
-    else if (/ngã|vấp\s+ngã|tai\s+nạn/.test(lw)) { action = 'phát hiện té ngã/tai nạn'; add('Hành vi: Té ngã / tai nạn'); }
-    else if (/đi\s+lạc|khóc/.test(lw)) { action = 'phát hiện trẻ em đi lạc/khóc'; add('Hành vi: Trẻ em đi lạc'); }
-    else if (/vũ\s+khí|gậy\s+gộc|sắc\s+nhọn/.test(lw)) { action = 'phát hiện mang vũ khí'; add('Hành vi: Mang vũ khí / vật nguy hiểm'); }
-    else if (/bán\s+hàng\s+rong/.test(lw)) { action = 'phát hiện bán hàng rong'; add('Hành vi: Bán hàng rong'); }
-    else if (/ho|hắt\s+hơi/.test(lw)) { action = 'giám sát dịch tễ'; add('Hành vi: Ho / hắt hơi'); }
-    else if (/thò\s+tay|chui\s+vào/.test(lw)) { action = 'phát hiện hành vi nguy hiểm'; add('Hành vi: Thò tay/chui vào máy móc'); }
-
-    // ── Đối tượng giám sát ──
-    if (/người\s+lạ|kẻ\s+gian|đối\s+tượng\s+khả\s+nghi|đối\s+tượng/.test(lw)) { target = 'đối tượng lạ/nghi vấn'; add('Đối tượng: Người lạ / khả nghi'); }
-    else if (/nhân\s+viên|bảo\s+vệ|công\s+nhân|người|bác\s+sĩ|y\s+tế|tài\s+xế|thợ|shipper/.test(lw)) { target = 'nhân sự/con người'; add('Đối tượng: Người / Nhân sự / Y tế'); }
-    else if (/khách\s+hàng|khách|bệnh\s+nhân|học\s+sinh|phụ\s+huynh|trẻ\s+em/.test(lw)) { target = 'người ra vào'; add('Đối tượng: Khách / Bệnh nhân / Học sinh / Trẻ em'); }
-    else if (/xe\s+máy|ô\s+tô|oto|x[eê]\s+tải|xe|container/.test(lw)) { target = 'phương tiện giao thông'; add('Đối tượng: Xe / Phương tiện'); }
-    else if (/vali|túi\s+xách|ba\s+lô|balo|hành\s+lý|cặp/.test(lw)) { target = 'hành lý/túi xách'; add('Vật thể: Hành lý / túi xách'); }
-    else if (/thùng\s+hàng|kiện\s+hàng|gói\s+hàng|pallet|bao\s+tải/.test(lw)) { target = 'thùng hàng/kiện hàng'; add('Vật thể: Kiện hàng / pallet / bao tải'); }
-    else if (/laptop|thiết\s+bị|máy\s+tính|máy\s+chiếu/.test(lw)) { target = 'thiết bị điện tử'; add('Vật thể: Thiết bị điện/điện tử'); }
-    else if (/bình\s+chữa\s+cháy/.test(lw)) { target = 'bình chữa cháy'; add('Vật thể: Bình chữa cháy'); }
-    else if (/rác|vật\s+phế\s+thải|phế\s+liệu/.test(lw)) { target = 'rác/phế thải'; add('Vật thể: Rác / phế thải'); }
-    else if (/sản\s+phẩm|chai|lọ|linh\s+kiện/.test(lw)) { target = 'sản phẩm/linh kiện'; add('Đối tượng: Sản phẩm / linh kiện'); }
-    else if (/hàng\s+cồng\s+kềnh|xe\s+đẩy/.test(lw)) { target = 'xe đẩy/hàng cồng kềnh'; add('Vật thể: Xe đẩy / hàng cồng kềnh'); }
-    else if (/tủ\s+điện|máy\s+móc|máy\s+ép|lưỡi\s+cưa|cần\s+cẩu/.test(lw)) { target = 'máy móc/thiết bị nặng'; add('Vật thể: Máy móc / thiết bị nặng'); }
-
-    // ── Khu vực cụ thể ──
-    const places: [RegExp, string][] = [
-      [/kho\s+hàng|kho\s+bãi|nhà\s+xưởng|kho|xưởng|chuyền|băng\s+chuyền|băng\s+tải/, 'nhà xưởng/dây chuyền/kho'],
-      [/cổng\s+\w+|cổng/, 'cổng'],
-      [/cửa\s+(kho|thoát\s*hiểm|phòng\s+server|hàng|khám|dock)|cửa/, 'cửa'],
-      [/tường\s+rào/, 'tường rào'],
-      [/bãi\s+đỗ|bãi\s+xe|nhà\s+xe|trạm|dock/, 'bãi đỗ xe/trạm'],
-      [/sảnh|lobby|lễ\s+tân|quầy/, 'khu vực sảnh/quầy'],
-      [/hành\s+lang|lối\s+đi/, 'hành lang/lối đi'],
-      [/lối\s+thoát/, 'lối thoát hiểm'],
-      [/thang\s+máy|thang\s+cuốn|cầu\s+thang/, 'thang máy/thang bộ'],
-      [/cây\s+atm|atm/, 'cây ATM'],
-      [/đường\s+băng|khoang\s+hành\s+lý/, 'khu vực hàng không'],
-      [/phòng\s+mổ|buồng\s+bệnh|cách\s+ly|nội\s+tổng\s+hợp|y\s+tế|cấp\s+cứu/, 'khu vực y tế'],
-      [/lớp\s+học|sân\s+trường|khuôn\s+viên\s+trường|nhà\s+vệ\s+sinh/, 'khu vực trường học/nội bộ'],
-      [/kệ|rack/, 'kệ hàng'],
-      [/khu\s+vực\s+(cấm|nguy\s*hiểm|điện\s+cao\s+thế|thi\s+công|bảo\s+vệ)|trạm\s+biến\s+áp|công\s+trường/, 'khu vực hạn chế'],
-    ];
-
-    // ── Thời gian cụ thể ──
-    if (/ban\s+đêm|buổi\s+tối|đêm/.test(lw)) { time = ' vào ban đêm'; add('Khung giờ: Ban đêm'); }
-    else if (/buổi\s+sáng/.test(lw)) { time = ' vào buổi sáng'; add('Khung giờ: Buổi sáng'); }
-    else if (/ngoài\s+giờ|sau\s+giờ/.test(lw)) { time = ' ngoài giờ hành chính'; add('Khung giờ: Ngoài giờ làm việc'); }
-    else {
-      const timeRange = lw.match(/(?:từ|sau)\s+(\d+)[:h]?\s*(?:giờ)?\s*(?:đến|->|tới)\s*(\d+)[:h]?\s*(?:giờ)?/);
-      if (timeRange) { time = ` trong khung giờ ${timeRange[1]}h - ${timeRange[2]}h`; add(`Khung giờ: ${timeRange[1]}h - ${timeRange[2]}h`); }
-      else {
-        const after = lw.match(/sau\s+(\d+)[:h]?\s*(?:giờ)?/);
-        if (after) { time = ` sau ${after[1]}h`; add(`Khung giờ: sau ${after[1]}h`); }
-      }
+    if (/xâm\s+nhập|đột\s+nhập|leo\s+trèo|lẻn\s+vào|trèo\s+tường|leo\s+rào|vượt\s+rào/.test(lw)) {
+      action = 'phát hiện xâm nhập/đột nhập'; add('Hành vi: Xâm nhập / đột nhập / leo rào');
+    }
+    else if (/lảng\s+vảng|ở\s+lại\s+lâu|dòm\s+ngó|đứng\s+lâu|lai\s+vảng|đứng\s+chờ\s+lâu/.test(lw)) {
+      action = 'phát hiện lảng vảng/chờ đợi lâu'; add('Hành vi: Lảng vảng / chờ đợi quá lâu');
+    }
+    else if (/rời\s+(lớp|phòng|khỏi|khu\s+vực)|đi\s+ra\s+khỏi|thoát\s+ra|ra\s+cổng\s+trong\s+giờ|trốn\s+khỏi/.test(lw)) {
+      action = 'phát hiện rời khỏi khu vực'; add('Hành vi: Rời khỏi khu vực');
+    }
+    else if (/\bđi\s+vào\b|vào\s+khu\s+vực|bước\s+vào|vào\s+lớp|tiến\s+vào/.test(lw)) {
+      action = 'phát hiện đi vào khu vực'; add('Hành vi: Đi vào khu vực');
+    }
+    else if (/đi\s+ngược|ngược\s+chiều|nhầm\s+làn|sai\s+chiều/.test(lw)) {
+      action = 'cảnh báo đi ngược chiều/nhầm làn'; add('Hành vi: Ngược chiều / nhầm làn');
+    }
+    else if (/che\s+(tay|kính\s+camera)|bịt\s+camera|dán\s+băng|xịt\s+sơn|bị\s+bẻ\s+hướng|sai\s+lệch\s+góc/.test(lw)) {
+      action = 'phát hiện can thiệp/phá hoại camera'; add('Hành vi: Che / phá hoại camera');
+    }
+    else if (/bỏ\s+lại|vô\s+chủ|bỏ\s+quên|không\s+ai\s+nhận|thùng\s+lạ|vali\s+vô\s+chủ/.test(lw)) {
+      action = 'phát hiện vật thể bỏ lại/vô chủ'; add('Hành vi: Bỏ lại đồ vật / vô chủ');
+    }
+    else if (/lấy\s+(mất|đi|trộm)|di\s+dời|bị\s+lấy|gỡ\s+xuống|bị\s+dời/.test(lw)) {
+      action = 'cảnh báo mất cắp/di dời tài sản'; add('Hành vi: Tài sản bị lấy / di dời');
+    }
+    else if (/đếm|số\s+lượng|thống\s+kê|kiểm\s+kê|tỷ\s+lệ|sĩ\s+số/.test(lw)) {
+      action = 'thống kê số lượng'; add('Hành vi: Đếm / thống kê số lượng');
+    }
+    else if (/vào\s+ra|ra\s+vào|đi\s+qua|qua\s+vạch|qua\s+cổng/.test(lw)) {
+      action = 'giám sát lưu lượng qua ranh giới'; add('Hành vi: Đi qua (vào/ra)');
+    }
+    else if (/đánh\s+nhau|xô\s+xát|hỗn\s+chiến|ẩu\s+đả|bao\s+vây|dồn\s+ép|trấn\s+lột/.test(lw)) {
+      action = 'phát hiện bạo lực/xô xát'; add('Hành vi: Bạo lực / xô xát / trấn lột');
+    }
+    else if (/tụ\s+tập|đám\s+đông|đông\s+người|ùn\s+tắc|ách\s+tắc|chen\s+lấn/.test(lw)) {
+      action = 'phát hiện đám đông/ùn tắc/chen lấn'; add('Hành vi: Đám đông / ùn tắc / chen lấn');
+    }
+    else if (/tia\s+lửa\s+điện|tia\s+lửa.*tủ/.test(lw)) {
+      action = 'phát hiện tia lửa điện bất thường'; add('Hành vi: Tia lửa điện');
+    }
+    else if (/khói|cháy|ngọn\s+lửa|bốc\s+lửa/.test(lw)) {
+      action = 'phát hiện khói/lửa'; add('Hành vi: Cháy nổ / Khói / Lửa');
+    }
+    else if (/hút\s+thuốc|điếu\s+thuốc|nhả\s+khói\s+thuốc/.test(lw)) {
+      action = 'phát hiện hút thuốc'; add('Hành vi: Hút thuốc sai khu vực');
+    }
+    else if (/điện\s+thoại|bấm\s+điện\s+thoại|nhìn\s+màn\s+hình/.test(lw)) {
+      action = 'phát hiện sử dụng điện thoại'; add('Hành vi: Dùng điện thoại trong giờ làm');
+    }
+    else if (/mũ\s+bảo\s+hộ|áo\s+phản\s+quang|giày\s+bảo\s+hộ|kính\s+hàn|kính\s+bảo\s+hộ|áo\s+choàng\s+cách\s+ly/.test(lw)) {
+      action = 'kiểm tra trang bị bảo hộ (PPE)'; add('Hành vi: Không tuân thủ đồ bảo hộ');
+    }
+    else if (/khẩu\s+trang|đeo\s+khẩu\s+trang|tháo\s+khẩu\s+trang/.test(lw)) {
+      action = 'kiểm tra khẩu trang y tế'; add('Hành vi: Không đeo / đeo sai khẩu trang');
+    }
+    else if (/nhãn\s+lệch|rách\s+bao\s+bì|mã\s+vạch|ocr|in\s+mờ|tem\s+nhãn/.test(lw)) {
+      action = 'kiểm tra nhãn mác / đọc mã vạch'; add('Hành vi: Lỗi nhãn / OCR');
+    }
+    else if (/vượt\s+quá\s+tốc\s+độ|phóng\s+nhanh|chạy\s+quá\s+tốc|tốc\s+độ\s+cao/.test(lw)) {
+      action = 'phát hiện vi phạm tốc độ'; add('Hành vi: Chạy quá tốc độ');
+    }
+    else if (/đỗ\s+(xe\s+)?quá\s+(giờ|lâu|phút)|chiếm\s+dụng.*quá\s+(lâu|giờ)/.test(lw)) {
+      action = 'phát hiện đỗ xe quá thời gian'; add('Hành vi: Đỗ xe quá giờ quy định');
+    }
+    else if (/dừng\s+đỗ\s+trái\s+phép|đỗ\s+sai\s+(quy|vị|khu)|đỗ\s+chiếm|lấn\s+vạch\s+đường/.test(lw)) {
+      action = 'phát hiện đỗ xe sai quy định'; add('Hành vi: Dừng đỗ sai quy định / sai khu vực');
+    }
+    else if (/biển\s+số|ngoại\s+tỉnh|danh\s+sách\s+đen|nhận\s+diện\s+xe/.test(lw)) {
+      action = 'nhận diện/kiểm tra biển số xe'; add('Hành vi: Nhận diện biển số xe');
+    }
+    else if (/cửa.*(mở\s+quá|bị\s+kẹp|không\s+đóng|mở\s+lâu)|cậy\s+phá\s+cửa|chèn\s+cửa|chặn.*cửa/.test(lw)) {
+      action = 'phát hiện bất thường cửa'; add('Hành vi: Cửa mở bất thường / cậy phá');
+    }
+    else if (/mở\s+cửa\s+ngoài\s+giờ|cửa.*sau\s+\d+\s*[hg]/.test(lw)) {
+      action = 'phát hiện mở cửa ngoài giờ'; add('Hành vi: Mở cửa ngoài giờ quy định');
+    }
+    else if (/cản\s+lối\s+thoát|chắn.*thoát\s+hiểm|bít\s+lối\s+thoát|cửa\s+thoát.*bị\s+khóa|vật\s+cản.*thoát/.test(lw)) {
+      action = 'phát hiện cản trở lối thoát hiểm'; add('Hành vi: Cản trở / khóa lối thoát hiểm');
+    }
+    else if (/thiếu\s+linh\s+kiện|lắp\s+ngược|lắp\s+sai|vết\s+nứt|sai\s+sót\s+công\s+đoạn|bỏ\s+qua\s+bước/.test(lw)) {
+      action = 'kiểm tra lỗi lắp ráp/quy trình'; add('Hành vi: Lỗi lắp ráp / bỏ qua công đoạn');
+    }
+    else if (/kệ\s+trống|hết\s+hàng|thiếu\s+sản\s+phẩm.*kệ|trống\s+chỗ.*kệ/.test(lw)) {
+      action = 'phát hiện kệ hàng trống'; add('Hành vi: Kệ hàng trống / thiếu sản phẩm');
+    }
+    else if (/hàng.*rơi|rớt\s+xuống|kiện.*rớt|thùng.*rớt|rơi\s+khỏi\s+băng/.test(lw)) {
+      action = 'phát hiện hàng hóa rơi/rớt'; add('Hành vi: Hàng hóa rơi rớt');
+    }
+    else if (/phân\s+loại\s+nhầm|lẫn\s+vào\s+dây\s+chuyền|màu.*kích\s+thước.*lẫn/.test(lw)) {
+      action = 'phát hiện phân loại nhầm hàng'; add('Hành vi: Phân loại nhầm / hàng lẫn');
+    }
+    else if (/xếp\s+nhầm|để\s+sai\s+(khu\s+vực|bãi|tuyến)|nhầm\s+tuyến|nhầm\s+bãi|sai\s+tuyến/.test(lw)) {
+      action = 'phát hiện để sai khu vực/tuyến'; add('Hành vi: Để nhầm khu vực / sai tuyến');
+    }
+    else if (/xe\s+nâng.*(sai\s+tuyến|khu\s+vực\s+người|cản\s+trở)|đỗ.*cản\s+lối.*kho/.test(lw)) {
+      action = 'phát hiện xe nâng vi phạm phân làn'; add('Hành vi: Xe nâng sai tuyến / cản trở lối đi');
+    }
+    else if (/lùi\s+xe.*nguy\s+hiểm|lùi.*không\s+người\s+xi|lùi.*khu\s+vực\s+khuất|lùi\s+sai\s+cửa/.test(lw)) {
+      action = 'phát hiện lùi xe không an toàn'; add('Hành vi: Lùi xe nguy hiểm');
+    }
+    else if (/xếp\s+chồng.*quá\s+cao|quá\s+cao.*nguy\s+cơ\s+đổ|chồng.*bất\s+thường/.test(lw)) {
+      action = 'phát hiện xếp hàng quá cao'; add('Hành vi: Xếp chồng quá cao nguy cơ đổ vỡ');
+    }
+    else if (/lại\s+gần\s+xe\s+nâng|đứng\s+sau\s+đuôi\s+xe|điểm\s+mù.*xe|bán\s+kính.*cần\s+cẩu/.test(lw)) {
+      action = 'phát hiện người tiếp cận nguy hiểm'; add('Hành vi: Người đến gần xe / vùng nguy hiểm');
+    }
+    else if (/thò\s+tay|chui\s+vào\s+(gầm|máy)|tiến\s+sát\s+lưỡi/.test(lw)) {
+      action = 'phát hiện hành vi nguy hiểm gần máy'; add('Hành vi: Thò tay / chui vào máy đang chạy');
+    }
+    else if (/máy.*dừng|băng\s+tải.*dừng|ngừng\s+hoạt\s+động|dây\s+chuyền.*dừng/.test(lw)) {
+      action = 'phát hiện máy móc ngừng hoạt động'; add('Hành vi: Máy / băng tải dừng bất thường');
+    }
+    else if (/thời\s+gian\s+trễ|nhịp\s+độ|tốc\s+độ\s+làm\s+việc|số\s+sản\s+phẩm.*giờ/.test(lw)) {
+      action = 'đo lường năng suất sản xuất'; add('Hành vi: Giám sát năng suất / nhịp độ');
+    }
+    else if (/vắng\s+mặt.*quầy|không\s+có\s+nhân\s+viên|không\s+đứng\s+đúng\s+vị\s+trí|tụm\s+tụi|túm\s+tụm/.test(lw)) {
+      action = 'phát hiện nhân viên vắng mặt/sai vị trí'; add('Hành vi: Nhân viên vắng mặt / tụ tập');
+    }
+    else if (/vắng\s+mặt|lơ\s+là|quên\s+tắt/.test(lw)) {
+      action = 'giám sát nhân sự/thiết bị'; add('Hành vi: Vắng mặt / lơ là / quên tắt thiết bị');
+    }
+    else if (/phòng\s+họp.*có\s+người|người\s+trong\s+phòng\s+họp|phòng\s+họp.*chưa\s+đặt|quên\s+tắt.*(điện|máy\s+chiếu)|họp\s+quá\s+giờ/.test(lw)) {
+      action = 'giám sát tình trạng phòng họp'; add('Hành vi: Sử dụng phòng họp bất thường');
+    }
+    else if (/bản\s+đồ\s+nhiệt|heatmap|thời\s+gian\s+dừng\s+chân|điểm\s+nóng|góc\s+khuất.*ít\s+người/.test(lw)) {
+      action = 'phân tích heatmap / điểm dừng chân'; add('Hành vi: Phân tích heatmap khách hàng');
+    }
+    else if (/nhân\s+khẩu|giới\s+tính|độ\s+tuổi|tỷ\s+lệ\s+nam\s+nữ/.test(lw)) {
+      action = 'phân tích nhân khẩu học'; add('Hành vi: Phân tích nhân khẩu học');
+    }
+    else if (/sát\s+khuẩn.*không|không.*sát\s+khuẩn|rửa\s+tay.*không|không.*rửa\s+tay|sát\s+khuẩn\s+quá\s+nhanh/.test(lw)) {
+      action = 'kiểm tra tuân thủ vệ sinh tay'; add('Hành vi: Không sát khuẩn / rửa tay không đúng');
+    }
+    else if (/điểm\s+danh|sĩ\s+số|ghi\s+nhận.*học\s+sinh/.test(lw)) {
+      action = 'ghi nhận điểm danh / sĩ số'; add('Hành vi: Điểm danh / ghi nhận sĩ số');
+    }
+    else if (/đi\s+trễ|vào\s+muộn|đến\s+trễ/.test(lw)) {
+      action = 'phát hiện đi trễ/vào muộn'; add('Hành vi: Đi trễ / vào lớp muộn');
+    }
+    else if (/rời\s+lớp\s+sớm|ra\s+khỏi\s+lớp\s+trước|xách\s+cặp\s+đi\s+ra/.test(lw)) {
+      action = 'phát hiện rời lớp trước giờ'; add('Hành vi: Rời lớp sớm');
+    }
+    else if (/trốn\s+học|ra\s+cổng\s+giờ\s+học|trốn.*khuôn\s+viên|núp.*giờ\s+học/.test(lw)) {
+      action = 'phát hiện học sinh trốn học'; add('Hành vi: Học sinh trốn học');
+    }
+    else if (/xếp\s+hàng\s+chờ|hàng\s+đợi\s+(dài|thanh\s+toán)|chờ\s+(quầy|dịch\s+vụ)|đứng\s+chờ\s+quá/.test(lw)) {
+      action = 'phát hiện hàng đợi dài'; add('Hành vi: Hàng đợi / xếp hàng chờ lâu');
+    }
+    else if (/vượt\s+vạch|lấn\s+chiếm|cản\s+lối|bán\s+hàng\s+rong|chiếm\s+vỉa\s+hè/.test(lw)) {
+      action = 'phát hiện cản trở/lấn chiếm'; add('Hành vi: Cản trở / lấn chiếm lối đi');
+    }
+    else if (/ngã|vấp\s+ngã|tai\s+nạn\s+lao\s+động|bị\s+ngã/.test(lw)) {
+      action = 'phát hiện té ngã/tai nạn'; add('Hành vi: Té ngã / tai nạn');
+    }
+    else if (/đi\s+lạc|trẻ\s+em.*khóc|khóc\s+một\s+mình|không\s+có\s+người\s+lớn/.test(lw)) {
+      action = 'phát hiện trẻ em đi lạc'; add('Hành vi: Trẻ em đi lạc / khóc một mình');
+    }
+    else if (/vũ\s+khí|gậy\s+gộc|vật\s+sắc\s+nhọn|dao|cầm\s+gậy/.test(lw)) {
+      action = 'phát hiện mang vũ khí'; add('Hành vi: Mang vũ khí / vật sắc nhọn');
+    }
+    else if (/ho\s+(hắt\s+hơi)?|hắt\s+hơi|tháo.*khẩu\s+trang.*ho/.test(lw)) {
+      action = 'giám sát dịch tễ / vệ sinh hô hấp'; add('Hành vi: Ho / hắt hơi / vi phạm phòng dịch');
     }
 
-    // ── Mức độ phản hồi ──
-    if (/ngay\s+lập\s+tức|tức\s+thì/.test(lw)) { condition = 'cảnh báo ngay lập tức'; add('Phản hồi: Cảnh báo ngay lập tức'); }
+    // ── Đối tượng giám sát ──
+    if (/xe\s+nâng|forklift/.test(lw)) { target = 'xe nâng'; add('Đối tượng: Xe nâng (Forklift)'); }
+    else if (/người\s+lạ|kẻ\s+gian|đối\s+tượng\s+khả\s+nghi/.test(lw)) { target = 'đối tượng lạ/khả nghi'; add('Đối tượng: Người lạ / khả nghi'); }
+    else if (/bác\s+sĩ|y\s+tá|nhân\s+viên\s+y\s+tế|điều\s+dưỡng/.test(lw)) { target = 'nhân viên y tế'; add('Đối tượng: Nhân viên y tế'); }
+    else if (/học\s+sinh|sinh\s+viên/.test(lw)) { target = 'học sinh'; add('Đối tượng: Học sinh'); }
+    else if (/phụ\s+huynh/.test(lw)) { target = 'phụ huynh'; add('Đối tượng: Phụ huynh'); }
+    else if (/bệnh\s+nhân/.test(lw)) { target = 'bệnh nhân'; add('Đối tượng: Bệnh nhân'); }
+    else if (/khách\s+hàng|khách\s+vip|khách/.test(lw)) { target = 'khách hàng'; add('Đối tượng: Khách hàng'); }
+    else if (/nhân\s+viên|bảo\s+vệ|công\s+nhân|tài\s+xế|thợ|shipper/.test(lw)) { target = 'nhân sự / nhân viên'; add('Đối tượng: Nhân viên / Công nhân'); }
+    else if (/trẻ\s+em/.test(lw)) { target = 'trẻ em'; add('Đối tượng: Trẻ em'); }
+    else if (/ô\s+tô|xe\s+tải|container|xe\s+bọc\s+thép/.test(lw)) { target = 'xe ô tô / xe tải'; add('Đối tượng: Ô tô / Xe tải'); }
+    else if (/xe\s+máy|motorcycle/.test(lw)) { target = 'xe máy'; add('Đối tượng: Xe máy'); }
+    else if (/pallet|kiện\s+hàng|thùng\s+carton|thùng\s+hàng|bao\s+tải/.test(lw)) { target = 'kiện hàng / pallet'; add('Vật thể: Kiện hàng / Pallet'); }
+    else if (/vali|túi\s+xách|ba\s+lô|hành\s+lý/.test(lw)) { target = 'hành lý / túi xách'; add('Vật thể: Hành lý / Túi xách'); }
+    else if (/laptop|máy\s+tính|máy\s+chiếu|thiết\s+bị\s+điện/.test(lw)) { target = 'thiết bị điện tử'; add('Vật thể: Thiết bị điện tử'); }
+    else if (/bình\s+chữa\s+cháy/.test(lw)) { target = 'bình chữa cháy'; add('Vật thể: Bình chữa cháy'); }
+    else if (/sản\s+phẩm|chai|lọ|linh\s+kiện|bảng\s+mạch/.test(lw)) { target = 'sản phẩm / linh kiện'; add('Đối tượng: Sản phẩm / Linh kiện'); }
+    else if (/kệ\s+hàng|giá\s+kệ|rack/.test(lw)) { target = 'kệ hàng'; add('Vật thể: Kệ hàng'); }
+    else if (/xe\s+đẩy|hàng\s+cồng\s+kềnh/.test(lw)) { target = 'xe đẩy / hàng cồng kềnh'; add('Vật thể: Xe đẩy'); }
+    else if (/máy\s+ép|lưỡi\s+cưa|cần\s+cẩu|dây\s+chuyền|băng\s+tải/.test(lw)) { target = 'máy móc / thiết bị sản xuất'; add('Vật thể: Máy móc / Dây chuyền'); }
+    else if (/rác|phế\s+thải|phế\s+liệu/.test(lw)) { target = 'rác / phế thải'; add('Vật thể: Rác / Phế thải'); }
+
+    // ── Khu vực cụ thể ──
+    const places: [RegExp, string, string][] = [
+      [/băng\s+chuyền|băng\s+tải|dây\s+chuyền|chuyền\s+sản\s+xuất/, 'dây chuyền / băng tải', 'Khu vực: Dây chuyền sản xuất'],
+      [/kho\s+hàng|kho\s+bãi|nhà\s+xưởng|xưởng\s+sản\s+xuất|nhà\s+máy/, 'nhà xưởng / kho hàng', 'Khu vực: Nhà xưởng / Kho'],
+      [/dock|cửa\s+bốc\s+dỡ|trạm\s+cân|bãi\s+(xuất|nhập)\s+hàng/, 'dock / cửa bốc dỡ', 'Khu vực: Dock / Trạm bốc dỡ'],
+      [/cổng\s+chính|cổng\s+ra|cổng\s+vào|trước\s+cổng|cổng\s+công\s+ty/, 'cổng ra vào', 'Khu vực: Cổng'],
+      [/cửa\s+thoát\s+hiểm|lối\s+thoát\s+hiểm/, 'lối thoát hiểm', 'Khu vực: Lối thoát hiểm'],
+      [/cửa\s+(kho|phòng\s+server|hàng|khám|sảnh\s+chính)/, 'cửa', 'Khu vực: Cửa'],
+      [/tường\s+rào|hàng\s+rào|rào\s+bảo\s+vệ/, 'tường rào / hàng rào', 'Khu vực: Tường rào'],
+      [/hầm\s+xe|bãi\s+đỗ\s+xe|bãi\s+gửi\s+xe|nhà\s+xe/, 'bãi đỗ xe / hầm xe', 'Khu vực: Bãi đỗ xe'],
+      [/sảnh|lobby|quầy\s+lễ\s+tân|khu\s+vực\s+lễ\s+tân/, 'sảnh / lễ tân', 'Khu vực: Sảnh / Lễ tân'],
+      [/hành\s+lang|lối\s+đi\s+nội\s+bộ/, 'hành lang / lối đi', 'Khu vực: Hành lang'],
+      [/thang\s+máy|sảnh\s+thang\s+máy/, 'thang máy', 'Khu vực: Thang máy'],
+      [/cầu\s+thang\s+(thoát\s+hiểm|bộ)|cầu\s+thang/, 'cầu thang', 'Khu vực: Cầu thang'],
+      [/cây\s+atm|khu\s+vực\s+atm/, 'khu vực ATM', 'Khu vực: ATM'],
+      [/phòng\s+mổ|buồng\s+bệnh|cách\s+ly|nội\s+tổng\s+hợp|cấp\s+cứu|phòng\s+khám/, 'khu vực y tế', 'Khu vực: Bệnh viện / Y tế'],
+      [/lớp\s+học|sân\s+trường|khuôn\s+viên\s+trường|cổng\s+trường/, 'trường học', 'Khu vực: Trường học'],
+      [/nhà\s+vệ\s+sinh|toilet/, 'nhà vệ sinh', 'Khu vực: Nhà vệ sinh'],
+      [/phòng\s+họp|meeting\s+room/, 'phòng họp', 'Khu vực: Phòng họp'],
+      [/kệ\s+hàng|giá\s+kệ|kệ\s+rack/, 'kệ hàng', 'Khu vực: Kệ hàng'],
+      [/khu\s+vực\s+(cấm|nguy\s*hiểm|điện\s+cao\s+thế|thi\s+công)|trạm\s+biến\s+áp|công\s+trường/, 'khu vực nguy hiểm / hạn chế', 'Khu vực: Khu hạn chế'],
+      [/trạm\s+xăng|cây\s+xăng/, 'trạm xăng', 'Khu vực: Trạm xăng'],
+      [/quầy\s+thu\s+ngân|quầy\s+thanh\s+toán|quầy\s+tư\s+vấn|quầy/, 'quầy dịch vụ', 'Khu vực: Quầy / Thu ngân'],
+    ];
+    for (const [re, loc, label] of places) {
+      if (re.test(lw)) { location = loc; add(label); break; }
+    }
+
+    // ── Thời gian / điều kiện ──
+    if (/ban\s+đêm|buổi\s+tối|đêm\s+khuya/.test(lw)) { time = ' vào ban đêm'; add('Khung giờ: Ban đêm'); }
+    else if (/buổi\s+sáng|đầu\s+giờ/.test(lw)) { time = ' vào buổi sáng'; add('Khung giờ: Buổi sáng'); }
+    else if (/giờ\s+cao\s+điểm|giờ\s+tan\s+tầm|tan\s+trường|giờ\s+tan\s+học/.test(lw)) { time = ' vào giờ cao điểm'; add('Khung giờ: Giờ cao điểm'); }
+    else if (/ngoài\s+giờ\s+(làm|hành\s+chính)|sau\s+giờ\s+làm/.test(lw)) { time = ' ngoài giờ hành chính'; add('Khung giờ: Ngoài giờ làm việc'); }
     else {
-      const dur = lw.match(/(\d+)\s*(phút|giây)/);
-      if (dur) { condition = `sẽ báo động nếu xảy ra liên tục quá ${dur[1]} ${dur[2]}`; add(`Ngưỡng: Xảy ra liên tục ${dur[1]} ${dur[2]}`); }
-      else { condition = 'sẽ tự động ghi nhận và gửi cảnh báo'; }
+      const timeRange = lw.match(/(?:từ|trong\s+khung\s+giờ)\s+(\d+)[:h]?\s*(?:giờ)?\s*(?:đến|->|tới)\s*(\d+)[:h]?\s*(?:giờ)?/);
+      if (timeRange) { time = ` ${timeRange[1]}h–${timeRange[2]}h`; add(`Khung giờ: ${timeRange[1]}h – ${timeRange[2]}h`); }
+      else {
+        const after = lw.match(/sau\s+(\d+)\s*[hg](?:iờ)?/);
+        if (after) { time = ` sau ${after[1]}h`; add(`Khung giờ: Sau ${after[1]}h`); }
+      }
+    }
+    if (/tiếng\s+chuông|sau\s+chuông|khi\s+chuông\s+reo|chuông\s+vào\s+lớp/.test(lw)) {
+      add('Điều kiện: Sau khi tiếng chuông reo');
+    }
+
+    // ── Ngưỡng thời gian (quá N phút/giây) ──
+    if (/ngay\s+lập\s+tức|tức\s+thì|khẩn\s+cấp/.test(lw)) {
+      condition = 'cảnh báo ngay lập tức'; add('Phản hồi: Cảnh báo ngay lập tức');
+    } else {
+      const dur = lw.match(/quá\s+(\d+)\s*(phút|giây|tiếng)|liên\s+tục\s+(\d+)\s*(phút|giây)/);
+      if (dur) {
+        const n = dur[1] ?? dur[3]; const u = dur[2] ?? dur[4];
+        condition = `sẽ cảnh báo nếu xảy ra quá ${n} ${u}`; add(`Ngưỡng: Quá ${n} ${u}`);
+      } else { condition = 'sẽ tự động ghi nhận và gửi cảnh báo'; }
     }
 
     const summary = `Hệ thống AI sẽ ${action} đối với ${target} tại ${location}${time}, và ${condition}.`;
-
     return { summary, findings };
   };
 
@@ -2982,75 +3183,13 @@ setSelectedDomain('');
                               </details>
                             );
                           })()}
-                          {smartFlowState === 'idle' && userDescription.trim() && (
-                            <div className="flex justify-end pt-2">
-                              <button onClick={() => setSmartFlowState('preview')} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2">
-                                <Activity size={13} /> Phân tích yêu cầu
-                              </button>
-                            </div>
-                          )}
-
-                          {smartFlowState === 'preview' && userDescription.trim() && (() => {
-                            const { summary, findings } = analyzePrompt(userDescription);
-                            if (findings.length === 0) {
-                              return (
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5 text-[11px] text-amber-800 mt-2">
-                                  Không tìm thấy thông tin cấu hình rõ ràng từ mô tả. Bạn có muốn áp dụng cấu hình mặc định?
-                                  <div className="flex items-center justify-end pt-2 gap-2 mt-2 border-t border-amber-200/50">
-                                    <button onClick={() => setSmartFlowState('idle')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg transition-colors cursor-pointer">
-                                      Chỉnh sửa mô tả
-                                    </button>
-                                    <button onClick={() => { handleSmartApply(); setSmartFlowState('applied'); }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2">
-                                      <Check size={13} /> Vẫn áp dụng
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return (
-                              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3 mt-2 shadow-inner shadow-emerald-100/50">
-                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 uppercase tracking-wide">
-                                  <Activity size={14} /> AI đã phân tích bài toán của bạn như sau:
-                                </div>
-                                <div className="text-[13px] text-emerald-900 font-medium leading-relaxed bg-emerald-100/50 p-3 rounded-lg border border-emerald-200">
-                                  {summary}
-                                </div>
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-3 mb-1">Các tham số bóc tách được:</div>
-                                <ul className="space-y-1.5 bg-white p-3 rounded-lg border border-emerald-100/60 shadow-sm">
-                                  {findings.map((f, i) => (
-                                    <li key={i} className="text-[12px] text-slate-700 flex items-start gap-2">
-                                      <span className="text-emerald-500 mt-0.5">▸</span>
-                                      {f}
-                                    </li>
-                                  ))}
-                                </ul>
-                                <p className="text-[11px] text-slate-500 italic mt-1">Bạn vui lòng kiểm tra lại cấu hình trên. Nếu đã chính xác, hãy xác nhận áp dụng.</p>
-                                <div className="flex items-center justify-end pt-2 gap-2 mt-2 border-t border-emerald-100">
-                                  <button onClick={() => setSmartFlowState('idle')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-[11px] font-bold rounded-lg transition-colors cursor-pointer">
-                                    Nhập lại
-                                  </button>
-                                  <button onClick={() => { handleSmartApply(); setSmartFlowState('applied'); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2 shadow-sm shadow-emerald-200">
-                                    <Check size={13} /> Xác nhận áp dụng
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {smartFlowState === 'applied' && userDescription.trim() && (
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between mt-2">
-                              <div className="flex items-center gap-2 text-emerald-700 text-[11px] font-bold">
-                                <Check size={14} /> Đã áp dụng cấu hình từ mô tả
-                              </div>
-                              <button onClick={() => setSmartFlowState('idle')} className="text-[10px] text-emerald-600 hover:text-emerald-800 underline cursor-pointer">
-                                Thay đổi
-                              </button>
-                            </div>
-                          )}
-
+                          {/* ── Ảnh tham chiếu (đặt trước preview) ── */}
                           {selectedUseCaseDef && (
                             <div>
-                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ảnh tham chiếu & mô tả<span className="font-normal normal-case text-slate-400 ml-1">(tuỳ chọn — upload ảnh và khoanh vùng kèm mô tả)</span></label>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                                Ảnh tham chiếu & mô tả
+                                <span className="font-normal normal-case text-slate-400 ml-1">(tuỳ chọn — upload ảnh và khoanh vùng kèm mô tả)</span>
+                              </label>
                               {useCaseImages.length > 0 && (
                                 <div className="flex flex-col gap-3 mb-3">
                                   {useCaseImages.map((img, idx) => (
@@ -3078,9 +3217,7 @@ setSelectedDomain('');
                                   Array.from(e.target.files || []).forEach((file: File) => {
                                     if (file.size > 5 * 1024 * 1024) { alert('File quá lớn (tối đa 5MB)'); return; }
                                     const reader = new FileReader();
-                                    reader.onload = (ev) => {
-                                      setUseCaseImages(prev => [...prev, ev.target!.result as string]);
-                                    };
+                                    reader.onload = (ev) => { setUseCaseImages(prev => [...prev, ev.target!.result as string]); };
                                     reader.readAsDataURL(file);
                                   });
                                   e.target.value = '';
@@ -3089,6 +3226,135 @@ setSelectedDomain('');
                                 <p className="text-xs text-slate-500">Upload ảnh tham chiếu · JPG, PNG · Tối đa 5MB</p>
                                 {useCaseImages.length > 0 && <p className="text-[10px] text-emerald-600 mt-0.5">Thêm ảnh nữa</p>}
                               </label>
+                            </div>
+                          )}
+
+                          {/* ── Nút phân tích (idle) ── */}
+                          {smartFlowState === 'idle' && userDescription.trim() && (
+                            <div className="flex justify-end pt-1">
+                              <button onClick={() => setSmartFlowState('preview')} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2">
+                                <Activity size={13} /> Phân tích yêu cầu
+                              </button>
+                            </div>
+                          )}
+
+                          {/* ── Preview: text + ảnh tham chiếu ── */}
+                          {smartFlowState === 'preview' && userDescription.trim() && (() => {
+                            const { summary, findings } = analyzePrompt(userDescription);
+                            const hasRoi = drawingPoints.length > 0 || currentCamZones.length > 0;
+                            const inferred = inferMonitoringConfig(userDescription, hasRoi);
+                            const RULE_LABELS: Record<string, string> = {
+                              enter_area: 'Phát hiện đi vào vùng',
+                              exit_area: 'Phát hiện rời khỏi vùng',
+                              loitering: 'Lảng vảng / ở lại quá lâu',
+                              cross_line: 'Vượt qua đường ranh giới',
+                              object_counting: 'Đếm số lượng',
+                              appear: 'Xuất hiện đối tượng',
+                              safety_violation: 'Vi phạm an toàn lao động (PPE)',
+                              defect_detected: 'Phát hiện lỗi sản phẩm',
+                              abandoned_object: 'Vật bỏ lại / vô chủ',
+                              object_removed: 'Đồ vật bị lấy đi',
+                              fire_smoke: 'Phát hiện khói / lửa / hút thuốc',
+                              zone_violation: 'Vi phạm khu vực / sai tuyến',
+                              door_anomaly: 'Bất thường cửa ra vào',
+                              semantic_match: 'Nhận diện ngữ nghĩa tự do',
+                            };
+                            const ruleLabel = RULE_LABELS[inferred.rule] ?? inferred.rule;
+                            const hasImages = useCaseImages.length > 0;
+                            if (findings.length === 0 && !hasImages) {
+                              return (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5 text-[11px] text-amber-800 mt-2">
+                                  Không tìm thấy thông tin cấu hình rõ ràng từ mô tả. Bạn có muốn áp dụng cấu hình mặc định?
+                                  <div className="flex items-center justify-end pt-2 gap-2 mt-2 border-t border-amber-200/50">
+                                    <button onClick={() => setSmartFlowState('idle')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg transition-colors cursor-pointer">
+                                      Chỉnh sửa mô tả
+                                    </button>
+                                    <button onClick={() => { handleSmartApply(); setSmartFlowState('applied'); }} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2">
+                                      <Check size={13} /> Vẫn áp dụng
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3 mt-2 shadow-inner shadow-emerald-100/50">
+                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 uppercase tracking-wide">
+                                  <Activity size={14} /> AI đã phân tích bài toán của bạn như sau:
+                                </div>
+
+                                {/* Summary từ text */}
+                                <div className="text-[13px] text-emerald-900 font-medium leading-relaxed bg-emerald-100/50 p-3 rounded-lg border border-emerald-200">
+                                  {summary}
+                                </div>
+
+                                {/* Ảnh tham chiếu trong preview */}
+                                {hasImages && (
+                                  <div className="space-y-1.5">
+                                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                                      <Package size={11} />
+                                      {useCaseImages.length} ảnh tham chiếu sẽ được đưa vào phân tích:
+                                    </div>
+                                    <div className="flex gap-2 flex-wrap">
+                                      {useCaseImages.map((img, idx) => {
+                                        const roiCount = (useCaseImageROIs[idx] || []).length;
+                                        return (
+                                          <div key={idx} className="relative group">
+                                            <img src={img} alt={`ref-${idx}`} className="w-16 h-16 object-cover rounded-lg border-2 border-emerald-200 shadow-sm" />
+                                            {roiCount > 0 && (
+                                              <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow">
+                                                {roiCount}
+                                              </span>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    {Object.values(useCaseImageROIs).some((r: BoundingBox[]) => r.length > 0) && (
+                                      <p className="text-[10px] text-emerald-600">· Có vùng khoanh — AI sẽ tập trung vào khu vực được đánh dấu</p>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Findings từ text */}
+                                {findings.length > 0 && (
+                                  <>
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">AI nhận diện được từ mô tả:</div>
+                                      <span className="text-[10px] bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">{ruleLabel}</span>
+                                    </div>
+                                    <ul className="space-y-1.5 bg-white p-3 rounded-lg border border-emerald-100/60 shadow-sm">
+                                      {findings.map((f, i) => (
+                                        <li key={i} className="text-[12px] text-slate-700 flex items-start gap-2">
+                                          <span className="text-emerald-500 mt-0.5">▸</span>
+                                          {f}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </>
+                                )}
+
+                                <p className="text-[11px] text-slate-500 italic">Nếu cấu hình chưa đúng, hãy chỉnh mô tả hoặc thêm/sửa ảnh tham chiếu, hoặc chuyển sang chế độ Tiêu chuẩn.</p>
+                                <div className="flex items-center justify-end pt-2 gap-2 mt-2 border-t border-emerald-100">
+                                  <button onClick={() => setSmartFlowState('idle')} className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-[11px] font-bold rounded-lg transition-colors cursor-pointer">
+                                    Nhập lại
+                                  </button>
+                                  <button onClick={() => { handleSmartApply(); setSmartFlowState('applied'); }} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2 shadow-sm shadow-emerald-200">
+                                    <Check size={13} /> Xác nhận áp dụng
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* ── Applied ── */}
+                          {smartFlowState === 'applied' && userDescription.trim() && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between mt-2">
+                              <div className="flex items-center gap-2 text-emerald-700 text-[11px] font-bold">
+                                <Check size={14} /> Đã áp dụng cấu hình từ mô tả{useCaseImages.length > 0 ? ` + ${useCaseImages.length} ảnh tham chiếu` : ''}
+                              </div>
+                              <button onClick={() => setSmartFlowState('idle')} className="text-[10px] text-emerald-600 hover:text-emerald-800 underline cursor-pointer">
+                                Thay đổi
+                              </button>
                             </div>
                           )}
                         </div>
