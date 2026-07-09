@@ -128,6 +128,12 @@ const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; d
     { id: 'h_fg3', name: 'Đám đông căng thẳng', description: 'Phát hiện đám đông có dấu hiệu kích động, chỉ trỏ lớn tiếng' },
     { id: 'h_fg4', name: 'Người ngã do xô đẩy', description: 'Phát hiện người bị ngã xuống đất sau tình huống giằng co' }
   ],
+  hse_fall: [
+    { id: 'h_fl1', name: 'Người già ngã bất ngờ', description: 'Phát hiện người cao tuổi ngã xuống sàn và không cử động' },
+    { id: 'h_fl2', name: 'Công nhân bất tỉnh tại xưởng', description: 'Cảnh báo khi công nhân đột ngột ngã và nằm yên trên sàn' },
+    { id: 'h_fl3', name: 'Bệnh nhân rời giường ngã', description: 'Phát hiện bệnh nhân ngã khỏi giường hoặc bất tỉnh tại chỗ' },
+    { id: 'h_fl4', name: 'Đột quỵ tại chỗ làm', description: 'Nhân viên đột ngột ngã hoặc nằm bất động tại văn phòng' },
+  ],
   hse_phone: [
     { id: 'h_ph1', name: 'Dùng điện thoại khi lái xe', description: 'Phát hiện tài xế xe nâng đang sử dụng điện thoại' },
     { id: 'h_ph2', name: 'Dùng điện thoại tại chuyền', description: 'Cảnh báo công nhân bấm điện thoại trong giờ làm việc' },
@@ -302,12 +308,6 @@ const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; d
     { id: 'e_at3', name: 'Rời lớp sớm', description: 'Ghi nhận học sinh xách cặp đi ra khỏi lớp trước giờ tan trường' },
     { id: 'e_at4', name: 'Vắng mặt quá lâu', description: 'Cảnh báo khi học sinh xin ra ngoài đi vệ sinh quá 15 phút chưa quay lại' }
   ],
-  edu_traffic: [
-    { id: 'e_tr1', name: 'Đậu xe chiếm lề đường', description: 'Cảnh báo phụ huynh đỗ xe máy sai quy định trước cổng trường' },
-    { id: 'e_tr2', name: 'Ùn tắc giờ tan tầm', description: 'Phát hiện tình trạng ùn tắc giao thông cục bộ khi học sinh ra về' },
-    { id: 'e_tr3', name: 'Bán hàng rong cản lối', description: 'Cảnh báo xe đẩy bán hàng rong lấn chiếm vạch sang đường của học sinh' },
-    { id: 'e_tr4', name: 'Xe ô tô quay đầu hẹp', description: 'Phát hiện ô tô quay đầu gây ách tắc ngay trước cổng trường học' }
-  ],
 
 
   sec_camera_tamper: [
@@ -418,8 +418,6 @@ const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; d
   ],
   bld_public_density: [
                   ],
-  hc_patient_escape: [
-                  ],
   hc_restricted: [
                   ],
   hc_crowd_restricted: [
@@ -489,6 +487,7 @@ const TASK_EXAMPLE_PROMPTS: Record<string, string> = {
   hse_ppe:           'VD: "Cảnh báo công nhân không đội mũ bảo hộ tại công trường"',
   hse_machine:       'VD: "Báo động khi người đứng quá gần máy ép đang chạy"',
   hse_fight:         'VD: "Phát hiện ẩu đả giữa công nhân tại khu vực xưởng"',
+  hse_fall:          'VD: "Cảnh báo ngay khi phát hiện người ngã và nằm yên quá 5 giây"',
   hse_phone:         'VD: "Phát hiện tài xế xe nâng sử dụng điện thoại khi lái"',
   hse_proximity:     'VD: "Cảnh báo khi người đi bộ đến gần xe nâng đang hoạt động"',
   fir_fire:          'VD: "Cảnh báo sớm khi có khói đen bốc lên từ kho bãi"',
@@ -499,7 +498,7 @@ const TASK_EXAMPLE_PROMPTS: Record<string, string> = {
   ret_shelf:         'VD: "Cảnh báo khi kệ trưng bày nước giải khát hết hàng"',
   ret_queue:         'VD: "Cảnh báo khi có hơn 5 khách xếp hàng chờ thanh toán"',
   ret_crowdanalysis: 'VD: "Thống kê tỷ lệ nam/nữ và độ tuổi khách mua sắm"',
-  ret_staff_absence: 'VD: "Cảnh báo quầy thu ngân không có nhân viên trực quá 3 phút"',
+  ret_staff_absence: 'VD: "Cảnh báo khi nhân viên rời quầy thu ngân quá 5 phút trong giờ làm việc"',
   retail_analytics:  'VD: "Phân tích vị trí khách đi lại nhiều nhất trong cửa hàng"',
   wh_forklift:       'VD: "Cảnh báo xe nâng chạy quá tốc độ trong kho hẹp"',
   wh_wrongzone:      'VD: "Phát hiện pallet xếp nhầm vào khu vực xuất hàng"',
@@ -511,7 +510,7 @@ const TASK_EXAMPLE_PROMPTS: Record<string, string> = {
   bld_elevator_queue: 'VD: "Báo động khi có quá nhiều người chờ thang máy giờ cao điểm"',
   bld_meeting_room:  'VD: "Phát hiện phòng họp không người nhưng máy chiếu vẫn bật"',
   bld_smoking:       'VD: "Cảnh báo khi có người hút thuốc tại hành lang chung"',
-  bld_reception:     'VD: "Báo hiệu cho lễ tân khi có khách đứng chờ quá 1 phút"',
+  bld_reception:     'VD: "Cảnh báo khi nhân viên rời quầy quá 5 phút trong giờ làm việc"',
   bld_restricted:    'VD: "Báo động nếu có người không phận sự vào phòng server"',
   bld_inout:         'VD: "Đếm nhân viên ra vào qua cổng chính theo ca"',
   bld_public_density: 'VD: "Đo mức độ đông đúc tại sảnh chính toà nhà"',
@@ -519,13 +518,11 @@ const TASK_EXAMPLE_PROMPTS: Record<string, string> = {
   hc_queue:          'VD: "Cảnh báo khu vực máy lấy số đang quá đông bệnh nhân"',
   hc_hand_hygiene:   'VD: "Cảnh báo nhân viên không sát khuẩn tay trước khi vào buồng bệnh"',
   hc_ppe_medical:    'VD: "Cảnh báo khách ra vào bệnh viện không đeo khẩu trang"',
-  hc_patient_escape: 'VD: "Cảnh báo khi bệnh nhân rời khỏi cổng bệnh viện"',
   hc_restricted:     'VD: "Phát hiện người lạ vào kho thuốc ngoài giờ hành chính"',
   hc_crowd_restricted: 'VD: "Cảnh báo ùn ứ người nhà tại hành lang khu cấp cứu"',
-  edu_leave:         'VD: "Phát hiện học sinh leo rào trốn khỏi khuôn viên trường"',
+  edu_leave:         'VD: "Cảnh báo khi học sinh rời khu vực lớp quá 10 phút trong giờ học"',
   edu_violence:      'VD: "Phát hiện đám đông học sinh tụ tập và xô xát ở sân trường"',
   edu_attendance:    'VD: "Điểm danh tự động và cảnh báo học sinh đi trễ"',
-  edu_traffic:       'VD: "Cảnh báo phụ huynh đỗ xe sai quy định trước cổng trường"',
   edu_escape:        'VD: "Phát hiện học sinh leo tường ra khỏi trường trong giờ học"',
   edu_cheating:      'VD: "Phát hiện học sinh sử dụng điện thoại trong phòng thi"',
   edu_weapons:       'VD: "Cảnh báo ngay khi phát hiện dao/gậy trong khuôn viên trường"',
@@ -568,7 +565,7 @@ const TASK_LABELS: Record<string, string> = {
 
 // ─── Use-Case Domain Definitions ─────────────────────────────────────────────
 
-type UCParamType = 'text' | 'textarea' | 'number' | 'select' | 'select_text' | 'toggle' | 'multicheck' | 'multicheck_dynamic' | 'time_range' | 'date_range' | 'slider_pct' | 'image' | 'file' | 'zone_hint' | 'line_hint' | 'bbox_per_field' | 'bbox_per_part' | 'card2' | 'card3';
+type UCParamType = 'text' | 'textarea' | 'number' | 'select' | 'select_text' | 'toggle' | 'multicheck' | 'multicheck_dynamic' | 'time_range' | 'time' | 'date_range' | 'slider_pct' | 'image' | 'file' | 'zone_hint' | 'line_hint' | 'bbox_per_field' | 'bbox_per_part' | 'card2' | 'card3' | 'license_plate_list' | 'zone_item_mapping' | 'weekly_schedule';
 
 interface UCParam {
   key: string;
@@ -610,66 +607,66 @@ const DOMAINS: DomainDef[] = [
       { id: 'sec_intrusion', name: 'Xâm nhập vùng cấm', taskMapType: 'security', desc: 'Cảnh báo tự động khi có đối tượng đi vào vùng cấm.', params: [
         { key: 'zone', label: 'Vẽ vùng cấm cần giám sát', type: 'zone_hint' },
         { key: 'target', label: 'Đối tượng nào BỊ CẤM vào vùng này', type: 'select', options: ['Người', 'Xe máy', 'Xe ô tô', 'Xe tải', 'Bất kỳ đối tượng nào'] },
+        { key: 'direction', label: 'Hướng xâm nhập', type: 'multicheck', options: ['Vào', 'Ra', 'Cả hai'] },
         { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
-        { key: 'confirmSeconds', label: 'Phải ở trong vùng liên tục bao lâu mới báo động', type: 'number', unit: 'giây', placeholder: '3' },
-      ]},
+        { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
+        { key: 'maxStaySeconds', label: 'Thời gian lưu lại tối đa', type: 'number', unit: 'giây', placeholder: '60' },
+        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+      ],
+        alertParams: [
+          { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
+        ]},
       { id: 'sec_loitering', name: 'Phát hiện lưu lại quá thời gian', taskMapType: 'security', desc: 'Phát hiện đối tượng đứng lâu bất thường tại một khu vực.', params: [
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'target', label: 'Đối tượng cần phát hiện', type: 'select', options: ['Người', 'Xe', 'Bất kỳ'] },
-        { key: 'activeHours', label: 'Giờ áp dụng', type: 'time_range' }
-      ],
-        alertParams: [
-          { key: 'maxStay', label: 'Thời gian tối đa ở lại', type: 'number', unit: 'phút' }
-        ]},
+        { key: 'maxStay', label: 'Thời gian tối đa ở lại', type: 'number', unit: 'phút' },
+      ]},
       { id: 'sec_afterhours', name: 'Phát hiện xâm nhập ngoài giờ', taskMapType: 'security', desc: 'Giám sát và cảnh báo hoạt động trong khung giờ vắng người.', params: [
         { key: 'workHours', label: 'Giờ làm việc bình thường', type: 'time_range' },
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
-        { key: 'guardSchedule', label: 'Lịch bảo vệ tuần tra', type: 'text', optional: true },
-        { key: 'cleaner', label: 'Nhân viên vệ sinh', type: 'text', placeholder: 'Nhận diện theo giờ + trang phục' }
+        { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
+        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây' },
       ],
-        alertParams: [
-          { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây' }
-        ]},
+        alertParams: []},
       { id: 'sec_assetloss', name: 'Phát hiện vật thể rời vị trí', taskMapType: 'security', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tài sản cần bảo vệ (giúp AI nhận dạng chính xác hơn)', desc: 'Báo động khi đồ vật quan trọng bị di dời khỏi vị trí.', params: [
         { key: 'assetImage', label: 'Upload ảnh vật thể cần tìm', type: 'file' },
-        { key: 'zone', label: 'Vùng đặt tài sản', type: 'zone_hint' }
+        { key: 'zone', label: 'Vùng đặt tài sản', type: 'zone_hint' },
+        { key: 'missingTime', label: 'Tài sản mất bao lâu mới báo', type: 'number', unit: 'giây' },
+        { key: 'tempMoveTime', label: 'Thời gian cho phép di chuyển tạm', type: 'number', unit: 'phút' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây', placeholder: '10' },
       ],
-        alertParams: [
-          { key: 'missingTime', label: 'Tài sản mất bao lâu mới báo', type: 'number', unit: 'giây' },
-          { key: 'tempMoveTime', label: 'Thời gian cho phép di chuyển tạm', type: 'number', unit: 'phút' }
-        ]},
+        alertParams: []},
 
       { id: 'sec_crowd', name: 'Phát hiện tụ tập đông người', taskMapType: 'security', desc: 'Nhận diện tình trạng tụ tập đông người bất thường.', params: [
         { key: 'zone', label: 'Vùng cần kiểm soát', type: 'zone_hint' },
-        { key: 'allowedZone', label: 'Khu vực được phép tụ tập', type: 'zone_hint', optional: true },
-        { key: 'breakHours', label: 'Giờ nghỉ ca / giờ ăn (bình thường)', type: 'time_range', optional: true },
+        { key: 'maxPeople', label: 'Số người tối đa cho phép / tối thiểu để báo', type: 'number', placeholder: '5' },
+        { key: 'minDuration', label: 'Thời gian tụ tập tối thiểu', type: 'number', unit: 'giây', placeholder: '10' },
       ]},
       { id: 'sec_camera_tamper', name: 'Phát hiện camera bị che, bị xoay lệch, mất nét, hình ảnh quá tối hoặc mất tín hiệu.', taskMapType: 'security', desc: 'Phát hiện trường hợp camera bị vật thể che trước ống kính, bị dán băng, bị che bởi tay/người/vật, hoặc vùng nhìn bị che quá nhiều khiến hệ thống không thể giám sát bình thường.', params: [
         { key: 'occlusionThreshold', label: 'Tỷ lệ khung hình bị che tối thiểu để báo', type: 'slider_pct' },
-        { key: 'duration', label: 'Thời gian bị che liên tục mới cảnh báo', type: 'number', unit: 'giây' },
-        { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-        { key: 'recipient', label: 'Người nhận cảnh báo', type: 'text', placeholder: 'Email/SĐT' },,
-        { key: 'activeHours', label: 'Khung giờ áp dụng', type: 'time_range', optional: true }
-      ]},
+        { key: 'duration', label: 'Thời gian bị che liên tục mới cảnh báo', type: 'number', unit: 'giây' }
+      ],
+        alertParams: [
+          { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] }
+        ]},
       { id: 'sec_door_abnormal', name: 'Phát hiện cửa mở bất thường', taskMapType: 'security', desc: 'Phát hiện cửa kho, cửa phòng server, cửa thoát hiểm hoặc cửa khu vực hạn chế bị mở quá lâu hoặc mở ngoài khung giờ cho phép.', params: [
         { key: 'zone', label: 'Vị trí cửa cần giám sát', type: 'zone_hint' },
         { key: 'normalState', label: 'Trạng thái cửa bình thường', type: 'select', options: ['Đóng', 'Mở'] },
         { key: 'maxOpenSeconds', label: 'Thời gian mở tối đa cho phép', type: 'number', unit: 'giây' },
         { key: 'allowedHours', label: 'Khung giờ được phép mở cửa', type: 'time_range' },
-        { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-      ]},
+      ],
+        alertParams: [
+          { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] }
+        ]},
       { id: 'sec_abandoned_object', name: 'Phát hiện vật thể bỏ quên', taskMapType: 'security', desc: 'Phát hiện túi, hộp, vali, thùng hàng hoặc vật thể lạ bị để lại trong khu vực giám sát quá lâu.', params: [
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
-        { key: 'allowedZone', label: 'Khu vực được phép đặt đồ', type: 'zone_hint', optional: true },
         { key: 'targetType', label: 'Loại vật thể cần theo dõi', type: 'multicheck', options: ['Túi', 'Hộp', 'Vali', 'Thùng hàng', 'Khác'] },
         { key: 'excludeType', label: 'Phân loại đối tượng loại trừ', type: 'multicheck', options: ['Người', 'Xe'] },
         { key: 'minSize', label: 'Kích thước vật thể tối thiểu', type: 'slider_pct' },
-        { key: 'maxDist', label: 'Khoảng cách tối đa từ chủ nhân đến vật thể', type: 'number', unit: 'mét' },
-        { key: 'activeHours', label: 'Khung giờ áp dụng', type: 'time_range' }
+        { key: 'minStillTime', label: 'Thời gian vật thể đứng yên tối thiểu', type: 'number', unit: 'giây/phút' },
       ],
         alertParams: [
-          { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-          { key: 'minStillTime', label: 'Thời gian vật thể đứng yên tối thiểu', type: 'number', unit: 'giây/phút' }
+          { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] }
         ]},
     ]
   },
@@ -678,23 +675,23 @@ const DOMAINS: DomainDef[] = [
     useCases: [
       { id: 'tra_alpr', name: 'Nhận diện biển số', taskMapType: 'traffic', desc: 'Tự động đọc biển số xe và đối chiếu danh sách trắng/đen.', params: [
         { key: 'vehicleTypes', label: 'Loại xe cần nhận diện', type: 'multicheck', options: ['Ô tô', 'Xe máy', 'Xe tải', 'Xe buýt'] },
-        { key: 'whitelist', label: 'Danh sách xe được phép vào', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
-        { key: 'blacklist', label: 'Danh sách xe bị cấm', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
+        { key: 'whitelist', label: 'Danh sách xe được phép vào', type: 'license_plate_list', optional: true },
+        { key: 'blacklist', label: 'Danh sách xe bị cấm', type: 'license_plate_list', optional: true },
       ]},
       { id: 'tra_count', name: 'Đếm phương tiện qua vạch', taskMapType: 'counting', desc: 'Đo lường số lượng phương tiện đi qua một vạch/vùng cụ thể.', params: [
         { key: 'vehicleTypes', label: 'Loại xe cần đếm', type: 'multicheck', options: ['Xe máy', 'Ô tô', 'Xe tải', 'Xe đạp', 'Tất cả'] },
         { key: 'direction', label: 'Hướng đếm', type: 'card3', options: ['Chỉ vào', 'Chỉ ra', 'Cả 2 chiều'] },
         { key: 'line', label: 'Vị trí vạch đếm', type: 'line_hint' },
-        { key: 'alertThreshold', label: 'Cảnh báo khi số xe vượt ngưỡng', type: 'number', unit: 'xe/giờ', optional: true },
         { key: 'ignoreParked', label: 'Bỏ qua xe đang đỗ (chỉ đếm xe di chuyển)', type: 'toggle', optional: true },
-      ]},
+      ],
+        alertParams: [
+          { key: 'alertThreshold', label: 'Cảnh báo khi số xe vượt ngưỡng', type: 'number', unit: 'xe/giờ' }
+        ]},
       { id: 'tra_parking', name: 'Phát hiện dừng đỗ sai quy định', taskMapType: 'traffic', desc: 'Phát hiện các phương tiện dừng đỗ tại khu vực cấm.', params: [
         { key: 'zone', label: 'Vùng cấm dừng đỗ', type: 'zone_hint' },
         { key: 'maxMinutes', label: 'Thời gian tối đa được dừng', type: 'number', unit: 'phút', placeholder: '5' },
         { key: 'hazardGrace', label: 'Xe bật đèn cảnh báo (hazard) được gia hạn thêm', type: 'toggle', optional: true },
         { key: 'exemptVehicles', label: 'Xe nào được miễn', type: 'multicheck', optional: true, options: ['Xe cứu thương', 'Xe cứu hỏa', 'Xe bảo trì'] },
-        { key: 'loadingZone', label: 'Khu vực bốc dỡ hàng (cho phép đỗ)', type: 'zone_hint', optional: true },,
-        { key: 'activeHours', label: 'Áp dụng vào giờ nào', type: 'time_range', optional: true }
       ]},
     ]
   },
@@ -707,59 +704,71 @@ const DOMAINS: DomainDef[] = [
         { key: 'mfgFormat', label: 'Định dạng Ngày sản xuất', type: 'select', options: ['DD/MM/YYYY', 'MM/YYYY', 'Khác'] },
         { key: 'expFormat', label: 'Định dạng Hạn sử dụng', type: 'select', options: ['DD/MM/YYYY', 'MM/YYYY', 'Khác'] },
         { key: 'batchFormat', label: 'Định dạng Số lô', type: 'text' },
-        { key: 'language', label: 'Ngôn ngữ trên nhãn', type: 'select', options: ['Tiếng Việt', 'Tiếng Anh'] }
-      ],
-        alertParams: [
-          { key: 'minShelfLife', label: 'HSD phải cách NSX tối thiểu', type: 'number', unit: 'ngày' },
-          { key: 'minRemaining', label: 'HSD phải còn hạn tối thiểu', type: 'number', unit: 'ngày' }
-        ]},
+        { key: 'language', label: 'Ngôn ngữ trên nhãn', type: 'select', options: ['Tiếng Việt', 'Tiếng Anh'] },
+        { key: 'minShelfLife', label: 'HSD phải cách NSX tối thiểu', type: 'number', unit: 'ngày' },
+        { key: 'minRemaining', label: 'HSD phải còn hạn tối thiểu', type: 'number', unit: 'ngày' }
+      ], alertParams: []},
       { id: 'prd_assembly', name: 'Phát hiện lỗi lắp ráp', taskMapType: 'assembly_inspection', needsImage: true, multipleImages: true, imageLabel: 'Ảnh mẫu sản phẩm lắp đúng', desc: 'Phát hiện linh kiện bị thiếu, sai vị trí, lắp ráp ngược.', params: [
-        { key: 'partsList', label: 'Liệt kê các bộ phận cần có', type: 'text', placeholder: 'Ốc vít, Bo mạch, Vỏ...' },
+        { key: 'criticalParts', label: 'Bộ phận nào là cần thiết', type: 'multicheck', options: ['Ốc vít', 'Bo mạch', 'Vỏ', 'Dây cáp', 'Màn hình', 'Pin', 'Nút bấm', 'Cảm biến', 'Đế', 'Lò xo'] },
         { key: 'partZone', label: 'Vùng từng bộ phận', type: 'zone_hint' },
         { key: 'multiVersion', label: 'Sản phẩm có nhiều phiên bản không', type: 'toggle' },
-        { key: 'criticalParts', label: 'Bộ phận nào là critical', type: 'text' }
       ]},
-      { id: 'prd_counting', name: 'Cảnh báo dây chuyền dừng / sản phẩm kẹt', taskMapType: 'counting', needsImage: true, multipleImages: true, imageLabel: 'Ảnh sản phẩm cần đếm (để trống = đếm tất cả)', desc: 'Cảnh báo ngay khi dây chuyền ngừng hoạt động đột ngột hoặc phát hiện sản phẩm bị kẹt, ứ đọng tại một điểm trên băng tải.', params: [
+      { id: 'prd_counting', name: 'Giám sát dây chuyền gặp sự cố', taskMapType: 'counting', needsImage: true, multipleImages: true, imageLabel: 'Ảnh sản phẩm trên băng chuyền (tùy chọn — để AI nhận dạng chính xác hơn)', desc: 'Cảnh báo ngay khi dây chuyền ngừng hoạt động đột ngột hoặc phát hiện sản phẩm bị kẹt, ứ đọng tại một điểm trên băng tải.', params: [
         { key: 'zone', label: 'Vùng dây chuyền cần giám sát', type: 'zone_hint' },
-        { key: 'line', label: 'Vạch đếm sản phẩm', type: 'line_hint', optional: true },
-        { key: 'targetPerShift', label: 'Mục tiêu sản lượng ca', type: 'number', placeholder: '2000' },
-        { key: 'alertBelowPct', label: 'Cảnh báo khi năng suất dưới', type: 'number', unit: '%' },
-        { key: 'stopAlertSeconds', label: 'Dây chuyền dừng bao lâu thì báo', type: 'number', unit: 'giây/phút' },
-        { key: 'jamAlertSeconds', label: 'Sản phẩm đứng yên bao lâu thì báo', type: 'number', unit: 'giây' },
-        { key: 'countRejects', label: 'Đếm riêng sản phẩm bị từ chối', type: 'toggle', optional: true },
-        { key: 'activeHours', label: 'Giờ sản xuất', type: 'time_range' },
-        { key: 'maintenanceHours', label: 'Giờ nghỉ/bảo trì', type: 'time_range', optional: true },
-        { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-      ]},
+        { key: 'outputLine', label: 'Vị trí đếm sản phẩm đầu ra', type: 'line_hint' },
+        { key: 'beltDirection', label: 'Chiều di chuyển của băng chuyền', type: 'card3', options: ['Trái → Phải', 'Phải → Trái', 'Trên → Dưới'] },
+        { key: 'shiftHours', label: 'Khung giờ hoạt động của ca sản xuất', type: 'time_range' },
+        { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
+      ],
+        alertParams: [
+          { key: 'stopAlertSecs', label: 'Băng chuyền dừng đột ngột quá', type: 'number', unit: 'giây', placeholder: '10' },
+          { key: 'jamAlertSecs', label: 'Sản phẩm kẹt / ùn ứ tại một điểm quá', type: 'number', unit: 'giây', placeholder: '5' },
+          { key: 'rateAlert', label: 'Tốc độ ra sản phẩm thấp hơn', type: 'number', unit: 'sp/phút', placeholder: '20' },
+        ]},
     ]
   },
   {
     key: 'safety', name: 'An toàn lao động', color: 'orange',
     useCases: [
-      { id: 'hse_ppe', name: 'Phát hiện thiếu trang thiết bị bảo hộ', taskMapType: 'ppe', desc: 'Kiểm tra nhân viên có mặc đủ áo phản quang, mũ, kính bảo hộ.', params: [
+      { id: 'hse_ppe', name: 'Phát hiện thiếu trang thiết bị bảo hộ', taskMapType: 'ppe', needsImage: true, multipleImages: true, imageLabel: 'Ảnh trang bị bảo hộ đúng chuẩn', desc: 'Kiểm tra nhân viên có mặc đủ áo phản quang, mũ, kính bảo hộ.', params: [
         { key: 'zone', label: 'Khu vực yêu cầu PPE', type: 'zone_hint' },
         { key: 'requiredPPE', label: 'PPE bắt buộc tại khu vực này', type: 'multicheck', options: ['Mũ bảo hộ', 'Áo phản quang', 'Găng tay', 'Giày bảo hộ'] },
         { key: 'ppeColor', label: 'Màu PPE tại cơ sở', type: 'text' },
+        { key: 'allowTempRemoval', label: 'Cho phép tháo PPE tạm trong', type: 'number', unit: 'giây', placeholder: '30' },
         { key: 'triggerCondition', label: 'Điều kiện kích hoạt', type: 'card2', options: ['Bước vào vùng', 'Luôn kiểm tra trong vùng'] }
       ],
         alertParams: [
-          { key: 'allowTempRemoval', label: 'Cho phép tháo PPE tạm trong', type: 'number', unit: 'giây' },
           { key: 'confirmFrames', label: 'Xác nhận sau', type: 'number', unit: 'frame/giây' }
         ]},
-      { id: 'hse_machine', name: 'Giám sát người vào khu vực nguy hiểm', taskMapType: 'security', desc: 'Báo động khi người tiến quá gần máy móc đang hoạt động.', params: [
-        { key: 'zone', label: 'Vùng nguy hiểm', type: 'zone_hint' },
-        { key: 'zoneCondition', label: 'Điều kiện vào vùng', type: 'card2', options: ['Chạm viền (phản ứng ngay)', 'Tâm đối tượng trong vùng'] },
-        { key: 'onlyWhenRunning', label: 'Chỉ báo khi máy đang chạy', type: 'toggle', optional: true },
-        { key: 'maintenanceSchedule', label: 'Lịch bảo trì (được vào)', type: 'time_range', optional: true },
-        { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thông báo', 'Dừng máy tự động qua webhook', 'Cả hai'] },
-      ]},
-      { id: 'hse_fight', name: 'Phát hiện ẩu đả / xô xát', taskMapType: 'behavior', desc: 'Phát hiện hành vi đánh nhau, xô xát, ẩu đả giữa các cá nhân trong khu vực sản xuất hoặc kho bãi.', params: [
-        { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
-        { key: 'minPeople', label: 'Số người tối thiểu để cảnh báo', type: 'number' },
-        { key: 'confirmSeconds', label: 'Thời gian xảy ra tối thiểu', type: 'number', unit: 'giây' },
-        { key: 'sensitivity', label: 'Độ nhạy phát hiện', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
+      { id: 'hse_machine', name: 'Xâm nhập vùng cấm', taskMapType: 'security', desc: 'Báo động khi người hoặc phương tiện xâm nhập vào vùng cấm quanh máy móc, thiết bị nguy hiểm đang hoạt động.', params: [
+        { key: 'zone', label: 'Vẽ vùng cấm cần giám sát', type: 'zone_hint' },
+        { key: 'target', label: 'Đối tượng nào BỊ CẤM vào vùng này', type: 'select', options: ['Người', 'Xe máy', 'Xe ô tô', 'Xe tải', 'Bất kỳ đối tượng nào'] },
+        { key: 'direction', label: 'Hướng xâm nhập', type: 'multicheck', options: ['Vào', 'Ra', 'Cả hai'] },
+        { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
+        { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
+        { key: 'maxStaySeconds', label: 'Thời gian lưu lại tối đa', type: 'number', unit: 'giây', placeholder: '60' },
+        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+      ], alertParams: [
         { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
       ]},
+      { id: 'hse_fight', name: 'Phát hiện đánh nhau / ẩu đả', taskMapType: 'behavior', desc: 'Phát hiện hành vi đánh nhau, xô xát, ẩu đả giữa các cá nhân trong khu vực sản xuất hoặc kho bãi.', params: [
+        { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
+        { key: 'minPeople', label: 'Số người tối thiểu liên quan', type: 'number', placeholder: '2' },
+        { key: 'detectWeapon', label: 'Nhận diện có sử dụng hung khí không', type: 'toggle' },
+        { key: 'motionIntensity', label: 'Cường độ chuyển động bất thường', type: 'slider_pct' },
+        { key: 'dangerLevel', label: 'Mức độ nguy hiểm', type: 'select', options: ['Nhẹ (ẩu đả)', 'Trung bình', 'Nghiêm trọng (có hung khí)'] },
+        { key: 'fightDuration', label: 'Thời gian xảy ra hành vi liên tục', type: 'number', unit: 'giây', placeholder: '3' },
+      ], alertParams: [
+        { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
+      ]},
+      { id: 'hse_fall', name: 'Phát hiện người ngã / đột quỵ', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu khu vực / tư thế bình thường', desc: 'Phát hiện người ngã xuống đất đột ngột hoặc bất động bất thường trong khu vực giám sát.', params: [
+        { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
+        { key: 'normalPosture', label: 'Tư thế làm việc bình thường (có cúi/ngồi thường xuyên không)', type: 'toggle' },
+        { key: 'confirmSeconds', label: 'Xác nhận ngã sau khi nằm yên', type: 'number', unit: 'giây', placeholder: '3' },
+      ],
+        alertParams: [
+          { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Trung bình', 'Cao', 'Khẩn cấp'] },
+        ]},
     ]
   },
   {
@@ -778,22 +787,19 @@ const DOMAINS: DomainDef[] = [
         ]},
       { id: 'fir_smoking', name: 'Phát hiện hút thuốc vùng cấm', taskMapType: 'behavior', desc: 'Phát hiện hành vi hút thuốc lá ở nơi có nguy cơ cháy nổ.', params: [
         { key: 'zone', label: 'Vùng cấm hút thuốc', type: 'zone_hint' },
-        { key: 'allowedZone', label: 'Khu vực cho phép hút thuốc', type: 'zone_hint', optional: true },
         { key: 'sensitivity', label: 'Mức độ nhạy', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-        { key: 'activeHours', label: 'Khung giờ áp dụng', type: 'time_range' }
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận', type: 'number', unit: 'giây' },
       ],
         alertParams: [
           { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-          { key: 'confirmSeconds', label: 'Thời gian xác nhận', type: 'number', unit: 'giây' }
         ]},
       { id: 'fir_exit', name: 'Phát hiện lỗi thoát hiểm bị chặn', taskMapType: 'security', desc: 'Cảnh báo khi hành lang, lối thoát hiểm bị vật cản che lấp.', params: [
         { key: 'exitZone', label: 'Vị trí lối thoát hiểm', type: 'zone_hint' },
         { key: 'loadingHours', label: 'Giờ bốc dỡ hàng qua lối thoát', type: 'time_range' },
-        { key: 'blockRatio', label: 'Coi là bị chặn khi bị che %', type: 'slider_pct' }
+        { key: 'blockRatio', label: 'Coi là bị chặn khi bị che %', type: 'slider_pct' },
+        { key: 'confirmSeconds', label: 'Báo sau bao lâu', type: 'number', unit: 'giây' },
       ],
-        alertParams: [
-          { key: 'confirmSeconds', label: 'Báo sau bao lâu', type: 'number', unit: 'giây' }
-        ]},
+        alertParams: []},
     ]
   },
   {
@@ -803,63 +809,71 @@ const DOMAINS: DomainDef[] = [
         { key: 'line', label: 'Vị trí cửa vào', type: 'line_hint' },
         { key: 'direction', label: 'Hướng đếm', type: 'card3', options: ['Chỉ vào', 'Chỉ ra', 'Cả 2 chiều'] },
         { key: 'maxSimultaneous', label: 'Cảnh báo khi có bao nhiêu khách đồng thời', type: 'number', optional: true },
-        { key: 'staffAppearance', label: 'Nhân viên nhận dạng thế nào (không đếm)', type: 'text', optional: true, placeholder: 'VD: đồng phục áo đỏ' },
-        { key: 'reportPeriod', label: 'Báo cáo tổng kết theo', type: 'select', options: ['Mỗi giờ', 'Mỗi ca', 'Cuối ngày'] },
+        { key: 'alertThreshold', label: 'Ngưỡng số người ra/vào bất thường', type: 'number', unit: 'người', optional: true },
         { key: 'peakHours', label: 'Giờ cao điểm bình thường', type: 'time_range', optional: true },
       ]},
-      { id: 'ret_shelf', name: 'Phát hiện kệ hàng đổ', taskMapType: 'retail_analytics', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kệ hàng bình thường', desc: 'Cảnh báo ngay khi kệ hàng bị đổ, nghiêng hoặc hàng hóa rơi vãi gây mất an toàn hoặc tổn thất hàng hóa.', params: [
-        { key: 'emptyThreshold', label: 'Coi là trống khi diện tích kệ trống vượt', type: 'slider_pct' },
-        { key: 'notifyTo', label: 'Ai cần nhận thông báo', type: 'text', placeholder: 'VD: nhân viên kho, trưởng khu vực' },
-        { key: 'restockMinutes', label: 'Cần bổ sung hàng trong bao lâu', type: 'number', unit: 'phút', placeholder: '15' },
-        { key: 'inventoryTime', label: 'Giờ kiểm kê đầu ngày (không báo)', type: 'time_range', optional: true },
-        { key: 'allowRearrange', label: 'Hàng được sắp xếp lại thường xuyên (tránh báo nhầm)', type: 'toggle', optional: true },
+      { id: 'ret_shelf', name: 'Phát hiện kệ hàng đổ', taskMapType: 'retail_analytics', needsImage: true, multipleImages: true, imageLabel: 'Hình ảnh tham chiếu kệ bình thường', desc: 'Cảnh báo ngay khi kệ hàng bị đổ, nghiêng hoặc hàng hóa rơi vãi gây mất an toàn hoặc tổn thất hàng hóa.', params: [
+        { key: 'refImage', label: 'Hình ảnh tham chiếu kệ bình thường', type: 'image' },
+        { key: 'tiltThreshold', label: 'Góc nghiêng tối đa cho phép', type: 'slider_pct' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây', placeholder: '3' },
+      ], alertParams: [
+        { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
       ]},
 
-      { id: 'ret_staff_absence', name: 'Cảnh báo nhân viên rời quầy quá lâu', taskMapType: 'behavior', desc: 'Giám sát quầy thu ngân, quầy tư vấn hoặc quầy lễ tân. Nếu trong khung giờ làm việc không có nhân viên tại quầy quá thời gian cho phép thì cảnh báo.', params: [
-        { key: 'zone', label: 'Vùng quầy cần giám sát', type: 'zone_hint' },
-        { key: 'recognition', label: 'Cách nhận diện nhân viên', type: 'select', options: ['Đồng phục', 'Khuôn mặt'] },
-        { key: 'workHours', label: 'Giờ làm việc của quầy', type: 'time_range' },
-        { key: 'breakHours', label: 'Giờ nghỉ/đổi ca', type: 'time_range', optional: true }
-      ],
-        alertParams: [
-          { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-          { key: 'maxAbsenceTime', label: 'Thời gian vắng mặt tối đa cho phép', type: 'number', unit: 'phút' },
-          { key: 'receiver', label: 'Người nhận cảnh báo', type: 'text' }
-        ]},
+      { id: 'ret_shelf_empty', name: 'Phát hiện kệ hàng trống', taskMapType: 'retail_analytics', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kệ hàng khi đầy', desc: 'Phát hiện kệ hàng bị trống hoặc thiếu hàng, nhắc nhân viên bổ sung kịp thời.', params: [
+        { key: 'refImageFull', label: 'Ảnh kệ hàng khi đầy', type: 'image' },
+        { key: 'inventoryTime', label: 'Giờ kiểm kê đầu ngày', type: 'time' },
+        { key: 'allowRearrange', label: 'Hàng có được sắp xếp lại thường xuyên không', type: 'toggle' },
+        { key: 'emptyThreshold', label: 'Coi là trống khi', type: 'slider_pct' },
+          { key: 'restockMinutes', label: 'Cần bổ sung hàng trong bao lâu', type: 'number', unit: 'phút', placeholder: '15' },
+        ], alertParams: []},
+
+      { id: 'ret_staff_absence', name: 'Rời khỏi vị trí', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu nhận diện đối tượng (đồng phục, thẻ, khuôn mặt)', desc: 'Phát hiện nhân viên, học sinh hoặc khách rời khỏi vị trí quy định quá thời gian cho phép mà không có phép.', params: [
+        { key: 'target', label: 'Đối tượng giám sát', type: 'select', options: ['Nhân viên', 'Học sinh', 'Khách'] },
+        { key: 'recognition', label: 'Cách nhận diện', type: 'select', options: ['Đồng phục', 'Thẻ', 'Hình ảnh'] },
+        { key: 'zone', label: 'Vùng cần giám sát', type: 'zone_hint' },
+        { key: 'breakHours', label: 'Giờ nghỉ / Ngoại lệ', type: 'time_range', optional: true },
+        { key: 'maxAbsenceTime', label: 'Thời gian rời vị trí tối đa cho phép', type: 'number', unit: 'phút', placeholder: '5' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây', placeholder: '3' },
+      ], alertParams: [
+        { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
+        { key: 'receiver', label: 'Người nhận cảnh báo', type: 'text' },
+      ]},
     ]
   },
   {
     key: 'warehouse', name: 'Kho bãi & logistics', color: 'cyan',
     useCases: [
-      { id: 'wh_forklift', name: 'Phát hiện người/xe vào sai khu vực', taskMapType: 'security', desc: 'Cảnh báo khi người đi bộ vào làn xe nâng, hoặc xe nâng/xe tải đi vào khu vực dành cho người đi bộ — ngăn ngừa va chạm và tai nạn trong kho.', params: [
-        { key: 'personZone', label: 'Vùng cấm người (làn xe nâng)', type: 'zone_hint' },
-        { key: 'vehicleZone', label: 'Vùng cấm xe (khu vực người đi bộ)', type: 'zone_hint', optional: true },
-        { key: 'zoneCondition', label: 'Phản ứng ngay khi', type: 'card2', options: ['Chân/bánh chạm viền vùng (intersect)', 'Đứng hẳn trong vùng (inside)'] },
-        { key: 'alertLevel', label: 'Mức cảnh báo', type: 'select', options: ['Chỉ thông báo', 'Kích hoạt còi tự động', 'Gửi lệnh dừng xe nâng'] },
-        { key: 'forkActiveHours', label: 'Xe nâng chỉ hoạt động vào giờ', type: 'time_range', optional: true },
-      ]},
+      { id: 'wh_forklift', name: 'Xâm nhập vùng cấm', taskMapType: 'security', desc: 'Cảnh báo khi người đi bộ vào làn xe nâng, hoặc xe nâng/xe tải đi vào khu vực dành cho người đi bộ — ngăn ngừa va chạm và tai nạn trong kho.', params: [
+        { key: 'zone', label: 'Vẽ vùng cấm cần giám sát', type: 'zone_hint' },
+        { key: 'target', label: 'Đối tượng nào BỊ CẤM vào vùng này', type: 'select', options: ['Người đi bộ', 'Xe nâng', 'Xe tải', 'Bất kỳ đối tượng nào'] },
+        { key: 'direction', label: 'Hướng xâm nhập', type: 'multicheck', options: ['Vào', 'Ra', 'Cả hai'] },
+        { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
+        { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
+        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+      ],
+        alertParams: [
+          { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
+          { key: 'maxStaySeconds', label: 'Thời gian lưu lại tối đa', type: 'number', unit: 'giây', placeholder: '60' },
+        ]},
       { id: 'wh_counting', name: 'Đếm hàng xuất/nhập kho', taskMapType: 'counting', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kiện hàng cần đếm (tuỳ chọn — để trống = đếm tất cả)', desc: 'Đếm số lượng hàng hóa được xếp lên hoặc hạ xuống xe tải.', params: [
         { key: 'line', label: 'Vị trí cổng xuất / nhập', type: 'line_hint' },
         { key: 'plannedQty', label: 'Số lượng theo kế hoạch hôm nay', type: 'number', placeholder: '500' },
-        { key: 'deviationPct', label: 'Sai lệch bao nhiêu % thì báo', type: 'number', unit: '%', placeholder: '5' },
         { key: 'truckCount', label: 'Hàng đến từ bao nhiêu chuyến xe', type: 'number', optional: true, placeholder: '3' },
       ]},
-      { id: 'wh_truck', name: 'Nhận diện biển số xe vào kho', taskMapType: 'traffic', desc: 'Tự động đọc và ghi nhận biển số xe tải vào/ra kho, đối chiếu danh sách xe được phép và cảnh báo xe không đăng ký.', params: [
-        { key: 'useALPR', label: 'Đọc biển số xe tải tự động', type: 'toggle' },
-        { key: 'expectedTrucks', label: 'Xe tải dự kiến hôm nay', type: 'textarea', optional: true, placeholder: 'Mỗi dòng một biển số' },
-        { key: 'unknownAction', label: 'Hành động khi xe không trong danh sách', type: 'select', options: ['Chỉ cảnh báo', 'Không mở barrier', 'Ghi log + cảnh báo'] },,
-        { key: 'receivingHours', label: 'Giờ nhận hàng', type: 'time_range', optional: true }
+      { id: 'wh_truck', name: 'Nhận diện biển số', taskMapType: 'traffic', desc: 'Tự động đọc và ghi nhận biển số xe tải vào/ra kho, đối chiếu danh sách xe được phép và cảnh báo xe không đăng ký.', params: [
+        { key: 'vehicleTypes', label: 'Loại xe cần nhận diện', type: 'multicheck', options: ['Ô tô', 'Xe máy', 'Xe tải', 'Xe buýt'] },
+        { key: 'action', label: 'Hành động khi phát hiện', type: 'select', options: ['Chỉ ghi log', 'Cảnh báo', 'Gọi webhook mở barrier'] },
+        { key: 'whitelist', label: 'Danh sách xe được phép vào', type: 'license_plate_list', optional: true },
+        { key: 'blacklist', label: 'Danh sách xe bị cấm', type: 'license_plate_list', optional: true },
       ]},
       { id: 'wh_wrongitem', name: 'Phát hiện hàng đặt sai khu vực', taskMapType: 'security', desc: 'Phát hiện hàng hóa, pallet hoặc thùng hàng được đặt vào khu vực không đúng quy định, ví dụ hàng thành phẩm đặt ở khu nguyên liệu, hàng chờ xuất đặt sai lane, hàng nguy hiểm đặt sai vùng.', params: [
-        { key: 'zoneList', label: 'Danh sách khu vực kho', type: 'text' },
-        { key: 'itemType', label: 'Loại hàng/ký hiệu hàng theo khu vực', type: 'text' },
-        { key: 'validZone', label: 'Khu vực hợp lệ của từng loại hàng', type: 'text' },
-        { key: 'transitZone', label: 'Khu vực trung chuyển được phép', type: 'zone_hint', optional: true },
-        { key: 'recognitionMethod', label: 'Cách nhận diện hàng', type: 'text' }
-      ],
-        alertParams: [
-          { key: 'tempTime', label: 'Thời gian cho phép đặt tạm', type: 'number', unit: 'phút' }
-        ]},
+        { key: 'zoneList', label: 'Danh sách khu vực kho', type: 'text', placeholder: 'VD: A1, A2, B1, B2, C1 (phân cách bằng dấu phẩy)' },
+        { key: 'itemType', label: 'Loại hàng / ký hiệu hàng', type: 'text', placeholder: 'VD: Hàng điện tử, Thực phẩm, Hàng nguy hiểm' },
+        { key: 'validZone', label: 'Quy tắc: loại hàng → khu vực hợp lệ', type: 'zone_item_mapping' },
+        { key: 'recognitionMethod', label: 'Cách nhận diện hàng', type: 'select', options: ['QR Code / Mã vạch', 'Màu sắc / ký hiệu in trên thùng', 'Hình dạng / kích thước', 'Nhãn mác / chữ in'] },
+        { key: 'tempTime', label: 'Thời gian cho phép đặt tạm', type: 'number', unit: 'phút', placeholder: '10' },
+      ]},
     ]
   },
   {
@@ -867,75 +881,101 @@ const DOMAINS: DomainDef[] = [
     useCases: [
       { id: 'bld_inout', name: 'Đếm người ra/vào', taskMapType: 'counting', desc: 'Đếm và ghi nhận số lượt người ra/vào tòa nhà, sảnh chính, văn phòng, tầng làm việc hoặc khu vực kiểm soát.', params: [
         { key: 'line', label: 'Vị trí cửa ra/vào', type: 'line_hint' },
-        { key: 'alertThreshold', label: 'Ngưỡng số người ra/vào bất thường', type: 'number', optional: true },
-        { key: 'reportPeriod', label: 'Báo cáo tổng hợp theo', type: 'select', options: ['Giờ', 'Ngày', 'Tuần'] },
-        { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'], optional: true },
+        { key: 'direction', label: 'Hướng đếm', type: 'card3', options: ['Chỉ vào', 'Chỉ ra', 'Cả 2 chiều'] },
+        { key: 'maxSimultaneous', label: 'Cảnh báo khi có bao nhiêu người đồng thời', type: 'number', optional: true },
+        { key: 'alertThreshold', label: 'Ngưỡng số người ra/vào bất thường', type: 'number', unit: 'người', optional: true },
+        { key: 'peakHours', label: 'Giờ cao điểm bình thường', type: 'time_range', optional: true },
       ]},
       { id: 'bld_door_abnormal', name: 'Phát hiện cửa mở bất thường', taskMapType: 'security', desc: 'Phát hiện cửa phòng server, cửa kho, cửa kỹ thuật, cửa thoát hiểm hoặc cửa khu vực hạn chế bị mở quá lâu hoặc mở ngoài khung giờ cho phép.', params: [
         { key: 'zone', label: 'Vị trí cửa cần giám sát', type: 'zone_hint' },
         { key: 'normalState', label: 'Trạng thái cửa bình thường', type: 'select', options: ['Đóng', 'Mở'] },
         { key: 'maxOpenTime', label: 'Thời gian mở tối đa cho phép', type: 'number', unit: 'giây/phút' },
         { key: 'allowedHours', label: 'Khung giờ được phép mở cửa', type: 'time_range' },
-        { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-      ]},
+      ],
+        alertParams: [
+          { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] }
+        ]},
       { id: 'bld_smoking', name: 'Phát hiện hút thuốc vùng cấm', taskMapType: 'behavior', desc: 'Phát hiện hành vi hút thuốc trong khu vực cấm như hành lang, thang bộ, nhà vệ sinh, sảnh, phòng kỹ thuật hoặc khu vực văn phòng.', params: [
         { key: 'zone', label: 'Vùng cấm hút thuốc', type: 'zone_hint' },
-        { key: 'allowedZone', label: 'Khu vực cho phép hút thuốc', type: 'zone_hint', optional: true },
+        { key: 'sensitivity', label: 'Mức độ nhạy', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
         { key: 'confirmSeconds', label: 'Thời gian xác nhận', type: 'number', unit: 'giây' },
-        { key: 'activeHours', label: 'Khung giờ áp dụng', type: 'time_range' },
+      ],
+        alertParams: [
+          { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
+        ]},
+      { id: 'bld_reception', name: 'Rời khỏi vị trí', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu nhận diện đối tượng (đồng phục, thẻ, khuôn mặt)', desc: 'Phát hiện nhân viên, học sinh hoặc khách rời khỏi vị trí quy định quá thời gian cho phép mà không có phép.', params: [
+        { key: 'target', label: 'Đối tượng giám sát', type: 'select', options: ['Nhân viên', 'Học sinh', 'Khách'] },
+        { key: 'recognition', label: 'Cách nhận diện', type: 'select', options: ['Đồng phục', 'Thẻ', 'Hình ảnh'] },
+        { key: 'zone', label: 'Vùng cần giám sát', type: 'zone_hint' },
+        { key: 'breakHours', label: 'Giờ nghỉ / Ngoại lệ', type: 'time_range', optional: true },
+        { key: 'maxAbsenceTime', label: 'Thời gian rời vị trí tối đa cho phép', type: 'number', unit: 'phút', placeholder: '5' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây', placeholder: '3' },
+      ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-      ]},
-      { id: 'bld_reception', name: 'Cảnh báo vắng mặt tại quầy trực', taskMapType: 'behavior', desc: 'Phát hiện quầy lễ tân, quầy tiếp khách, quầy bảo vệ hoặc bất kỳ vị trí trực nào không có người trong khung giờ quy định.', params: [
-        { key: 'zone', label: 'Vùng quầy lễ tân', type: 'zone_hint' },
-        { key: 'maxAbsenceMinutes', label: 'Thời gian vắng mặt tối đa', type: 'number', unit: 'phút' },
-        { key: 'workHours', label: 'Giờ làm việc', type: 'time_range' },
-        { key: 'breakHours', label: 'Giờ nghỉ/đổi ca', type: 'time_range', optional: true },
-        { key: 'staffAppearance', label: 'Cách nhận diện nhân viên', type: 'select_text', options: ['Đồng phục', 'Thẻ', 'Màu áo'] },
-        { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
+        { key: 'receiver', label: 'Người nhận cảnh báo', type: 'text' },
       ]},
     ]
   },
   {
     key: 'healthcare', name: 'Y tế', color: 'teal',
     useCases: [
-      { id: 'hc_ppe_sterile', name: 'Kiểm tra trang bị bảo hộ y tế', taskMapType: 'ppe', desc: 'Phát hiện nhân viên y tế không mặc đúng hoặc thiếu trang phục bảo hộ bắt buộc khi vào khu vực vô khuẩn, ICU, phòng mổ hoặc khu nguy hiểm lây nhiễm.', params: [
+      { id: 'hc_ppe_sterile', name: 'Kiểm tra trang bị bảo hộ y tế', taskMapType: 'ppe', needsImage: true, multipleImages: true, imageLabel: 'Ảnh trang phục bảo hộ đúng chuẩn', desc: 'Phát hiện nhân viên y tế không mặc đúng hoặc thiếu trang phục bảo hộ bắt buộc khi vào khu vực vô khuẩn, ICU, phòng mổ hoặc khu nguy hiểm lây nhiễm.', params: [
         { key: 'zone', label: 'Vùng yêu cầu bảo hộ', type: 'zone_hint' },
         { key: 'requiredPPE', label: 'Trang bị bắt buộc', type: 'multicheck', options: ['Áo mổ / Áo cách ly', 'Mũ phẫu thuật', 'Khẩu trang N95', 'Tấm chắn mặt', 'Găng tay', 'Bao giày'] },
         { key: 'ppeColors', label: 'Màu trang phục tại cơ sở', type: 'text', placeholder: 'Nhập màu tương ứng mỗi loại' },
-        { key: 'exempt', label: 'Ai được miễn', type: 'text', optional: true, placeholder: 'VD: bác sĩ cấp cứu đặc biệt' },
-        { key: 'confirmFrames', label: 'Xác nhận sau', type: 'number', unit: 'frame' },
-        { key: 'graceSeconds', label: 'Grace period tháo PPE tạm', type: 'number', unit: 'giây', optional: true },
-      ]},
+      ],
+        alertParams: [
+          { key: 'confirmFrames', label: 'Xác nhận sau', type: 'number', unit: 'frame' }
+        ]},
       { id: 'hc_restricted', name: 'Xâm nhập vùng cấm', taskMapType: 'security', desc: 'Phát hiện người vào khu vực cấm (kho thuốc, phòng mổ, ICU, khu cách ly) hoặc tụ tập đông người vượt giới hạn trong vùng hạn chế.', params: [
-        { key: 'zone', label: 'Vùng cấm / hạn chế', type: 'zone_hint' },
+        { key: 'zone', label: 'Vẽ vùng cấm cần giám sát', type: 'zone_hint' },
+        { key: 'target', label: 'Đối tượng nào BỊ CẤM vào vùng này', type: 'select', options: ['Người lạ / không có thẻ', 'Bất kỳ người nào', 'Bất kỳ đối tượng nào'] },
+        { key: 'direction', label: 'Hướng xâm nhập', type: 'multicheck', options: ['Vào', 'Ra', 'Cả hai'] },
         { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
-        { key: 'maxPeople', label: 'Số người tối đa trong vùng (0 = cấm hoàn toàn)', type: 'number', placeholder: '0' },
-        { key: 'workHours', label: 'Giờ làm việc hành chính (ngoài giờ = cấm tuyệt đối)', type: 'time_range' },
-        { key: 'confirmFrames', label: 'Xác nhận sau', type: 'number', unit: 'frame' },
+        { key: 'workHours', label: 'Khung giờ hành chính (ngoài giờ = cấm tuyệt đối)', type: 'time_range' },
+        { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
+        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+      ],
+        alertParams: [
+          { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
+          { key: 'maxStaySeconds', label: 'Thời gian lưu lại tối đa', type: 'number', unit: 'giây', placeholder: '60' },
+        ]},
+      { id: 'hc_crowd', name: 'Phát hiện tụ tập đông người', taskMapType: 'security', desc: 'Phát hiện tình trạng tụ tập đông người bất thường tại hành lang, phòng chờ, khu cấp cứu hoặc các vùng cần kiểm soát trong cơ sở y tế.', params: [
+        { key: 'zone', label: 'Vùng cần kiểm soát', type: 'zone_hint' },
+        { key: 'maxPeople', label: 'Số người tối đa cho phép / tối thiểu để báo', type: 'number', placeholder: '5' },
+        { key: 'minDuration', label: 'Thời gian tụ tập tối thiểu', type: 'number', unit: 'giây', placeholder: '10' },
       ]},
-      { id: 'hc_patient_escape', name: 'Giám sát bệnh nhân bỏ trốn/ rời khu vực', taskMapType: 'security', desc: 'Phát hiện bệnh nhân tâm thần, trẻ em, bệnh nhân ICU rời khỏi khu vực được phép mà không có nhân viên đi kèm.', params: [
-        { key: 'allowedZone', label: 'Vùng bệnh nhân được phép ở', type: 'zone_hint' },
-        { key: 'confirmSeconds', label: 'Thời gian rời khu vực mới báo', type: 'number', unit: 'giây' },
-        { key: 'transitZone', label: 'Vùng cho phép ra ngoài có nhân viên đi kèm', type: 'zone_hint', optional: true },
+      { id: 'hc_fall', name: 'Phát hiện người ngã / đột quỵ', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu khu vực / tư thế bình thường', desc: 'Phát hiện bệnh nhân hoặc người cao tuổi ngã xuống đất đột ngột hoặc bất động bất thường trong khu vực giám sát.', params: [
+        { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
+        { key: 'normalPosture', label: 'Tư thế bình thường có cúi/ngồi thường xuyên không', type: 'toggle' },
+        { key: 'confirmSeconds', label: 'Xác nhận ngã sau khi nằm yên', type: 'number', unit: 'giây', placeholder: '3' },
+      ], alertParams: [
+        { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Trung bình', 'Cao', 'Khẩn cấp'] },
       ]},
+
     ]
   },
   {
     key: 'education', name: 'Giáo dục', color: 'fuchsia',
     useCases: [
-      { id: 'edu_leave', name: 'Phát hiện học sinh rời khu vực trong giờ', taskMapType: 'security', desc: 'Phát hiện học sinh rời khỏi khuôn viên trường hoặc khu vực lớp học trong giờ học mà không có phép.', params: [
-        { key: 'allowedZone', label: 'Vùng cho phép học sinh ở lại', type: 'zone_hint' },
-        { key: 'forbiddenLine', label: 'Cổng/lối ra học sinh không được phép', type: 'line_hint' },
-        { key: 'schoolHours', label: 'Giờ học', type: 'time_range' },
-        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây' },
+      { id: 'edu_leave', name: 'Rời khỏi vị trí', taskMapType: 'security', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu nhận diện đối tượng (đồng phục, thẻ, khuôn mặt)', desc: 'Phát hiện nhân viên, học sinh hoặc khách rời khỏi vị trí quy định quá thời gian cho phép mà không có phép.', params: [
+        { key: 'target', label: 'Đối tượng giám sát', type: 'select', options: ['Nhân viên', 'Học sinh', 'Khách'] },
+        { key: 'recognition', label: 'Cách nhận diện', type: 'select', options: ['Đồng phục', 'Thẻ', 'Hình ảnh'] },
+        { key: 'zone', label: 'Vùng cần giám sát', type: 'zone_hint' },
+        { key: 'breakHours', label: 'Giờ nghỉ / Ngoại lệ', type: 'time_range', optional: true },
+        { key: 'maxAbsenceTime', label: 'Thời gian rời vị trí tối đa cho phép', type: 'number', unit: 'phút', placeholder: '5' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây', placeholder: '3' },
+      ], alertParams: [
+        { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
+        { key: 'receiver', label: 'Người nhận cảnh báo', type: 'text' },
       ]},
 
       { id: 'edu_violence', name: 'Phát hiện ẩu đả, bạo lực học đường', taskMapType: 'behavior', desc: 'Phát hiện hành vi ẩu đả, đánh nhau, bắt nạt giữa học sinh tại hành lang, nhà vệ sinh, sân trường, góc khuất.', params: [
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'minPeople', label: 'Số người tối thiểu liên quan', type: 'number' },
         { key: 'confirmSeconds', label: 'Thời gian hành vi bất thường liên tục', type: 'number', unit: 'giây' },
+      ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Theo dõi', 'Cảnh báo', 'Khẩn cấp'] },
-        { key: 'activeHours', label: 'Giờ áp dụng (giờ ra chơi, tan học)', type: 'time_range' },
       ]},
       { id: 'edu_cheating', name: 'Phát hiện hành vi gian lận thi cử', taskMapType: 'behavior', desc: 'Giám sát phòng thi, phát hiện học sinh nhìn bài nhau, trao đổi tài liệu, sử dụng điện thoại trong giờ thi.', params: [
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
@@ -945,14 +985,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'violationCount', label: 'Số lần vi phạm trước khi báo', type: 'number' },
         { key: 'violationDuration', label: 'Thời gian vi phạm tối thiểu', type: 'number', unit: 'giây' },
       ]},
-      { id: 'edu_traffic', name: 'Phát hiện đỗ xe sai quy định cổng trường', taskMapType: 'traffic', desc: 'Cảnh báo xe máy, ô tô đỗ sai vị trí quy định hoặc đỗ chắn lối đi trước cổng trường trong giờ tan học.', params: [
-        { key: 'gateZone', label: 'Vùng cổng trường', type: 'zone_hint' },
-        { key: 'noParkingZone', label: 'Vùng cấm đỗ xe đón trả', type: 'zone_hint' },
-        { key: 'maxParkingMinutes', label: 'Thời gian đỗ tối đa', type: 'number', unit: 'phút' },
-        { key: 'maxDensity', label: 'Mật độ người tối đa', type: 'number' },
-        { key: 'dismissalHours', label: 'Giờ tan học', type: 'time_range' },
-        { key: 'vehicleTypes', label: 'Loại phương tiện giám sát', type: 'multicheck', options: ['Xe máy', 'Ô tô'] },
-      ]},
+
       { id: 'edu_weapons', name: 'Phát hiện vật nguy hiểm trong trường', taskMapType: 'security', desc: 'Phát hiện học sinh mang vũ khí, vật sắc nhọn, hoặc mang theo đồ vật không phù hợp vào trường.', params: [
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'targetType', label: 'Đối tượng cần phát hiện', type: 'multicheck', options: ['Dao', 'Vũ khí', 'Gậy', 'Bình xịt'] }
@@ -966,36 +999,31 @@ const DOMAINS: DomainDef[] = [
   {
     key: 'transport', name: 'Sân bay/ga tàu', color: 'sky',
     useCases: [
-      { id: 'ap_abandoned_baggage', name: 'Phát hiện hành lý bỏ quên', taskMapType: 'security', desc: 'Phát hiện hành lý, vật thể bị bỏ rơi tại sảnh, phòng chờ quá thời gian quy định.', params: [
-        { key: 'zone', label: 'Vùng giám sát hành lý', type: 'zone_hint' },
-        { key: 'minSizePct', label: 'Kích thước vật thể tối thiểu cần phát hiện', type: 'slider_pct' },
-        { key: 'idleSeconds', label: 'Thời gian vật thể không di chuyển mới báo động', type: 'number', unit: 'giây' },
-        { key: 'maxDistance', label: 'Khoảng cách tối đa từ chủ nhân đến hành lý', type: 'number', unit: 'mét' },
-        { key: 'excludeObjects', label: 'Phân loại đối tượng loại trừ', type: 'multicheck', options: ['Thùng rác cố định', 'Xe đẩy', 'Cột chắn'] },
+      { id: 'ap_abandoned_baggage', name: 'Phát hiện vật thể bỏ quên', taskMapType: 'security', desc: 'Phát hiện hành lý, túi xách, thùng hàng hoặc bất kỳ vật thể nào bị bỏ lại tại sảnh, phòng chờ, ga tàu quá thời gian quy định.', params: [
+        { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
+        { key: 'objectTypes', label: 'Loại vật thể cần theo dõi', type: 'multicheck', options: ['Túi', 'Hộp', 'Vali', 'Thùng hàng', 'Khác'] },
+        { key: 'excludeObjects', label: 'Phân loại đối tượng loại trừ', type: 'multicheck', options: ['Thùng rác cố định', 'Xe đẩy hành lý', 'Cột chắn', 'Biển báo'] },
+        { key: 'minSizePct', label: 'Kích thước vật thể tối thiểu', type: 'slider_pct' },
+        { key: 'idleSeconds', label: 'Thời gian vật thể đứng yên tối thiểu', type: 'number', unit: 'giây/phút', placeholder: '300' },
+      ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Trung bình', 'Khẩn cấp'] },
       ]},
-      { id: 'ap_restricted', name: 'Phát hiện xâm nhập khu vực hạn chế', taskMapType: 'security', desc: 'Kiểm soát truy cập vào các khu vực cấm hoặc vùng kiểm soát an ninh.', params: [
-        { key: 'zone', label: 'Vùng cấm/Khu vực hạn chế', type: 'zone_hint' },
-        { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
-        { key: 'earlyWarningLine', label: 'Đường ranh giới cảnh báo sớm', type: 'line_hint' },
-        { key: 'target', label: 'Đối tượng cần phát hiện', type: 'select', options: ['Người', 'Xe', 'Cả hai', 'Bất kỳ'] },
-        { key: 'zoneCondition', label: 'Điều kiện vào vùng', type: 'card2', options: ['Tâm đối tượng nằm trong vùng', 'Bất kỳ phần nào chạm viền'] },
+      { id: 'ap_restricted', name: 'Xâm nhập vùng cấm', taskMapType: 'security', desc: 'Cảnh báo khi người hoặc phương tiện xâm nhập vào khu vực hạn chế, đường băng, vạch an toàn tại sân bay/ga tàu.', params: [
+        { key: 'zone', label: 'Vẽ vùng cấm cần giám sát', type: 'zone_hint' },
+        { key: 'target', label: 'Đối tượng nào BỊ CẤM vào vùng này', type: 'select', options: ['Người', 'Xe máy', 'Xe ô tô', 'Xe tải', 'Bất kỳ đối tượng nào'] },
         { key: 'direction', label: 'Hướng xâm nhập', type: 'multicheck', options: ['Vào', 'Ra', 'Cả hai'] },
-        { key: 'allowedObjects', label: 'Đối tượng được phép ngoại trừ', type: 'multicheck', options: ['Nhân viên mặc đồng phục', 'Xe chuyên dụng', 'Xe kéo hành lý'] },
-        { key: 'maxStaySeconds', label: 'Thời gian lưu lại vùng cấm tối đa', type: 'number', unit: 'giây' },
-        { key: 'wrongWayAlert', label: 'Cảnh báo đi ngược chiều (hải quan/cửa ra)', type: 'toggle' },
+        { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
+        { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
+        { key: 'maxStaySeconds', label: 'Thời gian lưu lại tối đa', type: 'number', unit: 'giây', placeholder: '60' },
+        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+      ], alertParams: [
+        { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
       ]},
       { id: 'ap_weapon', name: 'Phát hiện vũ khí, hung khí nguy hiểm', taskMapType: 'security', desc: 'Nhận diện hình ảnh vũ khí trước khu vực soi chiếu hoặc sảnh công cộng.', params: [
         { key: 'zone', label: 'Vùng giám sát trọng điểm', type: 'zone_hint' },
         { key: 'weaponTypes', label: 'Loại vũ khí cần nhận diện', type: 'multicheck', options: ['Súng ngắn', 'Súng trường', 'Dao, kiếm', 'Gậy gộc'] },
         { key: 'confidencePct', label: 'Độ tự tin tối thiểu để báo động', type: 'slider_pct' },
         { key: 'silentAlarm', label: 'Lưu vết và gửi cảnh báo khẩn cấp (Silent Alarm)', type: 'toggle' },
-      ]},
-      { id: 'ap_safety_line', name: 'Xâm nhập vùng cấm', taskMapType: 'security', desc: 'Cảnh báo khi hành khách lấn qua vạch vàng an toàn hoặc xâm nhập vào khu vực cấm tại ga tàu, sảnh soi chiếu.', params: [
-        { key: 'safetyLine', label: 'Đường ranh giới vạch vàng (Safety Line)', type: 'line_hint' },
-        { key: 'violationSeconds', label: 'Thời gian lấn vạch liên tục để báo động', type: 'number', unit: 'giây' },
-        { key: 'autoSpeaker', label: 'Kích hoạt hệ thống loa phát thanh nhắc nhở', type: 'toggle' },
-        { key: 'linkTrainSignal', label: 'Loại trừ khi tàu đã dừng và mở cửa', type: 'toggle' },
       ]},
     ]
   },
@@ -1249,7 +1277,7 @@ export default function PipelineBuilder({
 
   const [alertDuration, setAlertDuration] = useState(10);
 
-  const [alertCount, setAlertCount] = useState(1);
+  const [alertCount, setAlertCount] = useState(0);
 
   const [cooldown, setCooldown] = useState(60);
 
@@ -1304,6 +1332,9 @@ const [selectedDomain, setSelectedDomain] = useState<string>('');
   const [selectedUseCaseDef, setSelectedUseCaseDef] = useState<UCDef | null>(null);
   const [useCaseParamValues, setUseCaseParamValues] = useState<Record<string, string>>({});
   const [useCaseAlertParamValues, setUseCaseAlertParamValues] = useState<Record<string, string>>({});
+  const [plateDraft, setPlateDraft] = useState<Record<string, string>>({});
+  const [plateError, setPlateError] = useState<Record<string, string>>({});
+  const [scheduleDraft, setScheduleDraft] = useState<Record<string, { day: string; from: string; to: string }>>({});
   const [useCaseImages, setUseCaseImages] = useState<string[]>([]);
   const [useCaseImageROIs, setUseCaseImageROIs] = useState<Record<number, BoundingBox[]>>({});
   const [inputMode, setInputMode] = useState<'standard' | 'smart'>('standard');
@@ -1472,7 +1503,7 @@ setSelectedDomain('');
         countingType: usesLine ? 'line' : 'zone',
         config: {
           alertDuration: customDuration ?? (usesLoiter ? 60 : hasAfterHours ? 5 : 10),
-          alertCount: asksCount ? maxLimit : 1,
+          alertCount: asksCount ? maxLimit : 0,
           cooldown: isUrgent ? 15 : 60,
           confidence: 0.65, iou: 0.45, tracker: 'bytetrack',
           frameSkip: usesLine ? 0 : 1, inferenceFps: 15,
@@ -1503,7 +1534,7 @@ setSelectedDomain('');
         retrievalTopK: hasRoi ? 5 : 8,
         cooldown: isUrgent ? 15 : 60,
         alertDuration: customDuration ?? (usesLoiter ? 60 : 10),
-        alertCount: asksCount ? maxLimit : 1,
+        alertCount: asksCount ? maxLimit : 0,
       },
     };
   };
@@ -1775,41 +1806,12 @@ setSelectedDomain('');
     setDetectionRule(inferred.rule);
     setInferenceFps(Number(inferred.config.inferenceFps || 15));
     setAlertDuration(Number(inferred.config.alertDuration || 10));
-    setAlertCount(Number(inferred.config.alertCount || 1));
+    setAlertCount(Number(inferred.config.alertCount || 0));
     setCooldown(Number(inferred.config.cooldown || 60));
     setConfidence(Number(inferred.config.confidence || 0.65));
     setIou(Number(inferred.config.iou || 0.45));
-    setTracker(String(inferred.config.tracker || 'bytetrack'));
-    setFrameSkip(Number(inferred.config.frameSkip || 0));
-    const updates: Record<string, string> = {};
-    const targetParam = selectedUseCaseDef.params?.find(p => p.key === 'target');
-    if (targetParam && inferred.target) {
-      const targetMap: Record<string, string> = { person: 'Người', vehicle: 'Xe' };
-      if (targetMap[inferred.target]) updates['target'] = targetMap[inferred.target];
-    }
-    const ruleParam = selectedUseCaseDef.params?.find(p => p.key === 'rule');
-    if (ruleParam && inferred.rule && (ruleParam.options || []).includes(inferred.rule)) {
-      updates['rule'] = inferred.rule;
-    }
-    if (Object.keys(updates).length > 0) setUseCaseParamValues(prev => ({ ...prev, ...updates }));
-  };
 
-  const handleDescriptionChange = (text: string) => {
-    setUserDescription(text);
-    if (!text.trim()) { setRoutedModelName('Chưa xác định'); setRoutedModelReason('Vui lòng mô tả yêu cầu.'); return; }
-    const inferred = inferMonitoringConfig(text, drawingPoints.length > 0 || currentCamZones.length > 0);
-    setRoutedModelName(inferred.model);
-    setRoutedModelReason('Tự suy luận từ mô tả.');
-    setSearchScope(inferred.scope);
-    setDetectionTarget(inferred.target || 'person');
-    setDetectionRule(inferred.rule);
-    setConfidence(Number(inferred.config.confidence || 0.65));
-    setIou(Number(inferred.config.iou || 0.45));
-    setTracker(String(inferred.config.tracker || 'bytetrack'));
-    setFrameSkip(Number(inferred.config.frameSkip || 0));
-    setInferenceFps(Number(inferred.config.inferenceFps || 15));
-    setAlertDuration(Number(inferred.config.alertDuration || 10));
-    setAlertCount(Number(inferred.config.alertCount || 1));
+    setAlertCount(Number(inferred.config.alertCount || 0));
     setCooldown(Number(inferred.config.cooldown || 60));
   };
 
@@ -1870,7 +1872,7 @@ setSelectedDomain('');
 
     // Common params
     setAlertDuration(Number(pipe.config?.alertDuration || 10));
-    setAlertCount(Number(pipe.config?.alertCount || 1));
+    setAlertCount(Number(pipe.config?.alertCount || 0));
     setCooldown(Number(pipe.config?.cooldown || 60));
     setInferenceFps(Number(pipe.config?.inferenceFps || 15));
 
@@ -2832,6 +2834,184 @@ setSelectedDomain('');
                         );
                       }
 
+                      if (param.type === 'weekly_schedule') {
+                        const DAYS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật'];
+                        // stored as JSON array: [{day, from, to}, ...]
+                        let slots: { day: string; from: string; to: string }[] = [];
+                        try { slots = JSON.parse(val || '[]'); } catch { slots = []; }
+                        const draft = scheduleDraft[param.key] || { day: 'Thứ 2', from: '', to: '' };
+                        const setDraft = (patch: Partial<typeof draft>) =>
+                          setScheduleDraft(prev => ({ ...prev, [param.key]: { ...draft, ...patch } }));
+                        const addSlot = () => {
+                          if (!draft.from || !draft.to) return;
+                          setVal(JSON.stringify([...slots, { day: draft.day, from: draft.from, to: draft.to }]));
+                          setScheduleDraft(prev => ({ ...prev, [param.key]: { day: draft.day, from: '', to: '' } }));
+                        };
+                        const removeSlot = (i: number) =>
+                          setVal(JSON.stringify(slots.filter((_, idx) => idx !== i)));
+                        return (
+                          <div key={param.key}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">
+                              {param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}
+                            </label>
+                            {/* Existing slots */}
+                            {slots.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-2">
+                                {slots.map((s, i) => (
+                                  <span key={i} className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium px-2.5 py-1 rounded-lg">
+                                    <span className="font-bold">{s.day}</span>
+                                    <span className="text-amber-500">·</span>
+                                    <span className="font-mono">{s.from}–{s.to}</span>
+                                    <button type="button" onClick={() => removeSlot(i)} className="text-amber-400 hover:text-rose-500 leading-none cursor-pointer ml-0.5">×</button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {/* Add row */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <select value={draft.day} onChange={e => setDraft({ day: e.target.value })}
+                                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-amber-400">
+                                {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                              </select>
+                              <input type="text" value={draft.from} onChange={e => setDraft({ from: e.target.value })}
+                                placeholder="08:00" maxLength={5}
+                                className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-mono text-center focus:outline-none focus:border-amber-400" />
+                              <span className="text-xs text-slate-400">→</span>
+                              <input type="text" value={draft.to} onChange={e => setDraft({ to: e.target.value })}
+                                placeholder="09:00" maxLength={5}
+                                className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-mono text-center focus:outline-none focus:border-amber-400" />
+                              <button type="button" onClick={addSlot}
+                                className="px-3 py-2 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-600 cursor-pointer whitespace-nowrap">
+                                + Thêm
+                              </button>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-1.5">Trong các khung giờ này hệ thống sẽ bỏ qua cảnh báo</p>
+                          </div>
+                        );
+                      }
+
+                      if (param.type === 'zone_item_mapping') {
+                        const zones = (useCaseParamValues['zoneList'] || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                        const items = (useCaseParamValues['itemType'] || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                        // stored as JSON: { "Hàng điện tử": ["A1","B2"], ... }
+                        let mapping: Record<string, string[]> = {};
+                        try { mapping = JSON.parse(val || '{}'); } catch { mapping = {}; }
+                        const toggleZone = (item: string, zone: string) => {
+                          const cur = mapping[item] || [];
+                          const next = cur.includes(zone) ? cur.filter(z => z !== zone) : [...cur, zone];
+                          const updated = { ...mapping, [item]: next };
+                          setVal(JSON.stringify(updated));
+                        };
+                        if (zones.length === 0 || items.length === 0) return (
+                          <div key={param.key}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}</label>
+                            <p className="text-[10px] text-slate-400 italic bg-slate-50 border border-dashed border-slate-200 rounded-lg px-3 py-2">
+                              Nhập danh sách khu vực và loại hàng ở trên trước để tạo bảng mapping
+                            </p>
+                          </div>
+                        );
+                        return (
+                          <div key={param.key}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">{param.label}</label>
+                            <div className="border border-slate-200 rounded-xl overflow-hidden">
+                              {/* Header row */}
+                              <div className="grid bg-slate-50 border-b border-slate-200" style={{ gridTemplateColumns: `1fr repeat(${zones.length}, minmax(48px, 1fr))` }}>
+                                <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">Loại hàng</div>
+                                {zones.map(z => (
+                                  <div key={z} className="px-2 py-2 text-[10px] font-bold text-slate-600 text-center border-l border-slate-200">{z}</div>
+                                ))}
+                              </div>
+                              {/* Data rows */}
+                              {items.map((item, idx) => (
+                                <div key={item} className={`grid items-center ${idx < items.length - 1 ? 'border-b border-slate-100' : ''}`} style={{ gridTemplateColumns: `1fr repeat(${zones.length}, minmax(48px, 1fr))` }}>
+                                  <div className="px-3 py-2.5 text-[11px] text-slate-700 font-medium">{item}</div>
+                                  {zones.map(zone => {
+                                    const checked = (mapping[item] || []).includes(zone);
+                                    return (
+                                      <div key={zone} className="flex justify-center items-center border-l border-slate-100 py-2">
+                                        <button type="button" onClick={() => toggleZone(item, zone)}
+                                          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all cursor-pointer ${checked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white hover:border-emerald-400'}`}>
+                                          {checked && <span className="text-[10px] font-bold leading-none">✓</span>}
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-1.5">Tích vào ô để chỉ định khu vực hợp lệ cho từng loại hàng</p>
+                          </div>
+                        );
+                      }
+
+                      if (param.type === 'time') return (
+                        <div key={param.key}>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
+                          <input type="text" value={val} onChange={e => setVal(e.target.value)} placeholder="08:00" maxLength={5}
+                            className="w-32 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono text-center tracking-widest" />
+                          <p className="text-[9px] text-slate-400 mt-1">Định dạng 24h (VD: 07:30)</p>
+                        </div>
+                      );
+
+                      if (param.type === 'license_plate_list') {
+                        // Vietnamese plate regex:
+                        // Car:        29A-123.45 | 51LD-000.01
+                        // Motorcycle: 29-AA.123.45 | 51-AB.123.45
+                        const VN_PLATE = /^(\d{2}[A-Z]{1,2}-\d{3}\.\d{2}|\d{2}-[A-Z]{2}[\s.]?\d{3}\.\d{2})$/i;
+                        const plates = (val || '').split('|').filter(Boolean);
+                        const draft = plateDraft[param.key] || '';
+                        const errMsg = plateError[param.key] || '';
+                        const addPlate = (raw: string) => {
+                          const plate = raw.trim().toUpperCase();
+                          if (!plate) return;
+                          if (!VN_PLATE.test(plate)) {
+                            setPlateError(prev => ({ ...prev, [param.key]: `"${plate}" không đúng định dạng biển số Việt Nam` }));
+                            return;
+                          }
+                          if (plates.includes(plate)) {
+                            setPlateError(prev => ({ ...prev, [param.key]: 'Biển số này đã có trong danh sách' }));
+                            return;
+                          }
+                          setVal([...plates, plate].join('|'));
+                          setPlateDraft(prev => ({ ...prev, [param.key]: '' }));
+                          setPlateError(prev => ({ ...prev, [param.key]: '' }));
+                        };
+                        const removePlate = (p: string) => setVal(plates.filter(x => x !== p).join('|'));
+                        return (
+                          <div key={param.key}>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                              {param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}
+                            </label>
+                            {plates.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-2">
+                                {plates.map(p => (
+                                  <span key={p} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md border border-slate-200">
+                                    {p}
+                                    <button type="button" onClick={() => removePlate(p)} className="text-slate-400 hover:text-rose-500 leading-none cursor-pointer">×</button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={draft}
+                                onChange={e => { setPlateDraft(prev => ({ ...prev, [param.key]: e.target.value.toUpperCase() })); setPlateError(prev => ({ ...prev, [param.key]: '' })); }}
+                                onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addPlate(draft); } }}
+                                placeholder="VD: 29A-123.45 hoặc 51-AB.123.45"
+                                className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:border-emerald-500 uppercase"
+                              />
+                              <button type="button" onClick={() => addPlate(draft)}
+                                className="px-3 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 cursor-pointer whitespace-nowrap">
+                                + Thêm
+                              </button>
+                            </div>
+                            {errMsg && <p className="text-[10px] text-rose-500 mt-1">{errMsg}</p>}
+                            <p className="text-[9px] text-slate-400 mt-1">Ô tô: <span className="font-mono">29A-123.45</span> · Xe máy: <span className="font-mono">51-AB.123.45</span> · Nhấn Enter để thêm</p>
+                          </div>
+                        );
+                      }
+
                       return null;
                     };
 
@@ -2900,7 +3080,7 @@ setSelectedDomain('');
                           </div>
                         )}
 
-                        {/* Optional params in collapsible */}
+                        {/* Optional params in collapsible (skip severity/alertLevel params → shown in Alert step) */}
                         {optionalParams.filter(p => p.key !== 'severity' && p.key !== 'alertLevel').length > 0 && (
                           <details className="group">
                             <summary className="text-[11px] font-bold text-slate-400 uppercase tracking-wide cursor-pointer hover:text-slate-600 list-none flex items-center gap-1.5 select-none">
@@ -2941,6 +3121,16 @@ setSelectedDomain('');
                             })}
                           </div>
                         )}
+
+                        {/* Tracker selector — standard config */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Thuật toán bám đuổi <span className="font-normal text-slate-400 normal-case">(Tracker)</span></label>
+                          <select value={tracker} onChange={e => setTracker(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                            <option value="bytetrack">ByteTrack — chính xác, nhanh</option>
+                            <option value="deepsort">DeepSORT — mượt, tốn hơn</option>
+                            <option value="none">Không bám đuổi — nhanh nhất</option>
+                          </select>
+                        </div>
                       </div>
                     );
                   })()
@@ -3025,6 +3215,25 @@ setSelectedDomain('');
                                 <p className="text-xs text-slate-500">Upload ảnh tham chiếu · JPG, PNG · Tối đa 5MB</p>
                                 {useCaseImages.length > 0 && <p className="text-[10px] text-emerald-600 mt-0.5">Thêm ảnh nữa</p>}
                               </label>
+                            </div>
+                          )}
+
+                          {/* Smart flow alert thresholds */}
+                          {inputMode === 'smart' && !taskType.startsWith('defect_') && (
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau</label>
+                                <div className="flex items-center gap-2">
+                                  <input type="number" min={1} value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                                  <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
+                                </div>
+                                <p className="text-[9px] text-slate-400 mt-1">Phải diễn ra liên tục bao lâu trước khi báo</p>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ngưỡng số lượng</label>
+                                <input type="number" min={0} value={alertCount} onChange={e => setAlertCount(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
+                                <p className="text-[9px] text-slate-400 mt-1">Nhập 0 để bỏ qua. Phát hiện ≥ N đối tượng thì báo</p>
+                              </div>
                             </div>
                           )}
 
@@ -3160,59 +3369,6 @@ setSelectedDomain('');
                       )}
                     </div>
 
-                  {/* ── Common timing params (smart mode only) ── */}
-                  {inputMode === 'smart' && !taskType.startsWith('defect_') && (
-                    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Ngưỡng cảnh báo</label>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau</label>
-                          <div className="flex items-center gap-2">
-                            <input type="number" min={1} value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                            <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
-                          </div>
-                          <p className="text-[9px] text-slate-400 mt-1">Phải diễn ra liên tục bao lâu trước khi báo</p>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ngưỡng số lượng</label>
-                          <input type="number" min={1} value={alertCount} onChange={e => setAlertCount(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                          <p className="text-[9px] text-slate-400 mt-1">Phát hiện ≥ N đối tượng thì báo</p>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
-                          <div className="flex items-center gap-2">
-                            <input type="number" min={0} value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                            <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
-                          </div>
-                          <p className="text-[9px] text-slate-400 mt-1">Chờ bao lâu trước khi cho phép báo tiếp</p>
-                        </div>
-                      </div>
-                      {/* Severity param if the use case defines it */}
-                      {selectedUseCaseDef && selectedUseCaseDef.params.filter(p => p.key === 'severity' || p.key === 'alertLevel').map(p => {
-                        const val = useCaseParamValues[p.key] || '';
-                        const setVal = (v: string) => setUseCaseParamValues(prev => ({ ...prev, [p.key]: v }));
-                        const opts = p.options || ['Thấp', 'Trung bình', 'Cao'];
-                        return (
-                          <div key={p.key} className="border-t border-slate-100 pt-4">
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">{p.label}</label>
-                            <div className="flex gap-2">
-                              {opts.map(opt => (
-                                <button key={opt} type="button" onClick={() => setVal(opt)}
-                                  className={`flex-1 py-2 rounded-lg border-2 text-xs font-bold transition-all cursor-pointer ${val === opt
-                                    ? opt === 'Cao' ? 'border-rose-500 bg-rose-500 text-white'
-                                      : opt === 'Trung bình' ? 'border-amber-400 bg-amber-400 text-white'
-                                      : 'border-slate-400 bg-slate-400 text-white'
-                                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                                  {opt === 'Cao' ? '🔴' : opt === 'Trung bình' ? '🟡' : '⚪'} {opt}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
                   {/* Performance presets */}
                   {(() => {
                     const PRESETS = [
@@ -3291,15 +3447,6 @@ setSelectedDomain('');
                           {active.tracker !== 'none' && <><span className="text-slate-300">·</span><span>Bám đối tượng: Bật</span></>}
                         </div>
 
-                        {/* Tracker — main config, shown in both flows */}
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Thuật toán bám đuổi <span className="font-normal text-slate-400 normal-case">(Tracker)</span></label>
-                          <select value={tracker} onChange={e => setTracker(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm">
-                            <option value="bytetrack">ByteTrack — chính xác, nhanh</option>
-                            <option value="deepsort">DeepSORT — mượt, tốn hơn</option>
-                            <option value="none">Không bám đuổi — nhanh nhất</option>
-                          </select>
-                        </div>
 
                         {/* Collapsible advanced */}
                         <details className="group" open={showAdvancedPerf} onToggle={e => setShowAdvancedPerf((e.target as HTMLDetailsElement).open)}>
@@ -3451,8 +3598,7 @@ setSelectedDomain('');
         {currentStep === 'alert' && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-base font-bold text-slate-800">Thiết lập báo động</h3>
-              <p className="text-xs text-slate-500 mt-1">Cấu hình ngưỡng phát sinh cảnh báo và kênh nhận thông báo.</p>
+              <h3 className="text-base font-bold text-slate-800">Cấu hình ngưỡng phát sinh cảnh báo và kênh nhận thông báo</h3>
             </div>
 
             {/* ── Smart flow: 3 threshold params ── */}
@@ -3462,20 +3608,7 @@ setSelectedDomain('');
                   <Bell size={14} className="text-emerald-600" />
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Ngưỡng cảnh báo — Luồng thông minh</label>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau</label>
-                    <div className="flex items-center gap-2">
-                      <input type="number" min={1} value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                      <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
-                    </div>
-                    <p className="text-[9px] text-slate-400 mt-1">Phải diễn ra liên tục bao lâu trước khi báo</p>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ngưỡng số lượng</label>
-                    <input type="number" min={1} value={alertCount} onChange={e => setAlertCount(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                    <p className="text-[9px] text-slate-400 mt-1">Phát hiện ≥ N đối tượng thì báo</p>
-                  </div>
+                <div className="grid grid-cols-1 gap-3">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
                     <div className="flex items-center gap-2">
@@ -3489,67 +3622,84 @@ setSelectedDomain('');
             )}
 
             {/* ── Standard flow: alertParams from use case definition ── */}
-            {inputMode === 'standard' && selectedUseCaseDef?.alertParams && selectedUseCaseDef.alertParams.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex items-center gap-2">
-                  <Bell size={14} className="text-emerald-600" />
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Cấu hình ngưỡng cảnh báo — Luồng tiêu chuẩn</label>
-                </div>
-                <div className="space-y-3">
-                  {selectedUseCaseDef.alertParams.map(param => {
-                    const val = useCaseAlertParamValues[param.key] || '';
-                    const setVal = (v) => setUseCaseAlertParamValues(prev => ({ ...prev, [param.key]: v }));
-                    return (
-                      <div key={param.key}>
-                        <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
-                          {param.label}{param.optional && <span className="font-normal text-slate-400 ml-1 normal-case">(tùy chọn)</span>}
-                        </label>
-                        {param.type === 'number' && (
-                          <div className="flex items-center gap-2">
-                            <input type="number" value={val} onChange={e => setVal(e.target.value)}
-                              placeholder={param.placeholder || ''}
-                              className="w-40 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
-                            {param.unit && <span className="text-xs text-slate-400">{param.unit}</span>}
-                          </div>
-                        )}
-                        {param.type === 'slider_pct' && (
-                          <div className="flex items-center gap-2">
-                            <input type="range" min="0" max="100" value={val || 50} onChange={e => setVal(e.target.value)}
-                              className="flex-1 accent-emerald-500" />
-                            <span className="text-xs text-slate-600 font-bold min-w-[3ch]">{val || 50}%</span>
-                          </div>
-                        )}
-                        {(param.type === 'select' || param.type === 'select_text') && (
-                          <select value={val} onChange={e => setVal(e.target.value)}
-                            className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500">
-                            <option value="">-- Chọn --</option>
-                            {param.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
-                        )}
-                        {(param.type === 'text' || param.type === 'textarea') && (
-                          <input type="text" value={val} onChange={e => setVal(e.target.value)}
-                            placeholder={param.placeholder || ''}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
-                        )}
-                        {param.type === 'toggle' && (
-                          <button
-                            onClick={() => setVal(val === 'true' ? 'false' : 'true')}
-                            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${val === 'true' ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                          >
-                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${val === 'true' ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                          </button>
-                        )}
+            {inputMode === 'standard' && selectedUseCaseDef && (() => {
+              const alertParamsList = selectedUseCaseDef.alertParams ?? [];
+              const hasCooldown = alertParamsList.some(p => p.key === 'cooldownSeconds' || p.key === 'cooldownInterval');
+              const totalParams = alertParamsList.length + (hasCooldown ? 0 : 1);
+              const renderAlertParam = (param: UCParam) => {
+                const val = useCaseAlertParamValues[param.key] || '';
+                const setVal = (v: string) => setUseCaseAlertParamValues(prev => ({ ...prev, [param.key]: v }));
+                return (
+                  <div key={param.key}>
+                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
+                      {param.label}{param.optional && <span className="font-normal text-slate-400 ml-1 normal-case">(tùy chọn)</span>}
+                    </label>
+                    {param.type === 'number' && (
+                      <div className="flex items-center gap-2">
+                        <input type="number" value={val} onChange={e => setVal(e.target.value)}
+                          placeholder={param.placeholder || ''}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                        {param.unit && <span className="text-xs text-slate-400 whitespace-nowrap">{param.unit}</span>}
                       </div>
-                    );
-                  })}
+                    )}
+                    {param.type === 'slider_pct' && (
+                      <div className="flex items-center gap-2">
+                        <input type="range" min="0" max="100" value={val || 50} onChange={e => setVal(e.target.value)}
+                          className="flex-1 accent-emerald-500" />
+                        <span className="text-xs text-slate-600 font-bold min-w-[3ch]">{val || 50}%</span>
+                      </div>
+                    )}
+                    {(param.type === 'select' || param.type === 'select_text') && (
+                      <select value={val} onChange={e => setVal(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500">
+                        <option value="">-- Chọn --</option>
+                        {param.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    )}
+                    {(param.type === 'text' || param.type === 'textarea') && (
+                      <input type="text" value={val} onChange={e => setVal(e.target.value)}
+                        placeholder={param.placeholder || ''}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                    )}
+                    {param.type === 'toggle' && (
+                      <button
+                        onClick={() => setVal(val === 'true' ? 'false' : 'true')}
+                        className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${val === 'true' ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${val === 'true' ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
+                    )}
+                  </div>
+                );
+              };
+              return (
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Bell size={14} className="text-emerald-600" />
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Cấu hình ngưỡng cảnh báo — Luồng tiêu chuẩn</label>
+                  </div>
+                  <div
+                    className={totalParams > 1 ? 'grid gap-3' : 'space-y-3'}
+                    style={totalParams > 1 ? { gridTemplateColumns: `repeat(${totalParams}, minmax(0, 1fr))` } : undefined}
+                  >
+                    {alertParamsList.map(renderAlertParam)}
+                    {!hasCooldown && (
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Khoảng thời gian nhận cảnh báo 1 lần</label>
+                        <div className="flex items-center gap-2">
+                          <input type="number" value={useCaseAlertParamValues['cooldownInterval'] || ''}
+                            onChange={e => setUseCaseAlertParamValues(prev => ({ ...prev, cooldownInterval: e.target.value }))}
+                            placeholder="60"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
+                          <span className="text-xs text-slate-400 whitespace-nowrap">giây/phút</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             
-            <div>
-              <h3 className="text-base font-bold text-slate-800">Thiết lập nhận thông báo</h3>
-              <p className="text-xs text-slate-500 mt-1">Khi sự kiện kích hoạt, VisionOS sẽ gửi cảnh báo đến các kênh được chọn.</p>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 { key: 'zalo', icon: <MessageSquare size={20} />, label: 'Popup', desc: 'Hiển thị cảnh báo trực tiếp trên giao diện' },
