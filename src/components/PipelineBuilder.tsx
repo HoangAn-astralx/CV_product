@@ -1274,6 +1274,8 @@ export default function PipelineBuilder({
 
   const [cooldown, setCooldown] = useState(60);
 
+  const [alertSeverity, setAlertSeverity] = useState('Trung bình');
+
   const [confidence, setConfidence] = useState(0.65);
 
   const [iou, setIou] = useState(0.45);
@@ -3594,104 +3596,47 @@ setSelectedDomain('');
               <h3 className="text-base font-bold text-slate-800">Cấu hình ngưỡng phát sinh cảnh báo và kênh nhận thông báo</h3>
             </div>
 
-            {/* ── Smart flow: 3 threshold params ── */}
-            {inputMode === 'smart' && !taskType.startsWith('defect_') && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex items-center gap-2">
-                  <Bell size={14} className="text-emerald-600" />
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Ngưỡng cảnh báo — Luồng thông minh</label>
+            {/* ── Unified alert thresholds: same 2 params for both modes ── */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="flex items-center gap-2">
+                <Bell size={14} className="text-emerald-600" />
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Cấu hình ngưỡng cảnh báo</label>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Mức độ cảnh báo</label>
+                  <select
+                    value={inputMode === 'smart' ? alertSeverity : (useCaseAlertParamValues['severity'] || '')}
+                    onChange={e => {
+                      if (inputMode === 'smart') setAlertSeverity(e.target.value);
+                      else setUseCaseAlertParamValues(prev => ({ ...prev, severity: e.target.value }));
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">-- Chọn --</option>
+                    <option value="Thấp">Thấp</option>
+                    <option value="Trung bình">Trung bình</option>
+                    <option value="Cao">Cao</option>
+                  </select>
                 </div>
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nghỉ giữa cảnh báo</label>
-                    <div className="flex items-center gap-2">
-                      <input type="number" min={0} value={cooldown} onChange={e => setCooldown(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
-                      <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
-                    </div>
-                    <p className="text-[9px] text-slate-400 mt-1">Chờ bao lâu trước khi cho phép báo tiếp</p>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Khoảng thời gian nhận cảnh báo 1 lần</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={inputMode === 'smart' ? cooldown : (useCaseAlertParamValues['cooldownInterval'] || '')}
+                      onChange={e => {
+                        if (inputMode === 'smart') setCooldown(Number(e.target.value));
+                        else setUseCaseAlertParamValues(prev => ({ ...prev, cooldownInterval: e.target.value }));
+                      }}
+                      placeholder="60"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500"
+                    />
+                    <span className="text-xs text-slate-400 whitespace-nowrap">giây/phút</span>
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* ── Standard flow: alertParams from use case definition ── */}
-            {inputMode === 'standard' && selectedUseCaseDef && (() => {
-              const alertParamsList = selectedUseCaseDef.alertParams ?? [];
-              const hasCooldown = alertParamsList.some(p => p.key === 'cooldownSeconds' || p.key === 'cooldownInterval');
-              const totalParams = alertParamsList.length + (hasCooldown ? 0 : 1);
-              const renderAlertParam = (param: UCParam) => {
-                const val = useCaseAlertParamValues[param.key] || '';
-                const setVal = (v: string) => setUseCaseAlertParamValues(prev => ({ ...prev, [param.key]: v }));
-                return (
-                  <div key={param.key}>
-                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">
-                      {param.label}{param.optional && <span className="font-normal text-slate-400 ml-1 normal-case">(tùy chọn)</span>}
-                    </label>
-                    {param.type === 'number' && (
-                      <div className="flex items-center gap-2">
-                        <input type="number" value={val} onChange={e => setVal(e.target.value)}
-                          placeholder={param.placeholder || ''}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
-                        {param.unit && <span className="text-xs text-slate-400 whitespace-nowrap">{param.unit}</span>}
-                      </div>
-                    )}
-                    {param.type === 'slider_pct' && (
-                      <div className="flex items-center gap-2">
-                        <input type="range" min="0" max="100" value={val || 50} onChange={e => setVal(e.target.value)}
-                          className="flex-1 accent-emerald-500" />
-                        <span className="text-xs text-slate-600 font-bold min-w-[3ch]">{val || 50}%</span>
-                      </div>
-                    )}
-                    {(param.type === 'select' || param.type === 'select_text') && (
-                      <select value={val} onChange={e => setVal(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500">
-                        <option value="">-- Chọn --</option>
-                        {param.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    )}
-                    {(param.type === 'text' || param.type === 'textarea') && (
-                      <input type="text" value={val} onChange={e => setVal(e.target.value)}
-                        placeholder={param.placeholder || ''}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
-                    )}
-                    {param.type === 'toggle' && (
-                      <button
-                        onClick={() => setVal(val === 'true' ? 'false' : 'true')}
-                        className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${val === 'true' ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                      >
-                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${val === 'true' ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                      </button>
-                    )}
-                  </div>
-                );
-              };
-              return (
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Bell size={14} className="text-emerald-600" />
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Cấu hình ngưỡng cảnh báo — Luồng tiêu chuẩn</label>
-                  </div>
-                  <div
-                    className={totalParams > 1 ? 'grid gap-3' : 'space-y-3'}
-                    style={totalParams > 1 ? { gridTemplateColumns: `repeat(${totalParams}, minmax(0, 1fr))` } : undefined}
-                  >
-                    {alertParamsList.map(renderAlertParam)}
-                    {!hasCooldown && (
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1.5">Khoảng thời gian nhận cảnh báo 1 lần</label>
-                        <div className="flex items-center gap-2">
-                          <input type="number" value={useCaseAlertParamValues['cooldownInterval'] || ''}
-                            onChange={e => setUseCaseAlertParamValues(prev => ({ ...prev, cooldownInterval: e.target.value }))}
-                            placeholder="60"
-                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-emerald-500" />
-                          <span className="text-xs text-slate-400 whitespace-nowrap">giây/phút</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
