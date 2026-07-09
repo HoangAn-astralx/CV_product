@@ -610,8 +610,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'direction', label: 'Hướng xâm nhập', type: 'multicheck', options: ['Vào', 'Ra', 'Cả hai'] },
         { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
         { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
-        { key: 'maxStaySeconds', label: 'Thời gian lưu lại tối đa', type: 'number', unit: 'giây', placeholder: '60' },
-        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây/frame', placeholder: '3' },
       ],
         alertParams: [
           { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
@@ -625,7 +624,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'workHours', label: 'Giờ làm việc bình thường', type: 'time_range' },
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
-        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây' },
       ],
         alertParams: []},
       { id: 'sec_assetloss', name: 'Phát hiện vật thể rời vị trí', taskMapType: 'security', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tài sản cần bảo vệ (giúp AI nhận dạng chính xác hơn)', desc: 'Báo động khi đồ vật quan trọng bị di dời khỏi vị trí.', params: [
@@ -738,7 +737,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'triggerCondition', label: 'Điều kiện kích hoạt', type: 'card2', options: ['Bước vào vùng', 'Luôn kiểm tra trong vùng'] }
       ],
         alertParams: [
-          { key: 'confirmFrames', label: 'Xác nhận sau', type: 'number', unit: 'frame/giây' }
+          { key: 'confirmFrames', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'frame/giây' }
         ]},
       { id: 'hse_machine', name: 'Xâm nhập vùng cấm', taskMapType: 'security', desc: 'Báo động khi người hoặc phương tiện xâm nhập vào vùng cấm quanh máy móc, thiết bị nguy hiểm đang hoạt động.', params: [
         { key: 'zone', label: 'Vẽ vùng cấm cần giám sát', type: 'zone_hint' },
@@ -747,7 +746,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
         { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
         { key: 'maxStaySeconds', label: 'Thời gian lưu lại tối đa', type: 'number', unit: 'giây', placeholder: '60' },
-        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây/frame', placeholder: '3' },
       ], alertParams: [
         { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
       ]},
@@ -850,7 +849,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'direction', label: 'Hướng xâm nhập', type: 'multicheck', options: ['Vào', 'Ra', 'Cả hai'] },
         { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
         { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
-        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây/frame', placeholder: '3' },
       ],
         alertParams: [
           { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
@@ -925,7 +924,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'ppeColors', label: 'Màu trang phục tại cơ sở', type: 'text', placeholder: 'Nhập màu tương ứng mỗi loại' },
       ],
         alertParams: [
-          { key: 'confirmFrames', label: 'Xác nhận sau', type: 'number', unit: 'frame' }
+          { key: 'confirmFrames', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'frame' }
         ]},
       { id: 'hc_restricted', name: 'Xâm nhập vùng cấm', taskMapType: 'security', desc: 'Phát hiện người vào khu vực cấm (kho thuốc, phòng mổ, ICU, khu cách ly) hoặc tụ tập đông người vượt giới hạn trong vùng hạn chế.', params: [
         { key: 'zone', label: 'Vẽ vùng cấm cần giám sát', type: 'zone_hint' },
@@ -934,7 +933,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
         { key: 'workHours', label: 'Khung giờ hành chính (ngoài giờ = cấm tuyệt đối)', type: 'time_range' },
         { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
-        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây/frame', placeholder: '3' },
       ],
         alertParams: [
           { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
@@ -992,7 +991,7 @@ const DOMAINS: DomainDef[] = [
       ],
         alertParams: [
           { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Theo dõi', 'Khẩn cấp'] },
-          { key: 'confirmFrames', label: 'Xác nhận sau', type: 'number', unit: 'frame' }
+          { key: 'confirmFrames', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'frame' }
         ]},
     ]
   },
@@ -1015,15 +1014,9 @@ const DOMAINS: DomainDef[] = [
         { key: 'zoneCondition', label: 'Khi nào tính là "đã vào vùng"', type: 'card2', options: ['Tâm đối tượng nằm trong vùng (chính xác hơn)', 'Bất kỳ phần nào chạm viền (nhạy hơn)'] },
         { key: 'maintenanceSchedule', label: 'Lịch bảo trì / tuần tra (bỏ qua cảnh báo)', type: 'weekly_schedule', optional: true },
         { key: 'maxStaySeconds', label: 'Thời gian lưu lại tối đa', type: 'number', unit: 'giây', placeholder: '60' },
-        { key: 'confirmSeconds', label: 'Xác nhận sau', type: 'number', unit: 'giây/frame', placeholder: '3' },
+        { key: 'confirmSeconds', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'giây/frame', placeholder: '3' },
       ], alertParams: [
         { key: 'severity', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
-      ]},
-      { id: 'ap_weapon', name: 'Phát hiện vũ khí, hung khí nguy hiểm', taskMapType: 'security', desc: 'Nhận diện hình ảnh vũ khí trước khu vực soi chiếu hoặc sảnh công cộng.', params: [
-        { key: 'zone', label: 'Vùng giám sát trọng điểm', type: 'zone_hint' },
-        { key: 'weaponTypes', label: 'Loại vũ khí cần nhận diện', type: 'multicheck', options: ['Súng ngắn', 'Súng trường', 'Dao, kiếm', 'Gậy gộc'] },
-        { key: 'confidencePct', label: 'Độ tự tin tối thiểu để báo động', type: 'slider_pct' },
-        { key: 'silentAlarm', label: 'Lưu vết và gửi cảnh báo khẩn cấp (Silent Alarm)', type: 'toggle' },
       ]},
     ]
   },
@@ -3222,7 +3215,7 @@ setSelectedDomain('');
                           {inputMode === 'smart' && !taskType.startsWith('defect_') && (
                             <div className="space-y-4">
                               <div>
-                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Xác nhận sau</label>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Thời gian xác nhận cảnh báo</label>
                                 <div className="flex items-center gap-2">
                                   <input type="number" min={1} value={alertDuration} onChange={e => setAlertDuration(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" />
                                   <span className="text-xs text-slate-400 whitespace-nowrap">giây</span>
