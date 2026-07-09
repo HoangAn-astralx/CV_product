@@ -2613,8 +2613,8 @@ setSelectedDomain('');
                       if (param.type === 'toggle') return (
                         <div key={param.key}>
                           <label className="flex items-center gap-3 cursor-pointer">
-                            <div className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${val === 'true' ? 'bg-emerald-500' : 'bg-slate-200'}`} onClick={() => setVal(val === 'true' ? 'false' : 'true')}>
-                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${val === 'true' ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            <div className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${val === 'true' ? 'bg-emerald-500' : 'bg-slate-200'}`} onClick={() => setVal(val === 'true' ? 'false' : 'true')}>
+                              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${val === 'true' ? 'translate-x-5' : 'translate-x-0'}`} />
                             </div>
                             <span className="text-xs text-slate-700">{param.label}{param.optional && <span className="text-slate-400 ml-1">(tuỳ chọn)</span>}</span>
                           </label>
@@ -3359,7 +3359,7 @@ setSelectedDomain('');
                             onClick={() => setVal(val === 'true' ? 'false' : 'true')}
                             className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${val === 'true' ? 'bg-emerald-500' : 'bg-slate-300'}`}
                           >
-                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${val === 'true' ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${val === 'true' ? 'translate-x-5' : 'translate-x-0'}`} />
                           </button>
                         )}
                       </div>
@@ -3410,9 +3410,9 @@ setSelectedDomain('');
                       setScheduleSlots([]);
                     }
                   }}
-                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${scheduleSlots.length === 0 ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                  className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${scheduleSlots.length > 0 ? 'bg-emerald-500' : 'bg-slate-300'}`}
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${scheduleSlots.length === 0 ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${scheduleSlots.length > 0 ? 'translate-x-5' : 'translate-x-0'}`} />
                 </button>
               </div>
 
