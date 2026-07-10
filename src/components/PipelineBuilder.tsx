@@ -763,6 +763,7 @@ const DOMAINS: DomainDef[] = [
       { id: 'hse_fall', name: 'Phát hiện người ngã / đột quỵ', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu khu vực / tư thế bình thường', desc: 'Phát hiện người ngã xuống đất đột ngột hoặc bất động bất thường trong khu vực giám sát.', params: [
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'normalPosture', label: 'Tư thế làm việc bình thường (có cúi/ngồi thường xuyên không)', type: 'toggle' },
+        { key: 'targetGroup', label: 'Đối tượng cần giám sát', type: 'select', options: ['Người già', 'Bệnh nhân', 'Nhân viên', 'Bất kỳ'] },
         { key: 'confirmSeconds', label: 'Xác nhận ngã sau khi nằm yên', type: 'number', unit: 'giây', placeholder: '3' },
       ],
         alertParams: [
@@ -821,7 +822,7 @@ const DOMAINS: DomainDef[] = [
 
       { id: 'ret_shelf_empty', name: 'Phát hiện kệ hàng trống', taskMapType: 'retail_analytics', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kệ hàng khi đầy', desc: 'Phát hiện kệ hàng bị trống hoặc thiếu hàng, nhắc nhân viên bổ sung kịp thời.', params: [
         { key: 'refImageFull', label: 'Ảnh kệ hàng khi đầy', type: 'image' },
-        { key: 'inventoryTime', label: 'Giờ kiểm kê đầu ngày', type: 'time' },
+        { key: 'inventoryTime', label: 'Giờ kiểm kê đầu ngày', type: 'time_range' },
         { key: 'allowRearrange', label: 'Hàng có được sắp xếp lại thường xuyên không', type: 'toggle' },
         { key: 'emptyThreshold', label: 'Coi là trống khi', type: 'slider_pct' },
           { key: 'restockMinutes', label: 'Cần bổ sung hàng trong bao lâu', type: 'number', unit: 'phút', placeholder: '15' },
@@ -859,6 +860,7 @@ const DOMAINS: DomainDef[] = [
         { key: 'line', label: 'Vị trí cổng xuất / nhập', type: 'line_hint' },
         { key: 'plannedQty', label: 'Số lượng theo kế hoạch hôm nay', type: 'number', placeholder: '500' },
         { key: 'truckCount', label: 'Hàng đến từ bao nhiêu chuyến xe', type: 'number', optional: true, placeholder: '3' },
+        { key: 'deviationPercent', label: 'Sai lệch bao nhiêu % thì báo', type: 'number', unit: '%', placeholder: '10' },
       ]},
       { id: 'wh_truck', name: 'Nhận diện biển số', taskMapType: 'traffic', desc: 'Tự động đọc và ghi nhận biển số xe tải vào/ra kho, đối chiếu danh sách xe được phép và cảnh báo xe không đăng ký.', params: [
         { key: 'vehicleTypes', label: 'Loại xe cần nhận diện', type: 'multicheck', options: ['Ô tô', 'Xe máy', 'Xe tải', 'Xe buýt'] },
@@ -947,6 +949,7 @@ const DOMAINS: DomainDef[] = [
       { id: 'hc_fall', name: 'Phát hiện người ngã / đột quỵ', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu khu vực / tư thế bình thường', desc: 'Phát hiện bệnh nhân hoặc người cao tuổi ngã xuống đất đột ngột hoặc bất động bất thường trong khu vực giám sát.', params: [
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'normalPosture', label: 'Tư thế bình thường có cúi/ngồi thường xuyên không', type: 'toggle' },
+        { key: 'targetGroup', label: 'Đối tượng cần giám sát', type: 'select', options: ['Người già', 'Bệnh nhân', 'Nhân viên', 'Bất kỳ'] },
         { key: 'confirmSeconds', label: 'Xác nhận ngã sau khi nằm yên', type: 'number', unit: 'giây', placeholder: '3' },
       ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Trung bình', 'Cao', 'Khẩn cấp'] },
