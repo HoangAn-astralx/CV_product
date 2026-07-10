@@ -134,6 +134,12 @@ const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; d
     { id: 'h_fl3', name: 'Bệnh nhân rời giường ngã', description: 'Phát hiện bệnh nhân ngã khỏi giường hoặc bất tỉnh tại chỗ' },
     { id: 'h_fl4', name: 'Đột quỵ tại chỗ làm', description: 'Nhân viên đột ngột ngã hoặc nằm bất động tại văn phòng' },
   ],
+  hc_fall: [
+    { id: 'hc_fl1', name: 'Bệnh nhân ngã trong phòng bệnh', description: 'Cảnh báo khi phát hiện bệnh nhân ngã xuống sàn phòng bệnh' },
+    { id: 'hc_fl2', name: 'Người già ngã tại hành lang', description: 'Phát hiện người cao tuổi ngã tại hành lang bệnh viện' },
+    { id: 'hc_fl3', name: 'Bệnh nhân bất tỉnh', description: 'Cảnh báo khi phát hiện bệnh nhân nằm bất thường gần giường ICU' },
+    { id: 'hc_fl4', name: 'Ngã tại khu vệ sinh', description: 'Phát hiện người nằm bất động tại sàn nhà vệ sinh bệnh viện' },
+  ],
   hse_phone: [
     { id: 'h_ph1', name: 'Dùng điện thoại khi lái xe', description: 'Phát hiện tài xế xe nâng đang sử dụng điện thoại' },
     { id: 'h_ph2', name: 'Dùng điện thoại tại chuyền', description: 'Cảnh báo công nhân bấm điện thoại trong giờ làm việc' },
@@ -417,37 +423,101 @@ const TASK_SMART_SUGGESTIONS: Record<string, Array<{ id: string; name: string; d
     { id: 'bi4', name: 'Ra vào ngoài giờ', description: 'Đếm số lượng người vẫn còn ra vào toà nhà sau 20:00' },
   ],
   bld_public_density: [
-                  ],
+    { id: 'bpd1', name: 'Đo mật độ sảnh chính', description: 'Đo mức độ đông đúc và tụ tập đông người tại sảnh chính toà nhà trong giờ cao điểm' },
+    { id: 'bpd2', name: 'Ùn tắc thang máy', description: 'Phát hiện ùn tắc và đám đông đứng chờ thang máy tầng trệt' },
+    { id: 'bpd3', name: 'Đếm mật độ hành lang', description: 'Đếm số lượng người đi lại tại hành lang tầng lửng và khu vực chờ' },
+    { id: 'bpd4', name: 'Cảnh báo quá tải khu vực', description: 'Cảnh báo khi mật độ người tại sảnh vượt quá sức chứa cho phép' },
+  ],
   hc_restricted: [
-                  ],
-  hc_crowd_restricted: [
-                  ],
+    { id: 'hcr1', name: 'Kho thuốc ngoài giờ', description: 'Xâm nhập vào kho thuốc sau giờ làm việc hành chính' },
+    { id: 'hcr2', name: 'ICU/Khu cách ly', description: 'Cảnh báo người lạ đi vào khu vực cách ly khi không có phận sự' },
+    { id: 'hcr3', name: 'Phòng mổ', description: 'Phát hiện người lạ đột nhập vào phòng mổ khi đang phẫu thuật' },
+    { id: 'hcr4', name: 'Kho vật tư y tế', description: 'Giám sát xâm nhập kho vật tư y tế ngoài giờ làm việc' },
+  ],
+  hc_crowd: [
+    { id: 'hcc1', name: 'Hành lang cấp cứu', description: 'Đếm số lượng người nhà ùn ứ tại hành lang khu cấp cứu' },
+    { id: 'hcc2', name: 'Phòng chờ khám bệnh', description: 'Cảnh báo khi phòng chờ quá tải số lượng bệnh nhân' },
+    { id: 'hcc3', name: 'Sảnh bệnh viện', description: 'Đếm và cảnh báo tụ tập đông người bất thường tại sảnh chính' },
+    { id: 'hcc4', name: 'Khu vực tiêm chủng', description: 'Đếm số lượng mật độ người tại khu vực tiêm chủng để tránh quá tải' },
+  ],
   edu_escape: [
-                  ],
+    { id: 'ees1', name: 'Leo tường trốn học', description: 'Phát hiện học sinh leo rào hoặc leo tường ra khỏi trường trong giờ học' },
+    { id: 'ees2', name: 'Trốn qua cổng sau', description: 'Cảnh báo học sinh trốn ra cổng trường hoặc đi ra khỏi lớp giờ học' },
+    { id: 'ees3', name: 'Rời lớp sớm', description: 'Cảnh báo học sinh xách cặp rời lớp trước giờ tan hoặc trốn khỏi lớp' },
+    { id: 'ees4', name: 'Vượt rào khu vực', description: 'Phát hiện học sinh vượt rào hoặc leo trèo tại các khu vực góc khuất trong trường' },
+  ],
   edu_cheating: [
-                  ],
+    { id: 'ech1', name: 'Sử dụng điện thoại', description: 'Phát hiện học sinh nhìn và bấm điện thoại trong phòng thi' },
+    { id: 'ech2', name: 'Quay cóp sang bên cạnh', description: 'Cảnh báo học sinh quay sang nhìn bài người bên cạnh liên tục trong giờ thi' },
+    { id: 'ech3', name: 'Trao đổi tài liệu', description: 'Phát hiện hành vi trao đổi tài liệu, giấy tờ giữa các thí sinh' },
+    { id: 'ech4', name: 'Mang thiết bị lạ', description: 'Giám sát phát hiện học sinh mang tai nghe, thiết bị thu phát hoặc điện thoại vào phòng thi' },
+  ],
   edu_weapons: [
-                  ],
+    { id: 'ewp1', name: 'Mang dao vào trường', description: 'Phát hiện học sinh mang dao hoặc vật sắc nhọn vào khuôn viên trường' },
+    { id: 'ewp2', name: 'Gậy gộc trong sân', description: 'Cảnh báo ngay khi phát hiện vũ khí, gậy gộc trong sân trường hoặc hành lang' },
+    { id: 'ewp3', name: 'Bình xịt hơi cay', description: 'Phát hiện học sinh mang bình xịt, bình hơi hoặc vật thể lạ nguy hiểm trong cặp' },
+    { id: 'ewp4', name: 'Vũ khí tại cổng trường', description: 'Giám sát phát hiện vũ khí, gậy gộc hoặc vật sắc nhọn khi học sinh vào cổng trường' },
+  ],
   ap_abandoned_baggage: [
-                  ],
+    { id: 'aab1', name: 'Vali vô chủ', description: 'Cảnh báo vali hoặc túi xách để lại quá lâu không có người nhận tại sảnh chờ' },
+    { id: 'aab2', name: 'Bỏ quên hành lý', description: 'Phát hiện hành lý bị bỏ lại không ai trông coi tại khu vực ghế chờ' },
+    { id: 'aab3', name: 'Kiện hàng thất lạc', description: 'Cảnh báo thùng lạ hoặc kiện hàng không ai nhận tại sân bay' },
+    { id: 'aab4', name: 'Đồ vật bỏ quên quá lâu', description: 'Phát hiện túi xách, ba lô không có người nhận trong khu vực soi chiếu' },
+  ],
   ap_restricted: [
-                  ],
+    { id: 'apr1', name: 'Khu vực đường băng', description: 'Phát hiện người lạ xâm nhập hoặc đi vào khu vực đường băng cấm' },
+    { id: 'apr2', name: 'Khu bay đỗ tàu bay', description: 'Cảnh báo người không phận sự đột nhập vào khu vực đỗ máy bay' },
+    { id: 'apr3', name: 'Khu vực soi chiếu an ninh', description: 'Phát hiện đối tượng khả nghi lảng vảng hoặc vào khu vực soi chiếu trái phép' },
+    { id: 'apr4', name: 'Khu vực dịch vụ mặt đất', description: 'Phát hiện xâm nhập trái phép vào khu vực xe tải và thiết bị sân đỗ' },
+  ],
   ap_baggage_carousel: [
-                  ],
+    { id: 'abc1', name: 'Ùn tắc hành lý', description: 'Cảnh báo khi hành lý bị ùn ứ hoặc kẹt băng chuyền gây tắc nghẽn' },
+    { id: 'abc2', name: 'Hành lý chồng đống', description: 'Phát hiện kiện hàng rơi khỏi băng chuyền hoặc chồng đống bất thường' },
+    { id: 'abc3', name: 'Đông người chờ hành lý', description: 'Cảnh báo tụ tập đông người bất thường tại khu vực băng chuyền hành lý' },
+    { id: 'abc4', name: 'Băng tải dừng', description: 'Phát hiện băng chuyền hành lý dừng hoặc ngừng hoạt động bất thường' },
+  ],
   ap_weapon: [
-                  ],
+    { id: 'apw1', name: 'Mang súng', description: 'Cảnh báo phát hiện đối tượng mang súng hoặc vũ khí nguy hiểm tại nhà ga sân bay' },
+    { id: 'apw2', name: 'Mang dao/quẹt lửa', description: 'Phát hiện dao, vật sắc nhọn hoặc vật thể lạ nguy hiểm trong hành lý' },
+    { id: 'apw3', name: 'Đeo tạp dề/áo khoác lạ', description: 'Phát hiện đối tượng mặc áo khoác dày che giấu vũ khí trong người' },
+    { id: 'apw4', name: 'Vũ khí sau soi chiếu', description: 'Cảnh báo hành khách cầm dao hoặc vũ khí sau khi qua khu vực soi chiếu' },
+  ],
   ap_safety_line: [
-                  ],
+    { id: 'aps1', name: 'Lấn vạch vàng ga tàu', description: 'Phát hiện hành khách vượt vạch hoặc lấn vạch khi tàu đến ga' },
+    { id: 'aps2', name: 'Vượt vạch an toàn', description: 'Cảnh báo người đứng quá gần hoặc vượt quá vạch an toàn tại sân ga' },
+    { id: 'aps3', name: 'Trèo qua barie', description: 'Phát hiện hành khách leo trèo barie hoặc vượt rào vào khu vực tàu' },
+    { id: 'aps4', name: 'Cản trở lối thoát hiểm', description: 'Cảnh báo hành lý hoặc vật dụng chắn lối thoát hiểm tại sân ga' },
+  ],
   bld_restricted: [
-                  ],
+    { id: 'blr1', name: 'Phòng server', description: 'Cảnh báo người lạ xâm nhập hoặc đột nhập vào phòng server ngoài giờ' },
+    { id: 'blr2', name: 'Khu vực tầng hầm', description: 'Phát hiện đối tượng khả nghi đi vào hoặc lảng vảng khu vực tầng hầm để xe' },
+    { id: 'blr3', name: 'Phòng kỹ thuật', description: 'Cảnh báo cửa phòng kỹ thuật bị mở hoặc người lạ lẻn vào trái phép' },
+    { id: 'blr4', name: 'Kho tài sản', description: 'Phát hiện xâm nhập khu vực kho tài sản của tòa nhà ngoài giờ hành chính' },
+  ],
   edu_recess: [
-                  ],
+    { id: 'ers1', name: 'Học sinh tụ tập đánh nhau', description: 'Phát hiện học sinh tụ tập đông người và xô xát tại góc khuất sân trường' },
+    { id: 'ers2', name: 'Bạo lực học đường', description: 'Cảnh báo hành vi đánh nhau, ẩu đả hoặc bạo lực giữa học sinh tại hành lang' },
+    { id: 'ers3', name: 'Tụ tập góc khuất', description: 'Giám sát phát hiện học sinh túm tụm tại các góc khuất sau nhà vệ sinh' },
+    { id: 'ers4', name: 'Đám đông bất thường', description: 'Cảnh báo khi có đám đông học sinh tụ tập ùn tắc tại sân trường hoặc căng tin' },
+  ],
   ap_queue: [
-                  ],
+    { id: 'aqs1', name: 'Xếp hàng check-in dài', description: 'Cảnh báo khi hàng đợi check-in dài bất thường tại sảnh chờ sân bay' },
+    { id: 'aqs2', name: 'Quá tải soi chiếu', description: 'Phát hiện hàng đợi dài và ùn ứ tại khu vực soi chiếu an ninh' },
+    { id: 'aqs3', name: 'Chờ quá lâu tại quầy', description: 'Đếm số lượng hành khách đang đứng chờ tại quầy check-in quá lâu' },
+    { id: 'aqs4', name: 'Cửa ra tàu dồn ứ', description: 'Cảnh báo khi hành khách đứng chờ dồn ứ tại cửa ra tàu trước giờ bay' },
+  ],
   traffic: [
-                          ],
+    { id: 'trf1', name: 'Đếm xe ra vào', description: 'Đếm số lượng ô tô và xe máy đi qua cổng ra vào công ty theo ngày' },
+    { id: 'trf2', name: 'Đọc biển số', description: 'Nhận diện biển số ô tô và xe tải ra vào cổng chính để chấm công' },
+    { id: 'trf3', name: 'Lưu lượng giao thông', description: 'Thống kê số lượng xe ô tô và xe máy đi qua vạch đếm mỗi giờ' },
+    { id: 'trf4', name: 'Phân luồng xe', description: 'Đếm và phân loại xe máy, ô tô, xe tải đi qua ngã tư' },
+  ],
   behavior: [
-                      ],
+    { id: 'beh1', name: 'Đánh nhau', description: 'Phát hiện hành vi đánh nhau, xô xát hoặc ẩu đả trong khuôn viên' },
+    { id: 'beh2', name: 'Tụ tập đông người', description: 'Cảnh báo khi phát hiện đám đông tụ tập bất thường tại sảnh toà nhà' },
+    { id: 'beh3', name: 'Bạo lực trấn lột', description: 'Phát hiện hành vi bạo lực, dồn ép hoặc trấn lột tài sản tại bãi xe' },
+    { id: 'beh4', name: 'Hỗn chiến', description: 'Cảnh báo phát hiện hỗn chiến hoặc bao vây giữa các nhóm tại khu vực công cộng' },
+  ],
   retail_analytics: [
     { id: 'r1', name: 'Heatmap lưu lượng', description: 'Phân tích vị trí khách đi lại nhiều nhất trong cửa hàng' },
     { id: 'r2', name: 'Thời gian dừng chân tại kệ', description: 'Đo thời gian trung bình khách hàng dừng lại và tương tác tại từng khu kệ hàng' },
@@ -2582,10 +2652,10 @@ setSelectedDomain('');
                       <span className="text-xs font-bold text-slate-700">{selectedUseCaseDef?.name || 'Chưa chọn bài toán'}</span>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => setInputMode('standard')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold transition-all cursor-pointer ${inputMode === 'standard' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}>
+                      <button onClick={() => { setInputMode('standard'); setUserDescription(''); }} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold transition-all cursor-pointer ${inputMode === 'standard' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}>
                         <FileText size={14} /> Tiêu chuẩn
                       </button>
-                      <button onClick={() => setInputMode('smart')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold transition-all cursor-pointer ${inputMode === 'smart' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}>
+                      <button onClick={() => { setInputMode('smart'); setUseCaseParamValues({}); }} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold transition-all cursor-pointer ${inputMode === 'smart' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200'}`}>
                         <Sparkles size={14} /> Thông minh
                       </button>
                     </div>
@@ -2706,15 +2776,16 @@ setSelectedDomain('');
                       );
 
                       if (param.type === 'time_range') {
+                        const norm = (t: string) => /^\d{1,2}$/.test(t.trim()) ? t.trim().padStart(2, '0') + ':00' : /^(\d{1,2}):(\d{0,2})$/.test(t.trim()) ? t.trim().replace(/^(\d{1,2}):(\d{0,2})$/, (_, h, m) => `${h.padStart(2, '0')}:${m.padEnd(2, '0')}`) : t.trim();
                         const startVal = String(val || '').split('–')[0] || '';
                         const endVal = String(val || '').split('–')[1] || '';
                         return (
                           <div key={param.key}>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
                             <div className="flex items-center gap-2">
-                              <input type="text" placeholder="08:00" value={startVal} onChange={e => setVal(`${e.target.value}–${endVal}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono text-center tracking-widest" maxLength={5} />
+                              <input type="text" placeholder="08:00" value={startVal} onChange={e => setVal(`${e.target.value}–${endVal}`)} onBlur={e => setVal(`${norm(e.target.value)}–${endVal}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono text-center tracking-widest" maxLength={5} />
                               <span className="text-xs text-slate-400">đến</span>
-                              <input type="text" placeholder="17:00" value={endVal} onChange={e => setVal(`${startVal}–${e.target.value}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono text-center tracking-widest" maxLength={5} />
+                              <input type="text" placeholder="17:00" value={endVal} onChange={e => setVal(`${startVal}–${e.target.value}`)} onBlur={e => setVal(`${startVal}–${norm(e.target.value)}`)} className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono text-center tracking-widest" maxLength={5} />
                             </div>
                             <p className="text-[9px] text-slate-400 mt-1.5">Định dạng 24h (Ví dụ: 08:30 đến 17:00)</p>
                           </div>
@@ -2871,11 +2942,11 @@ setSelectedDomain('');
                                 className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-amber-400">
                                 {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
                               </select>
-                              <input type="text" value={draft.from} onChange={e => setDraft({ from: e.target.value })}
+                              <input type="text" value={draft.from} onChange={e => setDraft({ from: e.target.value })} onBlur={e => { const v = e.target.value; setDraft({ from: /^\d{1,2}$/.test(v.trim()) ? v.trim().padStart(2, '0') + ':00' : /^(\d{1,2}):(\d{0,2})$/.test(v.trim()) ? v.trim().replace(/^(\d{1,2}):(\d{0,2})$/, (_, h, m) => `${h.padStart(2, '0')}:${m.padEnd(2, '0')}`) : v.trim() }); }}
                                 placeholder="08:00" maxLength={5}
                                 className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-mono text-center focus:outline-none focus:border-amber-400" />
                               <span className="text-xs text-slate-400">→</span>
-                              <input type="text" value={draft.to} onChange={e => setDraft({ to: e.target.value })}
+                              <input type="text" value={draft.to} onChange={e => setDraft({ to: e.target.value })} onBlur={e => { const v = e.target.value; setDraft({ to: /^\d{1,2}$/.test(v.trim()) ? v.trim().padStart(2, '0') + ':00' : /^(\d{1,2}):(\d{0,2})$/.test(v.trim()) ? v.trim().replace(/^(\d{1,2}):(\d{0,2})$/, (_, h, m) => `${h.padStart(2, '0')}:${m.padEnd(2, '0')}`) : v.trim() }); }}
                                 placeholder="09:00" maxLength={5}
                                 className="w-16 bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-mono text-center focus:outline-none focus:border-amber-400" />
                               <button type="button" onClick={addSlot}
@@ -2945,7 +3016,7 @@ setSelectedDomain('');
                       if (param.type === 'time') return (
                         <div key={param.key}>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
-                          <input type="text" value={val} onChange={e => setVal(e.target.value)} placeholder="08:00" maxLength={5}
+                          <input type="text" value={val} onChange={e => setVal(e.target.value)} onBlur={e => { const v = e.target.value; setVal(/^\d{1,2}$/.test(v.trim()) ? v.trim().padStart(2, '0') + ':00' : /^(\d{1,2}):(\d{0,2})$/.test(v.trim()) ? v.trim().replace(/^(\d{1,2}):(\d{0,2})$/, (_, h, m) => `${h.padStart(2, '0')}:${m.padEnd(2, '0')}`) : v.trim()); }} placeholder="08:00" maxLength={5}
                             className="w-32 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500 font-mono text-center tracking-widest" />
                           <p className="text-[9px] text-slate-400 mt-1">Định dạng 24h (VD: 07:30)</p>
                         </div>
@@ -3754,31 +3825,6 @@ setSelectedDomain('');
           const isMultiCam = selectedCameraIds.length > 1;
           const hasZones = pvZones.length > 0;
 
-          // ── Problem statement generator ──────────────────────────────────
-          const generateProblemStatement = (): string => {
-            const scheduleDesc = scheduleSlots.length === 0 ? '24/7' : formatScheduleSlots(scheduleSlots);
-            const pvZonesHere = multiZones[pvCamId] || [];
-            const monitorZones = pvZonesHere.filter(z => (z.role ?? 'monitor') === 'monitor');
-            const excludeZones = pvZonesHere.filter(z => z.role === 'exclude');
-            const zoneDesc = pvZonesHere.length > 0
-              ? `tại ${monitorZones.length > 0 ? `${monitorZones.length} vùng giám sát (${monitorZones.map(z => z.name).join(', ')})` : 'toàn bộ khung hình'}` +
-                (excludeZones.length > 0 ? `, bỏ qua ${excludeZones.length} vùng ngoại lệ (${excludeZones.map(z => z.name).join(', ')})` : '')
-              : 'toàn bộ khung hình';
-
-            if (selectedUseCaseDef) {
-              const baseDesc = userDescription.trim() || selectedUseCaseDef.name || 'giám sát theo nghiệp vụ';
-              return `AI thực hiện ${baseDesc} ${zoneDesc}. Hệ thống chạy ${scheduleDesc}, xác nhận sự kiện sau ${alertDuration}s và nghỉ ${cooldown}s giữa các cảnh báo liên tiếp.`;
-            }
-
-            if (taskType.startsWith('defect_')) {
-              const methods = [enableSSIM && 'kiểm tra bề mặt (MS-SSIM + FSIM)', enableCNN && 'đặc trưng ngữ nghĩa (DINOv2)', enableOCR && 'đọc nhãn mác (PaddleOCR)'].filter(Boolean).join(', ');
-              return `AI so sánh sản phẩm thực tế với ${goldenSamples.length > 0 ? `${goldenSamples.length} ảnh mẫu chuẩn` : 'ảnh mẫu (chưa upload)'} sử dụng ${methods || 'kiểm tra bề mặt mặc định'}. Mỗi sản phẩm được phân tích tại ${inferenceFps} FPS và nhận phán quyết OK/NG theo ngưỡng đã cấu hình.`;
-            }
-
-            const baseDesc = userDescription.trim() || 'giám sát theo yêu cầu người dùng';
-            return `AI sẽ ${baseDesc} ${zoneDesc}. Hệ thống chạy ${scheduleDesc}, xác nhận sự kiện sau ${alertDuration}s và nghỉ ${cooldown}s giữa các cảnh báo liên tiếp.`;
-          };
-
           // Resolve input mode for display
           const displayMode = inputMode === 'smart' ? 'Thông minh' : 'Tiêu chuẩn';
 
@@ -4022,14 +4068,6 @@ setSelectedDomain('');
                         </div>
                       )}
 
-                      {/* Description */}
-                      {userDescription && (
-                        <div className="flex items-start gap-3">
-                          <span className="text-[11px] text-slate-400 w-24 flex-shrink-0 pt-px">Mô tả</span>
-                          <span className="text-[11px] font-semibold text-slate-800 line-clamp-2">{userDescription}</span>
-                        </div>
-                      )}
-
                       {/* Defect: samples + features */}
                       {taskType.startsWith('defect_') && (
                         <>
@@ -4050,23 +4088,63 @@ setSelectedDomain('');
                         </>
                       )}
 
-                      {/* Alert thresholds */}
+                      {/* Alert thresholds – mode-specific */}
                       <div className="pt-2.5 border-t border-slate-100">
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-2">Ngưỡng cảnh báo</p>
                         <div className="flex gap-5 flex-wrap">
-                          <div>
-                            <p className="text-[9px] text-slate-400">Tiếp diễn tối thiểu</p>
-                            <p className="text-xs font-bold text-slate-700">{alertDuration}s</p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-slate-400">Tạm ngưng sau báo</p>
-                            <p className="text-xs font-bold text-slate-700">{cooldown}s</p>
-                          </div>
-                          {!taskType.startsWith('defect_') && maxLimit > 0 && (
-                            <div>
-                              <p className="text-[9px] text-slate-400">Giới hạn số lượng</p>
-                              <p className="text-xs font-bold text-slate-700">&gt; {maxLimit}</p>
-                            </div>
+                          {inputMode === 'smart' ? (
+                            <>
+                              <div>
+                                <p className="text-[9px] text-slate-400">Thời gian xác nhận cảnh báo</p>
+                                <p className="text-xs font-bold text-slate-700">{alertDuration}s</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-slate-400">Tạm ngưng sau báo</p>
+                                <p className="text-xs font-bold text-slate-700">{cooldown}s</p>
+                              </div>
+                              {alertCount > 0 && (
+                                <div>
+                                  <p className="text-[9px] text-slate-400">Ngưỡng số lượng</p>
+                                  <p className="text-xs font-bold text-slate-700">&ge; {alertCount}</p>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            selectedUseCaseDef && (() => {
+                              const allParams = [...(selectedUseCaseDef.params || []), ...(selectedUseCaseDef.alertParams || [])];
+                              const shownKeys = new Set<string>();
+                              return allParams
+                                .filter(p => {
+                                  const val = useCaseParamValues[p.key];
+                                  if (!val || val === '') return false;
+                                  if (shownKeys.has(p.key)) return false;
+                                  shownKeys.add(p.key);
+                                  return true;
+                                })
+                                .map(p => {
+                                  let displayValue = useCaseParamValues[p.key];
+                                  if (p.type === 'weekly_schedule') {
+                                    try {
+                                      const slots = JSON.parse(displayValue || '[]') as { day: string; from: string; to: string }[];
+                                      displayValue = slots.map(s => {
+                                        const fmt = (t: string) => t.includes(':') ? t : `${t.padStart(2, '0')}:00`;
+                                        return `${s.day}: ${fmt(s.from)}–${fmt(s.to)}`;
+                                      }).join(';  ');
+                                    } catch { displayValue = ''; }
+                                  } else if (p.type === 'multicheck') {
+                                    displayValue = (displayValue || '').replace(/\|/g, ', ');
+                                  }
+                                  return (
+                                    <div key={p.key}>
+                                      <p className="text-[9px] text-slate-400">{p.label}</p>
+                                      <p className="text-xs font-bold text-slate-700">
+                                        {displayValue}
+                                        {p.unit && <span className="text-slate-400 font-normal ml-0.5">{p.unit}</span>}
+                                      </p>
+                                    </div>
+                                  );
+                                });
+                            })()
                           )}
                         </div>
                       </div>
@@ -4104,17 +4182,6 @@ setSelectedDomain('');
                       </div>
                     </div>
                   )}
-
-                  {/* ── Problem Statement Card ── */}
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                    <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
-                      <FileText size={12} className="text-slate-400" />
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Phát biểu bài toán</span>
-                    </div>
-                    <div className="p-4">
-                      <p className="text-xs text-slate-300 leading-relaxed">{generateProblemStatement()}</p>
-                    </div>
-                  </div>
 
                   <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex items-start gap-2.5">
                     <Check size={16} className="text-emerald-600 mt-0.5 flex-shrink-0" />
