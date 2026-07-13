@@ -1884,7 +1884,7 @@ setSelectedDomain('');
   };
 
   const applyTemplate = (tpl: any) => {
-    handleDescriptionChange(tpl.description || '');
+    setUserDescription(tpl.description || '');
   };
 
   const hydratePipelineForEdit = (pipe: Pipeline) => {
