@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Camera, Pipeline, AlertEvent, LogEntry, AlertRule } from './types';
 import { INITIAL_CAMERAS, INITIAL_PIPELINES, INITIAL_ALERTS, INITIAL_LOGS, INITIAL_RULES } from './mockData';
+import { fetchCameras, fetchPipelines, fetchEvents, startPipeline, stopPipeline } from './api';
 import LiveMonitor from './components/LiveMonitor';
 import PipelineBuilder from './components/PipelineBuilder';
 import Playback from './components/Playback';
@@ -74,7 +75,7 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === 10) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
     localStorage.removeItem('visionos_cameras');
@@ -131,6 +132,52 @@ export default function App() {
     document.addEventListener('fullscreenchange', onFSChange);
     return () => document.removeEventListener('fullscreenchange', onFSChange);
   }, []);
+
+  // ── Sync từ backend API ──────────────────────────────────────────────────
+  useEffect(() => {
+    // Load cameras từ API, API cameras xuất hiện đầu list (override mock trùng id)
+    fetchCameras().then(apiCams => {
+      setCameras(prev => {
+        const apiIds = new Set(apiCams.map(c => c.id));
+        const merged: Camera[] = [
+          ...apiCams,
+          ...prev.filter(c => !apiIds.has(c.id)),
+        ];
+        return merged;
+      });
+    }).catch(() => { /* backend chưa sẵn sàng, dùng mock */ });
+
+    // Load pipelines từ API
+    fetchPipelines().then(apiPipes => {
+      setPipelines(prev => {
+        const apiIds = new Set(apiPipes.map(p => p.id));
+        const merged: Pipeline[] = [
+          ...apiPipes,
+          ...prev.filter(p => !apiIds.has(p.id)),
+        ];
+        return merged;
+      });
+    }).catch(() => {});
+  }, []);
+
+  // Poll events/alerts từ API mỗi 5 giây
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const apiEvents = await fetchEvents(20);
+        setAlerts(prev => {
+          const existingIds = new Set(prev.map(a => a.id));
+          const newOnes = apiEvents.filter(e => !existingIds.has(e.id));
+          if (newOnes.length === 0) return prev;
+          return [...newOnes, ...prev];
+        });
+      } catch { /* ignore if offline */ }
+    };
+    poll();
+    const timer = setInterval(poll, 5000);
+    return () => clearInterval(timer);
+  }, []);
+  // ────────────────────────────────────────────────────────────────────────
 
   const toggleFullscreen = () => {
     const el = document.getElementById('monitor-grid-container');
@@ -216,7 +263,27 @@ export default function App() {
     }
   };
 
-  const togglePipeline = (pipelineId: string) => {
+  const IS_BACKEND_UUID = (id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  const togglePipeline = async (pipelineId: string) => {
+    const pipeline = pipelines.find(p => p.id === pipelineId);
+    if (!pipeline) return;
+
+    // Gọi API backend trước cho pipeline UUID thật
+    if (IS_BACKEND_UUID(pipelineId)) {
+      try {
+        if (pipeline.isActive) {
+          await stopPipeline(pipelineId);
+        } else {
+          await startPipeline(pipelineId);
+        }
+      } catch (e) {
+        console.error('[togglePipeline] API error:', e);
+        // Vẫn update local state để UI không bị kẹt
+      }
+    }
+
     setPipelines(prev =>
       prev.map(p => {
         if (p.id === pipelineId) {
@@ -644,7 +711,7 @@ export default function App() {
 
               {gridLayout === '1x1' ? (
                 <div className="flex-1 flex flex-col min-h-0 bg-slate-100">
-                  <div className="p-2 border-b border-slate-200 flex-shrink-0 bg-white">
+                  <div className="p-2 border-b border-slate-200 flex-shrink-0 bg-white sticky top-0 z-10">
                     <button
                       onClick={backToCameraGrid}
                       className="px-3 py-1.5 text-xs font-medium rounded bg-slate-800 border border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
@@ -653,6 +720,7 @@ export default function App() {
                       Quay lại lưới
                     </button>
                   </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
                   <LiveMonitor
                     camera={activeCamera}
                     pipelines={pipelines}
@@ -674,6 +742,7 @@ export default function App() {
                     onDeleteCamera={handleDeleteCamera}
                     onTogglePipeline={togglePipeline}
                   />
+                  </div>
                 </div>
               ) : (
                 <div

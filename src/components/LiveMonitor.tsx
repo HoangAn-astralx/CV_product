@@ -1,4 +1,5 @@
-import React, { useState, Dispatch, SetStateAction } from 'react';
+import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import { getLatestFrame, getLatestDetection, TrackBox } from '../api';
 import { Camera, Pipeline, AlertEvent, LogEntry } from '../types';
 import { Play, Pause, MoreVertical, Edit2, Trash2, AlertTriangle, Sparkles, Activity, CheckCircle, Wifi, Monitor, Usb, Camera as CameraIcon, ZoomIn, ZoomOut, Move, RotateCcw, Maximize, Maximize2, Minimize } from 'lucide-react';
 
@@ -107,6 +108,38 @@ export default function LiveMonitor({
   };
 
   const activePipelines = pipelines.filter(p => p.cameraId === camera.id && p.isActive);
+
+  // Poll frame thật + detection thật từ API mỗi 2 giây
+  const [liveFrameUrl, setLiveFrameUrl] = useState<string | null>(null);
+  const [liveDetections, setLiveDetections] = useState<TrackBox[] | null>(null);
+
+  useEffect(() => {
+    if (activePipelines.length === 0) {
+      setLiveFrameUrl(null);
+      setLiveDetections(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      for (const pl of activePipelines) {
+        const [url, det] = await Promise.all([
+          getLatestFrame(pl.id),
+          getLatestDetection(pl.id),
+        ]);
+        if (url) {
+          if (!cancelled) {
+            setLiveFrameUrl(url);
+            setLiveDetections(det ? det.tracks : []);
+          }
+          return;
+        }
+      }
+    };
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => { cancelled = true; clearInterval(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePipelines.map(p => p.id).join(',')]);
   const cameraAlerts = alerts.filter(a => a.cameraName === camera.name);
   const unreadAlertsCount = cameraAlerts.filter(a => a.status === 'new').length;
 
@@ -135,12 +168,23 @@ export default function LiveMonitor({
   };
 
   const renderBackground = () => {
+    // Nếu có frame thật từ backend → hiển thị ảnh thay vì mock
+    if (liveFrameUrl) {
+      return (
+        <img
+          src={liveFrameUrl}
+          alt="Live frame"
+          className="absolute inset-0 w-full h-full object-cover select-none"
+          draggable={false}
+        />
+      );
+    }
     switch (camera.type) {
       case 'retail':
         return (
           <div
             className="absolute inset-0 overflow-hidden select-none bg-cover bg-center"
-            style={{ backgroundImage: "linear-gradient(rgba(248, 250, 252, 0.85), rgba(248, 250, 252, 0.85)), url('https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?q=80&w=1200&auto=format&fit=crop')" }}
+            style={{ background: "rgb(248, 250, 252)" }}
           >
             <div className="absolute top-[5%] left-[5%] w-[25%] h-[25%] bg-slate-200/80 border border-slate-300 rounded-md flex flex-col justify-center items-center text-xs text-slate-500 font-medium z-20">
               <span>Kệ Hàng A</span>
@@ -159,7 +203,7 @@ export default function LiveMonitor({
         return (
           <div
             className="absolute inset-0 overflow-hidden select-none bg-cover bg-center"
-            style={{ backgroundImage: "linear-gradient(rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.85)), url('https://images.unsplash.com/photo-1586528116311-ad8ed745140c?q=80&w=1200&auto=format&fit=crop')" }}
+            style={{ background: "rgb(241, 245, 249)" }}
           >
             <div className="absolute top-[8%] left-[5%] w-[25%] h-[20%] bg-amber-50 border border-amber-200 rounded-md p-1 text-[11px] text-amber-700 font-medium flex flex-col justify-center items-center">
               <span>Kệ hàng #01</span>
@@ -182,7 +226,7 @@ export default function LiveMonitor({
         return (
           <div
             className="absolute inset-0 overflow-hidden select-none bg-cover bg-center"
-            style={{ backgroundImage: "linear-gradient(rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.85)), url('https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?q=80&w=1200&auto=format&fit=crop')" }}
+            style={{ background: "rgb(241, 245, 249)" }}
           >
             <div className="absolute top-[5%] left-[5%] h-[20%] w-[15%] border border-slate-300 bg-slate-100 flex items-center justify-center text-[10px] text-slate-400 z-20 rounded-md">P1</div>
             <div className="absolute top-[40%] left-[5%] h-[20%] w-[15%] border border-emerald-300 bg-emerald-50 text-emerald-600 flex items-center justify-center text-[10px] font-bold z-20 rounded-md">Đã đỗ</div>
@@ -193,7 +237,7 @@ export default function LiveMonitor({
         return (
           <div
             className="absolute inset-0 overflow-hidden flex flex-col justify-center p-4 select-none bg-cover bg-center"
-            style={{ backgroundImage: "linear-gradient(rgba(241, 245, 249, 0.85), rgba(241, 245, 249, 0.85)), url('https://images.unsplash.com/photo-1587293852726-6947eb45b4e9?q=80&w=1200&auto=format&fit=crop')" }}
+            style={{ background: "rgb(241, 245, 249)" }}
           >
             <div className="h-[30%] w-full bg-slate-300 border-y-4 border-slate-400 shadow-inner relative flex items-center">
               <div className="absolute inset-0 flex justify-around pointer-events-none opacity-20">
@@ -462,13 +506,13 @@ export default function LiveMonitor({
                     )}
                     {zone.type === 'zone' && zone.points.length >= 3 && (
                       <>
-                        <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
                           <polygon
-                            points={zone.points.map(p => `${p.x}% ${p.y}%`).join(' ')}
+                            points={zone.points.map(p => `${p.x},${p.y}`).join(' ')}
                             fill="rgba(245, 158, 11, 0.08)"
                             stroke="#f59e0b"
-                            strokeWidth="2"
-                            strokeDasharray="6 3"
+                            strokeWidth="0.5"
+                            strokeDasharray="2 1"
                           />
                         </svg>
                         <span
@@ -486,31 +530,39 @@ export default function LiveMonitor({
                   </div>
                 ))}
 
-                {/* Detection bounding boxes */}
-                {(() => {
-                  const detections = getDetections(camera.id, camera.type);
-                  return detections.map((d, i) => (
+                {/* Detection bounding boxes — thật từ YOLO/backend */}
+                {liveDetections && liveDetections.map((d, i) => {
+                  const [x1, y1, x2, y2] = d.bbox_pct;
+                  const COLOR: Record<string, string> = {
+                    person: '#10b981', car: '#f59e0b', motorcycle: '#8b5cf6',
+                    truck: '#ef4444', bus: '#3b82f6', bicycle: '#06b6d4',
+                  };
+                  const LABEL: Record<string, string> = {
+                    person: 'Người', car: 'Ô tô', motorcycle: 'Xe máy',
+                    truck: 'Xe tải', bus: 'Xe buýt', bicycle: 'Xe đạp',
+                  };
+                  const color = COLOR[d.class_name] ?? '#94a3b8';
+                  const label = LABEL[d.class_name] ?? d.class_name;
+                  return (
                     <div
-                      key={i}
+                      key={`${d.track_id}-${i}`}
                       className="absolute border-2 rounded-sm"
                       style={{
-                        left: `${d.x}%`,
-                        top: `${d.y}%`,
-                        width: `${d.width}%`,
-                        height: `${d.height}%`,
-                        borderColor: d.color,
-                        background: `${d.color}15`,
+                        left: `${x1}%`, top: `${y1}%`,
+                        width: `${x2 - x1}%`, height: `${y2 - y1}%`,
+                        borderColor: color,
+                        background: `${color}18`,
                       }}
                     >
                       <span
                         className="absolute -top-4 left-0 text-[9px] font-bold px-1 py-0.5 rounded whitespace-nowrap"
-                        style={{ background: d.color, color: '#fff' }}
+                        style={{ background: color, color: '#fff' }}
                       >
-                        {d.label} {Math.round(d.confidence * 100)}%
+                        {label} #{d.track_id} {Math.round(d.confidence * 100)}%
                       </span>
                     </div>
-                  ));
-                })()}
+                  );
+                })}
               </div>
             )}
             </div>
@@ -721,7 +773,7 @@ export default function LiveMonitor({
 
       {/* Alerts Panel (non-compact) */}
       {!isCompact && (
-        <div className="lg:col-span-4 bg-white border border-slate-100 rounded-2xl overflow-hidden flex flex-col">
+        <div className="lg:col-span-4 bg-white border border-slate-100 rounded-2xl overflow-hidden flex flex-col min-h-0 max-h-[500px] lg:max-h-none">
           <div className="bg-slate-900 px-4 py-3 text-white flex items-center justify-between">
             <div className="flex items-center gap-2">
               <AlertTriangle size={14} className="text-amber-400" />
