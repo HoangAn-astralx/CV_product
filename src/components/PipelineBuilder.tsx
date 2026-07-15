@@ -767,7 +767,7 @@ const DOMAINS: DomainDef[] = [
       { id: 'hse_fall', name: 'Phát hiện người ngã / đột quỵ', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu khu vực / tư thế bình thường', desc: 'Phát hiện người ngã xuống đất đột ngột hoặc bất động bất thường trong khu vực giám sát.', params: [
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'normalPosture', label: 'Tư thế làm việc bình thường (có cúi/ngồi thường xuyên không)', type: 'toggle' },
-        { key: 'targetGroup', label: 'Đối tượng cần giám sát', type: 'select', options: ['Người già', 'Bệnh nhân', 'Nhân viên', 'Tất cả'] },
+        { key: 'target', label: 'Đối tượng cần giám sát', type: 'multicheck', options: ['Người già', 'Bệnh nhân', 'Nhân viên', 'Tất cả'] },
         { key: 'confirmSeconds', label: 'Xác nhận ngã sau khi nằm yên', type: 'number', unit: 'giây', placeholder: '3' },
       ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Trung bình', 'Cao', 'Khẩn cấp'] },
@@ -824,8 +824,8 @@ const DOMAINS: DomainDef[] = [
       ], alertParams: []},
       { id: 'ret_staff_absence', name: 'Rời khỏi vị trí', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu nhận diện đối tượng (đồng phục, thẻ, khuôn mặt)', desc: 'Phát hiện nhân viên, học sinh hoặc khách rời khỏi vị trí quy định quá thời gian cho phép mà không có phép.', params: [
         { key: 'monitorTarget', label: 'Đối tượng giám sát', type: 'multicheck', options: ['Nhân viên', 'Học sinh', 'Khách'] },
-        { key: 'recognition', label: 'Cách nhận diện', type: 'multicheck', options: ['Đồng phục', 'Thẻ', 'Hình ảnh'] },
         { key: 'zone', label: 'Vùng cần giám sát', type: 'zone_hint' },
+        { key: 'confirmMinutes', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'phút', placeholder: '5' },
         { key: 'exceptionSchedule', label: 'Thời gian ngoại lệ (không cảnh báo)', type: 'weekly_schedule', optional: true },
       ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
@@ -875,8 +875,8 @@ const DOMAINS: DomainDef[] = [
       ]},
       { id: 'bld_reception', name: 'Rời khỏi vị trí', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu nhận diện đối tượng (đồng phục, thẻ, khuôn mặt)', desc: 'Phát hiện nhân viên, học sinh hoặc khách rời khỏi vị trí quy định quá thời gian cho phép mà không có phép.', params: [
         { key: 'monitorTarget', label: 'Đối tượng giám sát', type: 'multicheck', options: ['Nhân viên', 'Học sinh', 'Khách'] },
-        { key: 'recognition', label: 'Cách nhận diện', type: 'multicheck', options: ['Đồng phục', 'Thẻ', 'Hình ảnh'] },
         { key: 'zone', label: 'Vùng cần giám sát', type: 'zone_hint' },
+        { key: 'confirmMinutes', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'phút', placeholder: '5' },
         { key: 'exceptionSchedule', label: 'Thời gian ngoại lệ (không cảnh báo)', type: 'weekly_schedule', optional: true },
       ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
@@ -900,9 +900,10 @@ const DOMAINS: DomainDef[] = [
         { key: 'minDuration', label: 'Thời gian tụ tập tối thiểu', type: 'number', unit: 'giây', placeholder: '10' },
       ]},
       { id: 'hc_fall', name: 'Phát hiện người ngã / đột quỵ', taskMapType: 'behavior', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu khu vực / tư thế bình thường', desc: 'Phát hiện bệnh nhân hoặc người cao tuổi ngã xuống đất đột ngột hoặc bất động bất thường trong khu vực giám sát.', params: [
+        { key: 'target', label: 'Đối tượng giám sát', type: 'multicheck', options: ['Tất cả', 'Bệnh nhân', 'Người cao tuổi', 'Nhân viên y tế', 'Khách'] },
         { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
         { key: 'normalPosture', label: 'Tư thế bình thường có cúi/ngồi thường xuyên không', type: 'toggle' },
-        { key: 'confirmSeconds', label: 'Xác nhận ngã sau khi nằm yên', type: 'number', unit: 'giây', placeholder: '3' },
+        { key: 'confirmFrames', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'frame', placeholder: '3' },
       ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Trung bình', 'Cao', 'Khẩn cấp'] },
       ]},
@@ -913,8 +914,8 @@ const DOMAINS: DomainDef[] = [
     useCases: [
       { id: 'edu_leave', name: 'Rời khỏi vị trí', taskMapType: 'security', needsImage: true, multipleImages: true, imageLabel: 'Ảnh tham chiếu nhận diện đối tượng (đồng phục, thẻ, khuôn mặt)', desc: 'Phát hiện nhân viên, học sinh hoặc khách rời khỏi vị trí quy định quá thời gian cho phép mà không có phép.', params: [
         { key: 'monitorTarget', label: 'Đối tượng giám sát', type: 'multicheck', options: ['Nhân viên', 'Học sinh', 'Khách'] },
-        { key: 'recognition', label: 'Cách nhận diện', type: 'multicheck', options: ['Đồng phục', 'Thẻ', 'Hình ảnh'] },
         { key: 'zone', label: 'Vùng cần giám sát', type: 'zone_hint' },
+        { key: 'confirmMinutes', label: 'Thời gian xác nhận cảnh báo', type: 'number', unit: 'phút', placeholder: '5' },
         { key: 'exceptionSchedule', label: 'Thời gian ngoại lệ (không cảnh báo)', type: 'weekly_schedule', optional: true },
       ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
@@ -3092,6 +3093,7 @@ setSelectedDomain('');
 
                     const DESC_FIRST_UCS = new Set(['sec_assetloss', 'sec_crowd', 'sec_camera_tamper', 'sec_door_abnormal', 'tra_parking']);
                     const descFirst = DESC_FIRST_UCS.has(uc.id);
+                    const isWeaponUC = uc.id === 'edu_weapons' || uc.id === 'ap_weapon';
 
                     return (
                       <div className={`bg-white border-2 ${c.border} rounded-2xl p-5 shadow-sm space-y-4`}>
@@ -3102,8 +3104,8 @@ setSelectedDomain('');
                         </div>
 
                         {/* ── Prompt first for fir_smoking, fir_exit, ret_counting, ret_shelf, ret_shelf_empty, wh_counting, bld_smoking, hc_crowd, edu_violence ── */}
-                        {(uc.id === 'fir_smoking' || uc.id === 'fir_exit' || uc.id === 'ret_counting' || uc.id === 'ret_shelf' || uc.id === 'ret_shelf_empty' || uc.id === 'wh_counting' || uc.id === 'bld_smoking' || uc.id === 'hc_crowd' || uc.id === 'edu_violence' || uc.id === 'edu_cheating' || uc.id === 'prd_label' || uc.id === 'prd_assembly' || uc.id === 'prd_counting' || uc.id === 'hse_fight' || uc.id === 'hc_fall') && (
-                        <div className="space-y-3 pt-2 border-t border-slate-100">
+                        {(uc.id === 'fir_smoking' || uc.id === 'fir_exit' || uc.id === 'ret_counting' || uc.id === 'ret_shelf' || uc.id === 'ret_shelf_empty' || uc.id === 'wh_counting' || uc.id === 'bld_smoking' || uc.id === 'hc_crowd' || uc.id === 'edu_violence' || uc.id === 'edu_cheating' || uc.id === 'prd_label' || uc.id === 'prd_assembly' || uc.id === 'prd_counting' || uc.id === 'hse_fight') && (
+                        <div className="space-y-3 pt-2">
                           <div className="flex items-center gap-2">
                             <Sparkles size={15} className="text-emerald-500" />
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Mô tả bổ sung bằng ngôn ngữ tự nhiên <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span></span>
@@ -3149,7 +3151,7 @@ setSelectedDomain('');
                           const firstKey = uc.id === 'fir_fire' ? 'detectTarget' : (uc.id === 'hse_ppe' || uc.id === 'hc_ppe_sterile') ? 'requiredPPE' : (uc.id === 'ret_staff_absence' || uc.id === 'bld_reception' || uc.id === 'edu_leave') ? 'monitorTarget' : (uc.id === 'edu_weapons' || uc.id === 'ap_weapon') ? 'targetType' : null;
                           const weaponUC = uc.id === 'edu_weapons' || uc.id === 'ap_weapon';
                           const firstParam = firstKey ? (weaponUC ? requiredParams.filter(p => p.key === firstKey) : topParams.filter(p => p.key === firstKey)) : [];
-                          const restParams = firstKey ? (weaponUC ? requiredParams.filter(p => p.key !== firstKey && !isTargetParam(p)) : topParams.filter(p => p.key !== firstKey)) : topParams;
+                          const restParams = firstKey ? (weaponUC ? requiredParams.filter(p => p.key !== firstKey && !isTargetParam(p) && p.type !== 'zone_hint' && p.type !== 'line_hint' && !CONFIRM_KEYS.includes(p.key) && p.key !== 'confirmMinutes' && p.key !== 'anomalyThreshold' && !['minSize', 'minStillTime'].includes(p.key)) : topParams.filter(p => p.key !== firstKey)) : topParams;
                           return topParams.length > 0 && (
                             <>
                               <div className="space-y-3">
@@ -3161,7 +3163,7 @@ setSelectedDomain('');
                                 const firstVal = useCaseParamValues[firstKey] || '';
                                 const hasFirstVal = firstVal.trim() !== '';
                                 return (<>
-                              <div className="space-y-3 pt-2 border-t border-slate-100">
+                              <div className="space-y-3 pt-2">
                                 {!hasFirstVal ? (<>
                                 <div className="flex items-center gap-2">
                                   <Sparkles size={15} className="text-emerald-500" />
@@ -3210,8 +3212,8 @@ setSelectedDomain('');
                                 {restParams.filter(p => uc.id !== 'ret_staff_absence' || p.key !== 'confirmSeconds').map(renderParam)}
                               </div>
                               )}
-                              {(uc.id === 'ret_staff_absence' || uc.id === 'bld_reception' || uc.id === 'hc_ppe_sterile' || uc.id === 'edu_leave' || uc.id === 'edu_weapons' || uc.id === 'ap_weapon') && imageUploadJSX}
-                              {(uc.id === 'ret_staff_absence' || uc.id === 'bld_reception' || uc.id === 'hc_ppe_sterile' || uc.id === 'edu_leave' || uc.id === 'edu_weapons' || uc.id === 'ap_weapon') && (() => {
+                              {(uc.id === 'ret_staff_absence' || uc.id === 'bld_reception' || uc.id === 'edu_leave' || uc.id === 'edu_weapons' || uc.id === 'ap_weapon') && imageUploadJSX}
+                              {(uc.id === 'ret_staff_absence' || uc.id === 'bld_reception' || uc.id === 'edu_leave' || uc.id === 'edu_weapons' || uc.id === 'ap_weapon') && (() => {
                                 const confirmParam = requiredParams.filter(p => p.key === 'confirmSeconds' || p.key === 'confirmFrames');
                                 return confirmParam.length > 0 && (
                         <div className="space-y-3">
@@ -3234,8 +3236,8 @@ setSelectedDomain('');
                         )}
 
                         {/* ── Mô tả bổ sung bằng ngôn ngữ tự nhiên ── */}
-                        {uc.params.some(p => isTargetParam(p)) && (
-                        <div className="space-y-3 pt-2 border-t border-slate-100">
+                        {!isWeaponUC && uc.params.some(p => isTargetParam(p)) && (
+                        <div className="space-y-3 pt-2">
                           {!hasTargetValue ? (<>
                           <div className="flex items-center gap-2">
                             <Sparkles size={15} className="text-emerald-500" />
@@ -3281,7 +3283,7 @@ setSelectedDomain('');
                         )}
 
                         {/* Image upload after description (target-param UCs) */}
-                        {uc.params.some(p => isTargetParam(p)) && imageUploadJSX}
+                        {!isWeaponUC && uc.params.some(p => isTargetParam(p)) && imageUploadJSX}
 
                         {/* duration — Thời gian liên tục trong vùng (desc-first UCs render after NLP) */}
                         {!descFirst && (() => {
@@ -3294,7 +3296,7 @@ setSelectedDomain('');
                         })()}
 
                         {/* confirmParams — Thời gian xác nhận cảnh báo (sau upload ảnh) */}
-                        {(() => {
+                        {!isWeaponUC && (() => {
                           const confirmParams = requiredParams.filter(p => p.key === 'confirmMinutes' || p.key === 'confirmSeconds' || p.key === 'confirmFrames');
                           return confirmParams.length > 0 && (
                             <div className="space-y-3 pt-2 border-t border-slate-100">
@@ -3324,11 +3326,11 @@ setSelectedDomain('');
                           );
                         })()}
 
-                        {uc.params.some(p => isTargetParam(p)) && analyzeButtonJSX}
+                        {!isWeaponUC && uc.params.some(p => isTargetParam(p)) && analyzeButtonJSX}
 
                         {/* zoneCondition — Điều kiện vùng, riêng sec_intrusion */}
                         {(() => {
-                          const hasTarget = uc.params.some(p => isTargetParam(p));
+                          const hasTarget = !isWeaponUC && uc.params.some(p => isTargetParam(p));
                           if (!hasTarget) return null;
                           const zoneCondParams = requiredParams.filter(p => p.key === 'zoneCondition');
                           return zoneCondParams.length > 0 && (
@@ -3341,7 +3343,7 @@ setSelectedDomain('');
 
                         {/* Remaining required params (non-target, non-zone) — Tham số bổ sung */}
                         {(() => {
-                          const hasTarget = uc.params.some(p => isTargetParam(p));
+                          const hasTarget = !isWeaponUC && uc.params.some(p => isTargetParam(p));
                           if (!hasTarget) return null;
                           const bottomParams = requiredParams.filter(p => p.type !== 'zone_hint' && p.type !== 'line_hint' && !isTargetParam(p) && p.key !== 'zoneCondition' && p.key !== 'duration' && p.key !== 'confirmMinutes' && p.key !== 'anomalyThreshold' && !['minSize', 'minStillTime'].includes(p.key));
                           return bottomParams.length > 0 && (
@@ -3353,8 +3355,8 @@ setSelectedDomain('');
                         })()}
 
                         {/* ── Mô tả bổ sung (cho UC không có target params) ── */}
-                        {!uc.params.some(p => isTargetParam(p)) && !['fir_fire','hse_ppe','fir_smoking','fir_exit','ret_counting','ret_shelf','ret_shelf_empty','ret_staff_absence','bld_reception','wh_counting','bld_smoking','hc_ppe_sterile','hc_crowd','edu_leave','edu_violence','edu_cheating','edu_weapons','ap_weapon','prd_label','prd_assembly','prd_counting','hse_fight','hc_fall'].includes(uc.id) && (
-                        <div className="space-y-3 pt-2 border-t border-slate-100">
+                        {!uc.params.some(p => isTargetParam(p)) && !['fir_fire','hse_ppe','fir_smoking','fir_exit','ret_counting','ret_shelf','ret_shelf_empty','ret_staff_absence','bld_reception','wh_counting','bld_smoking','hc_ppe_sterile','hc_crowd','edu_leave','edu_violence','edu_cheating','edu_weapons','ap_weapon','prd_label','prd_assembly','prd_counting','hse_fight'].includes(uc.id) && (
+                        <div className="space-y-3 pt-2">
                           <div className="flex items-center gap-2">
                             <Sparkles size={15} className="text-emerald-500" />
                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Mô tả bổ sung bằng ngôn ngữ tự nhiên <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span></span>
