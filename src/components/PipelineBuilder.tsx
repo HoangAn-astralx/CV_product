@@ -660,7 +660,6 @@ const LEAVE_PARAMS: UCParam[] = [
   { key: 'zone', label: 'Vùng giám sát', type: 'zone_hint' },
   { key: 'personCondition', label: 'Điều kiện nhận diện người', type: 'card2', options: ['Người bất kỳ', 'Theo ảnh mẫu'], size: 'sm', condition: (v) => v.leaveMode !== 'Thông minh' },
   { key: 'minPeople', label: 'Số người tối thiểu cần có', type: 'number', placeholder: '1', condition: (v) => v.leaveMode !== 'Thông minh' },
-  { key: 'safeZoneExpansion', label: 'Mức mở rộng vùng an toàn', type: 'select', options: ['Chặt', 'Bình thường', 'Rộng'], condition: (v) => v.leaveMode !== 'Thông minh' },
   { key: 'maxLeaveMinutes', label: 'Thời gian rời vị trí tối đa', type: 'number', unit: 'phút' },
 ];
 
@@ -820,7 +819,7 @@ const DOMAINS: DomainDef[] = [
       ], alertParams: [
         { key: 'alertLevel', label: 'Mức độ cảnh báo', type: 'select', options: ['Thấp', 'Trung bình', 'Cao'] },
       ]},
-      { id: 'ret_shelf_empty', name: 'Phát hiện kệ hàng trống', taskMapType: 'retail_analytics', needsImage: true, multipleImages: true, imageLabel: 'Ảnh kệ hàng khi đầy', desc: 'Phát hiện kệ hàng bị trống hoặc thiếu hàng, nhắc nhân viên bổ sung kịp thời.', params: [
+      { id: 'ret_shelf_empty', name: 'Phát hiện kệ hàng trống', taskMapType: 'retail_analytics', hidden: true, needsImage: true, multipleImages: true, imageLabel: 'Ảnh kệ hàng khi đầy', desc: 'Phát hiện kệ hàng bị trống hoặc thiếu hàng, nhắc nhân viên bổ sung kịp thời.', params: [
         { key: 'shelfEmptyMode', label: 'Chế độ hoạt động', type: 'card2', options: ['Tiêu chuẩn', 'Thông minh'] },
         { key: 'zone', label: 'Vùng kệ hàng cần giám sát', type: 'zone_hint' },
         { key: 'emptyThreshold', label: 'Coi là trống khi', type: 'slider_pct', condition: (v) => v.shelfEmptyMode !== 'Thông minh' },
@@ -2668,7 +2667,7 @@ setSelectedDomain('');
                       );
 
                       if (param.type === 'multicheck') {
-                        const isSingleSelect = new Set(['target', 'targetType', 'vehicleTypes']).has(param.key);
+                        const isSingleSelect = false;
                         return (
                         <div key={param.key}>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">{param.label}{param.optional && <span className="font-normal normal-case text-slate-300 ml-1">(tuỳ chọn)</span>}</label>
@@ -3151,7 +3150,7 @@ setSelectedDomain('');
                         </div>
 
                         {/* ── Prompt first for fir_smoking, fir_exit, ret_counting, ret_shelf, ret_shelf_empty, wh_counting, bld_smoking, hc_crowd, edu_violence ── */}
-                        {(uc.id === 'fir_smoking' || uc.id === 'fir_exit' || uc.id === 'ret_counting' || uc.id === 'ret_shelf' || uc.id === 'wh_counting' || uc.id === 'bld_smoking' || uc.id === 'hc_crowd' || uc.id === 'edu_violence' || uc.id === 'edu_cheating' || uc.id === 'prd_label' || uc.id === 'prd_counting' || uc.id === 'hse_fight') && (
+                        {(uc.id === 'fir_smoking' || uc.id === 'fir_exit' || uc.id === 'ret_counting' || uc.id === 'ret_shelf' || uc.id === 'wh_counting' || uc.id === 'bld_smoking' || uc.id === 'hc_crowd' || uc.id === 'edu_violence' || uc.id === 'edu_cheating' || uc.id === 'prd_label' || uc.id === 'prd_counting' || uc.id === 'hse_fight' || (uc.id === 'ret_staff_absence' && useCaseParamValues.leaveMode === 'Thông minh')) && (
                         <div className="space-y-3 pt-2">
                           <div className="flex items-center gap-2">
                             <Sparkles size={15} className="text-emerald-500" />
